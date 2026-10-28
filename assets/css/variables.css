@@ -8,12 +8,13 @@
     --text-primary: #342E29;
     --text-secondary: #50483E;
 
-    /* Fundo — cor real extraída do vídeo-fonte (média de 4 cantos, 20 quadros) */
-    --background-video: #E5DFD5;
-    /* Extensão sutil para as laterais: o estúdio é levemente mais claro à
-       esquerda e mais escuro/quente à direita (ver docs/ASSETS_PENDENTES.md) */
-    --background-video-left: #E8E4DA;
-    --background-video-right: #DFD9CE;
+    /* Fundo — branco puro. Os quadros (assets/media/frames) têm fundo
+       real removido (alpha/transparência via rembg/u2net), então o
+       branco da página é o próprio "ambiente" por trás do rosto — não
+       uma cor aproximada do estúdio. Nada precisa ser pintado no canvas
+       para "casar" com o fundo: a transparência garante isso por
+       construção. */
+    --background-video: #FFFFFF;
 
     /* Tipografia */
     --font-display: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;

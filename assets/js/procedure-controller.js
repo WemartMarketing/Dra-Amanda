@@ -14,10 +14,6 @@ class ProcedureController {
             this.dotEls[el.dataset.progressDot] = el;
         });
         this._activeId = null;
-
-        document.addEventListener('aurea:hotspot-interact', (e) => {
-            this._flashPending(e.detail.procedureId);
-        });
     }
 
     update(state) {
@@ -35,13 +31,5 @@ class ProcedureController {
         });
 
         this._activeId = proc.id;
-    }
-
-    _flashPending(procedureId) {
-        const el = this.textEls[procedureId];
-        const note = el && el.querySelector('.procedure-pending');
-        if (!note) return;
-        note.classList.add('is-flash');
-        window.setTimeout(() => note.classList.remove('is-flash'), 900);
     }
 }

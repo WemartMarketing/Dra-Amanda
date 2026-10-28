@@ -6,7 +6,7 @@ body {
     margin: 0;
     font-family: var(--font-body);
     color: var(--text-primary);
-    background: linear-gradient(90deg, var(--background-video-left) 0%, var(--background-video) 50%, var(--background-video-right) 100%);
+    background: var(--background-video);
     -webkit-font-smoothing: antialiased;
 }
 
@@ -37,7 +37,7 @@ button {
     align-items: center;
     justify-content: space-between;
     padding: var(--space-md) var(--space-lg);
-    background: linear-gradient(to bottom, rgba(229, 223, 213, 0.9), rgba(229, 223, 213, 0));
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0));
     pointer-events: none;
 }
 .site-header > * { pointer-events: auto; }
@@ -108,6 +108,13 @@ button {
 }
 
 .face-poster {
+    /* Placeholder borrado enquanto o quadro 1 carrega — mostra a pose
+       frontal (frame central) já no zoom/escala do estado inicial
+       (apresentação: zoom 0.48, ver includes/procedures.php) para não
+       aparecer maior/desalinhado em relação ao quadro real que vai
+       substituí-lo (object-fit:contain sozinho equivaleria a zoom 1). */
+    object-fit: contain;
+    transform: translate(-50%, -50%) scale(0.48);
     filter: blur(14px);
     opacity: 1;
     transition: opacity 500ms ease;
@@ -195,7 +202,7 @@ button {
     text-align: center;
     max-width: 32rem;
 }
-.procedure-text--anchor-top { top: 14%; transform: translate(0, 0); }
+.procedure-text--anchor-top { top: 10%; transform: translate(0, 0); }
 .procedure-text--center.procedure-text--anchor-top { transform: translate(-50%, 0); }
 .procedure-text--anchor-bottom { top: auto; bottom: 5%; transform: translate(0, 0); }
 .procedure-text--center.procedure-text--anchor-bottom { transform: translate(-50%, 0); }
@@ -224,31 +231,6 @@ button {
     line-height: 1.6;
     color: var(--text-secondary);
     margin: 0;
-}
-
-.procedure-pending {
-    margin-top: var(--space-sm);
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    border: 1px dashed var(--gold-soft);
-    padding: 0.6rem 0.8rem;
-    border-radius: 2px;
-    cursor: default;
-}
-.procedure-pending.is-flash {
-    border-color: var(--gold-primary);
-    background: rgba(173, 147, 105, 0.12);
-}
-.pending-badge {
-    display: inline-block;
-    font-size: 0.65rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--gold-dark);
-    border: 1px solid var(--gold-dark);
-    padding: 0.1rem 0.4rem;
-    border-radius: 2px;
-    margin-right: 0.4rem;
 }
 
 /* ---------------------------------------------------------------- */
@@ -334,12 +316,6 @@ button {
 .btn-whatsapp:hover,
 .btn-whatsapp:focus-visible { background: var(--gold-primary); color: #fff; }
 
-.booking-pending-note {
-    margin-top: var(--space-xs);
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-}
-
 /* ---------------------------------------------------------------- */
 /* Overlays                                                           */
 /* ---------------------------------------------------------------- */
@@ -379,14 +355,10 @@ button {
     font-weight: 500;
     margin-top: 0;
 }
-.overlay-pending {
+.overlay-note {
     color: var(--text-secondary);
     font-size: 0.9rem;
     line-height: 1.6;
-}
-.overlay-pending code {
-    background: rgba(155, 122, 70, 0.12);
-    padding: 0.1rem 0.3rem;
 }
 
 .overlay-close {

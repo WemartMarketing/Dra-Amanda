@@ -23,8 +23,9 @@ define('COLOR_GOLD_DARK', '#806339');
 define('COLOR_GOLD_SOFT', '#AD9369');
 define('COLOR_TEXT_PRIMARY', '#342E29');
 define('COLOR_TEXT_SECONDARY', '#50483E');
-// Cor real extraída do vídeo-fonte (média de 4 cantos, 20 quadros amostrados).
-define('COLOR_BACKGROUND_VIDEO', '#E5DFD5');
+// Fundo branco puro — os quadros têm o fundo de estúdio removido
+// (transparência real), então a página inteira é o "ambiente" do rosto.
+define('COLOR_BACKGROUND_VIDEO', '#FFFFFF');
 
 // ----------------------------------------------------------------------
 // WhatsApp / Agendamento

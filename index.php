@@ -55,19 +55,16 @@ $scrollVh = max(600, (int) round($totalScrollWeight * 100));
                     <?php else: ?>
                         <h2 class="procedure-title"><?php echo htmlspecialchars($proc['title']); ?></h2>
                         <?php if (!empty($proc['description'])): ?><p class="procedure-description"><?php echo htmlspecialchars($proc['description']); ?></p><?php endif; ?>
-                        <?php if (!empty($proc['pendingAsset'])): ?>
-                            <p class="procedure-pending" data-interactive-demo="<?php echo htmlspecialchars($proc['interactiveDemo'] ?? ''); ?>" tabindex="0" role="button"
-                               aria-label="Demonstração ilustrativa pendente: <?php echo htmlspecialchars($proc['pendingAsset']); ?>">
-                                <span class="pending-badge">Pendente</span> Representação ilustrativa ainda não disponível.
-                            </p>
-                        <?php endif; ?>
                         <?php if (!empty($proc['isBooking'])): ?>
-                            <button type="button" class="btn-whatsapp" data-booking-cta data-whatsapp-context="<?php echo htmlspecialchars($proc['id']); ?>">
-                                <?php echo htmlspecialchars($proc['ctaLabel'] ?? 'Agendar avaliação'); ?>
-                            </button>
-                            <p class="booking-pending-note" data-booking-pending hidden>
-                                Agendamento via WhatsApp em configuração — número ainda não cadastrado.
-                            </p>
+                            <?php if (WHATSAPP_NUMBER !== ''): ?>
+                                <button type="button" class="btn-whatsapp" data-booking-cta data-whatsapp-context="<?php echo htmlspecialchars($proc['id']); ?>">
+                                    <?php echo htmlspecialchars($proc['ctaLabel'] ?? 'Agendar avaliação'); ?>
+                                </button>
+                            <?php else: ?>
+                                <button type="button" class="btn-whatsapp" data-overlay="agendamento">
+                                    <?php echo htmlspecialchars($proc['ctaLabel'] ?? 'Agendar avaliação'); ?>
+                                </button>
+                            <?php endif; ?>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>

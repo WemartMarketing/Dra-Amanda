@@ -46,17 +46,15 @@
     // --------------------------------------------------------------
     // Agendamento via WhatsApp
     // --------------------------------------------------------------
+    // O botão [data-booking-cta] só existe no HTML quando WHATSAPP_NUMBER
+    // está configurado (ver index.php); sem número, o CTA abre o overlay
+    // de Agendamento ([data-overlay="agendamento"], tratado acima) em vez
+    // de mostrar um link falso ou um aviso técnico ao visitante.
     const cfg = window.AUREA_CONFIG || {};
-    const hasWhatsapp = !!(cfg.whatsappNumber && cfg.whatsappNumber.length > 0);
 
     document.querySelectorAll('[data-booking-cta]').forEach((btn) => {
         btn.addEventListener('click', () => {
             const context = btn.dataset.whatsappContext || 'geral';
-            if (!hasWhatsapp) {
-                const note = btn.parentElement.querySelector('[data-booking-pending]');
-                if (note) note.hidden = false;
-                return;
-            }
             const message = `${cfg.whatsappDefaultMessage} (${context})`;
             const url = `https://wa.me/${cfg.whatsappNumber}?text=${encodeURIComponent(message)}`;
             window.open(url, '_blank', 'noopener');

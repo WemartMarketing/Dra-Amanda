@@ -49,7 +49,12 @@ class HotspotLayer {
             dot.style.top = pos.topPct + '%';
             dot.title = spot.label || '';
             dot.classList.add('is-visible');
-            if (procedure.interactiveDemo) {
+            // Só fica clicável quando existe de fato uma demonstração
+            // pronta (interactiveDemo sem pendingAsset) — enquanto o
+            // asset não existe, o hotspot permanece um marcador
+            // silencioso, sem anunciar nada de "pendente" ao visitante
+            // (ver docs/ASSETS_PENDENTES.md para o que falta).
+            if (procedure.interactiveDemo && !procedure.pendingAsset) {
                 dot.setAttribute('data-hotspot-interactive', procedure.interactiveDemo);
                 dot.onclick = () => {
                     document.dispatchEvent(new CustomEvent('aurea:hotspot-interact', {

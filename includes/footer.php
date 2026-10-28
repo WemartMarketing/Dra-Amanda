@@ -11,11 +11,10 @@ $hasWhatsapp  = defined('WHATSAPP_NUMBER') && WHATSAPP_NUMBER !== '';
             <button type="button" class="overlay-close" data-overlay-close aria-label="Fechar">&times;</button>
             <h2 id="overlay-sobre-title">Sobre nós</h2>
             <?php if (empty($professional['name']) && empty($professional['bio'])): ?>
-                <p class="overlay-pending">
-                    Conteúdo pendente de configuração. Preencha os dados da profissional e da
-                    clínica em <code>includes/config.php</code> (nome, especialidade, registro
-                    profissional, biografia, endereço e foto) — nenhuma informação foi
-                    inventada nesta versão.
+                <p class="overlay-note">
+                    Um cuidado facial pensado para valorizar sua beleza natural, com avaliação
+                    individualizada e acompanhamento profissional. Mais informações sobre a
+                    equipe em breve.
                 </p>
             <?php else: ?>
                 <?php if (!empty($professional['photo'])): ?>
@@ -45,10 +44,8 @@ $hasWhatsapp  = defined('WHATSAPP_NUMBER') && WHATSAPP_NUMBER !== '';
                    href="https://wa.me/<?php echo htmlspecialchars(WHATSAPP_NUMBER); ?>?text=<?php echo rawurlencode(WHATSAPP_DEFAULT_MESSAGE); ?>"
                    target="_blank" rel="noopener">Agendar pelo WhatsApp</a>
             <?php else: ?>
-                <p class="overlay-pending">
-                    Integração com WhatsApp pendente de configuração. Defina
-                    <code>WHATSAPP_NUMBER</code> em <code>includes/config.php</code> para
-                    ativar o agendamento — nenhum número de exemplo foi utilizado.
+                <p class="overlay-note">
+                    Em breve você poderá agendar sua avaliação diretamente por aqui.
                 </p>
             <?php endif; ?>
         </div>
@@ -59,10 +56,8 @@ $hasWhatsapp  = defined('WHATSAPP_NUMBER') && WHATSAPP_NUMBER !== '';
             <button type="button" class="overlay-close" data-overlay-close aria-label="Fechar">&times;</button>
             <h2 id="overlay-contato-title">Contato</h2>
             <?php if (empty($contact['whatsapp_display']) && empty($contact['instagram']) && empty($contact['address']) && empty($contact['hours'])): ?>
-                <p class="overlay-pending">
-                    Informações de contato pendentes de configuração em
-                    <code>includes/config.php</code> (WhatsApp, Instagram, endereço, horário de
-                    atendimento) — nenhum dado foi inventado.
+                <p class="overlay-note">
+                    Nossos canais de contato estarão disponíveis em breve.
                 </p>
             <?php else: ?>
                 <ul class="contact-list">

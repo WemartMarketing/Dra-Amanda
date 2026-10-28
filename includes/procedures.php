@@ -45,7 +45,7 @@ return [
         'description' => 'Conheça as possibilidades de suavizar determinadas alterações da região dos olhos, respeitando as características individuais.',
         'camera'      => ['frame' => 58, 'zoom' => 1.6, 'focalX' => 48, 'focalY' => 36],
         'text'        => ['side' => 'left', 'anchor' => 'middle'],
-        'faceExclusion' => ['cx' => 50, 'cy' => 40, 'rx' => 26, 'ry' => 30],
+        'faceExclusion' => ['cx' => 50, 'cy' => 40, 'rx' => 26, 'ry' => 37],
         'hotspots'    => [
             ['x' => 44, 'y' => 40, 'label' => 'Região infraorbital'],
         ],

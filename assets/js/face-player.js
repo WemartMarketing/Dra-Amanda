@@ -7,13 +7,17 @@
  * para que o ponto focal configurado fique centralizado — o canvas corta
  * naturalmente o que sai de seus limites, sem CSS de recorte adicional.
  *
- * PONTO DE TROCA PARA A SEQUÊNCIA REAL:
- * Este player já consome a sequência real de 120 quadros (desktop) e 60
- * quadros (mobile) extraída dos dois vídeos-fonte — não é mais um
- * placeholder abstrato. Para trocar por uma sequência nova (outra
- * modelo, nova sessão de vídeo), basta substituir os arquivos em
+ * SEQUÊNCIA DE QUADROS:
+ * Consome a sequência real de 120 quadros (desktop) e 60 quadros
+ * (mobile) extraída dos dois vídeos-fonte, com o fundo de estúdio já
+ * removido (WebP com canal alpha real, via rembg/u2net) — por isso o
+ * canvas nunca pinta nem esmaece nada: onde a imagem não cobre o stage,
+ * o branco puro da página (--background-video em variables.css) aparece
+ * naturalmente por trás, sem costura possível. Para trocar por uma
+ * sequência nova (outra modelo, nova sessão de vídeo), gere quadros
+ * também com fundo transparente, substitua os arquivos em
  * assets/media/frames/{desktop,mobile}/frame_XXX.webp mantendo a mesma
- * numeração sequencial e atualizar `count` em window.AUREA_CONFIG.frames
+ * numeração sequencial e atualize `count` em window.AUREA_CONFIG.frames
  * (em index.php) — nenhuma outra mudança de código é necessária.
  */
 class FacePlayer {
@@ -160,7 +164,6 @@ class FacePlayer {
 
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.stageW, this.stageH);
-        this._paintBackground();
 
         this._drawImageFocused(img0, fx, fy, zoom, 1, exclusion);
 
@@ -238,50 +241,14 @@ class FacePlayer {
     }
 
     /**
-     * Pinta o fundo real do estúdio (extraído do vídeo-fonte, ver
-     * docs/ASSETS_PENDENTES.md) em todo o canvas antes de desenhar o
-     * quadro. Evita a "caixa de player": quando o quadro é desenhado
-     * menor que o stage (zoom < cobertura total), a área ao redor da
-     * imagem já nasce na mesma cor do fundo da página, em vez de ficar
-     * transparente/com uma cor divergente por trás.
-     */
-    _paintBackground() {
-        const ctx = this.ctx;
-        if (!this._bgGradientCache || this._bgGradientCache.w !== this.stageW) {
-            const styles = getComputedStyle(document.documentElement);
-            const left = styles.getPropertyValue('--background-video-left').trim() || '#E8E4DA';
-            const right = styles.getPropertyValue('--background-video-right').trim() || '#DFD9CE';
-            const g = ctx.createLinearGradient(0, 0, this.stageW, 0);
-            g.addColorStop(0, left);
-            g.addColorStop(1, right);
-            this._bgGradientCache = { w: this.stageW, gradient: g };
-        }
-        ctx.fillStyle = this._bgGradientCache.gradient;
-        ctx.fillRect(0, 0, this.stageW, this.stageH);
-    }
-
-    _getOffscreen(w, h) {
-        if (!this._offscreen) {
-            this._offscreen = document.createElement('canvas');
-            this._offscreenCtx = this._offscreen.getContext('2d');
-        }
-        if (this._offscreen.width !== w || this._offscreen.height !== h) {
-            this._offscreen.width = w;
-            this._offscreen.height = h;
-        }
-        return this._offscreenCtx;
-    }
-
-    /**
      * Desenha o quadro preservando integralmente a proporção original
      * (equivalente a object-fit: contain — nunca deforma, nunca corta
-     * por CSS). Quando o enquadramento atual deixa a borda do quadro
-     * visível dentro do stage (zoom afastado o bastante para que a
-     * imagem não cubra toda a tela em algum eixo), a borda real da
-     * imagem é esmaecida em um gradiente muito discreto para dentro do
-     * fundo já pintado por _paintBackground — nunca sobre a pele, pois
-     * o esmaecimento ocorre apenas nos últimos ~6% da imagem, sempre
-     * fundo de estúdio vazio (seção 3 do briefing).
+     * por CSS). Os quadros já têm o fundo de estúdio removido (alpha
+     * real, via rembg/u2net) e a página é branco puro (--background-video
+     * em variables.css), então onde a imagem não cobre o stage o branco
+     * da própria página aparece por trás do canvas — sem precisar pintar
+     * ou esmaecer nada para "casar" as cores, o que elimina
+     * estruturalmente a antiga "caixa de player".
      */
     _drawImageFocused(img, fx, fy, zoom, alpha, exclusion) {
         const ctx = this.ctx;
@@ -291,57 +258,9 @@ class FacePlayer {
         const dx = this.stageW / 2 - (fx / 100) * drawW;
         const dy = this._verticalCenter(drawH, fy, exclusion) - (fy / 100) * drawH;
 
-        // Cada borda é avaliada de forma independente — não basta
-        // comparar drawW/drawH com o stage: o deslocamento vertical do
-        // foco (ver _verticalCenter, usado no mobile para reservar a
-        // faixa de texto) pode abrir um vão só embaixo (ou só em cima),
-        // mesmo quando a imagem, centralizada, cobriria o stage inteiro.
-        const gapLeft = dx > 0.5;
-        const gapRight = dx + drawW < this.stageW - 0.5;
-        const gapTop = dy > 0.5;
-        const gapBottom = dy + drawH < this.stageH - 0.5;
-
         ctx.save();
         ctx.globalAlpha = alpha;
-
-        if (gapLeft || gapRight || gapTop || gapBottom) {
-            const w = Math.max(1, Math.round(drawW));
-            const h = Math.max(1, Math.round(drawH));
-            const octx = this._getOffscreen(w, h);
-            octx.clearRect(0, 0, w, h);
-            octx.drawImage(img, 0, 0, w, h);
-
-            const featherX = Math.max(20, w * 0.06);
-            const featherY = Math.max(20, h * 0.06);
-            octx.globalCompositeOperation = 'destination-in';
-            if (gapLeft || gapRight) {
-                const stop0 = gapLeft ? Math.min(featherX / w, 0.45) : 0;
-                const stop1 = gapRight ? Math.max(1 - featherX / w, 0.55) : 1;
-                const gx = octx.createLinearGradient(0, 0, w, 0);
-                gx.addColorStop(0, gapLeft ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
-                gx.addColorStop(stop0, 'rgba(0,0,0,1)');
-                gx.addColorStop(stop1, 'rgba(0,0,0,1)');
-                gx.addColorStop(1, gapRight ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
-                octx.fillStyle = gx;
-                octx.fillRect(0, 0, w, h);
-            }
-            if (gapTop || gapBottom) {
-                const stop0 = gapTop ? Math.min(featherY / h, 0.45) : 0;
-                const stop1 = gapBottom ? Math.max(1 - featherY / h, 0.55) : 1;
-                const gy = octx.createLinearGradient(0, 0, 0, h);
-                gy.addColorStop(0, gapTop ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
-                gy.addColorStop(stop0, 'rgba(0,0,0,1)');
-                gy.addColorStop(stop1, 'rgba(0,0,0,1)');
-                gy.addColorStop(1, gapBottom ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
-                octx.fillStyle = gy;
-                octx.fillRect(0, 0, w, h);
-            }
-            octx.globalCompositeOperation = 'source-over';
-            ctx.drawImage(this._offscreen, dx, dy);
-        } else {
-            ctx.drawImage(img, dx, dy, drawW, drawH);
-        }
-
+        ctx.drawImage(img, dx, dy, drawW, drawH);
         ctx.restore();
     }
 }

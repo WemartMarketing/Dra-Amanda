@@ -54,7 +54,7 @@
         align-items: flex-start;
         justify-content: center;
         padding: var(--space-sm) var(--space-md);
-        background: linear-gradient(to top, var(--background-video) 55%, rgba(229,223,213,0));
+        background: linear-gradient(to top, var(--background-video) 55%, rgba(255,255,255,0));
     }
 
     .procedure-text {
