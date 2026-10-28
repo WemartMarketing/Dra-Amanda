@@ -107,17 +107,6 @@ button {
     max-height: 100%;
 }
 
-/* Aplicada apenas quando a câmera virtual está afastada o bastante para
-   que a borda do quadro original fique visível dentro da viewport —
-   nesses casos a borda cai sempre no fundo vazio, nunca sobre a pele,
-   então o esmaecimento não recorta rosto nem cabelo (seção 3). Alternada
-   via JS (FacePlayer) conforme o zoom atual de cada procedimento. */
-.face-poster.is-framed,
-#face-canvas.is-framed {
-    -webkit-mask-image: radial-gradient(ellipse 72% 72% at center, #000 82%, transparent 100%);
-    mask-image: radial-gradient(ellipse 72% 72% at center, #000 82%, transparent 100%);
-}
-
 .face-poster {
     filter: blur(14px);
     opacity: 1;

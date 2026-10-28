@@ -136,16 +136,13 @@ class FacePlayer {
      * @param {number} fx posição focal X em % (0-100)
      * @param {number} fy posição focal Y em % (0-100)
      * @param {number} zoom intensidade do zoom (1 = contido sem corte)
+     * @param {{cx:number,cy:number,rx:number,ry:number}|null} exclusion
+     *   zona de exclusão ao redor do rosto (% da imagem original, ver
+     *   `faceExclusion` em includes/procedures.php) usada no mobile para
+     *   nunca deixar a faixa de texto fixa cobrir essa área (seção 4).
      */
-    draw(floatIndexRef, fx = 50, fy = 50, zoom = 1) {
-        this._lastDrawn = { index: floatIndexRef, fx, fy, zoom };
-
-        // Com a câmera afastada (zoom baixo), a borda do quadro original
-        // fica visível dentro da viewport, sempre sobre fundo vazio —
-        // nesse caso, esmaece a borda (ver .is-framed em style.css).
-        const framed = zoom < 0.9;
-        this.canvas.classList.toggle('is-framed', framed);
-        this.posterEl.classList.toggle('is-framed', framed);
+    draw(floatIndexRef, fx = 50, fy = 50, zoom = 1, exclusion = null) {
+        this._lastDrawn = { index: floatIndexRef, fx, fy, zoom, exclusion };
 
         // floatIndexRef chega na numeração de referência (1–120, desktop);
         // reescala para o conjunto de quadros realmente ativo.
@@ -163,13 +160,14 @@ class FacePlayer {
 
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.stageW, this.stageH);
+        this._paintBackground();
 
-        this._drawImageFocused(img0, fx, fy, zoom, 1);
+        this._drawImageFocused(img0, fx, fy, zoom, 1, exclusion);
 
         if (t > 0.02) {
             const img1 = this.cache.get(i1);
             if (img1 && img1 !== img0) {
-                this._drawImageFocused(img1, fx, fy, zoom, t);
+                this._drawImageFocused(img1, fx, fy, zoom, t, exclusion);
             }
         }
     }
@@ -184,12 +182,12 @@ class FacePlayer {
     project(xPercent, yPercent) {
         if (!this._refImg || !this._lastDrawn) return null;
         const img = this._refImg;
-        const { fx, fy, zoom } = this._lastDrawn;
-        const scale = Math.min(this.stageW / img.naturalWidth, this.stageH / img.naturalHeight) * zoom;
+        const { fx, fy, zoom, exclusion } = this._lastDrawn;
+        const scale = this._baseScale(img) * zoom;
         const drawW = img.naturalWidth * scale;
         const drawH = img.naturalHeight * scale;
         const dx = this.stageW / 2 - (fx / 100) * drawW;
-        const dy = this.stageH / 2 - (fy / 100) * drawH;
+        const dy = this._verticalCenter(drawH, fy, exclusion) - (fy / 100) * drawH;
         const screenX = dx + (xPercent / 100) * drawW;
         const screenY = dy + (yPercent / 100) * drawH;
         return {
@@ -198,16 +196,152 @@ class FacePlayer {
         };
     }
 
-    _drawImageFocused(img, fx, fy, zoom, alpha) {
+    /**
+     * Escala-base de enquadramento ("zoom" 1 = contido, sem corte do
+     * rosto). Em telas largas (desktop), usa o ajuste clássico de
+     * object-fit: contain (o menor entre largura e altura). Em telas
+     * estreitas (mobile), o quadro original é bem mais largo que a tela
+     * — ajustar pela largura encolheria o rosto demais; em vez disso
+     * ajusta pela altura e deixa o fundo (vazio) sangrar para fora dos
+     * limites horizontais da tela, exatamente como pede a seção 12 do
+     * briefing ("preservar o enquadramento... sem recortes acidentais,
+     * manter o rosto como elemento principal"). O rosto em si ocupa só
+     * uma fração central do quadro original, então nunca é cortado por
+     * esse ajuste — apenas o fundo extra que sobraria nas laterais.
+     */
+    _baseScale(img) {
+        if (this.isMobile) return this.stageH / img.naturalHeight;
+        return Math.min(this.stageW / img.naturalWidth, this.stageH / img.naturalHeight);
+    }
+
+    /**
+     * Centro vertical usado para posicionar o foco da câmera no mobile,
+     * onde todo o texto de cada etapa cai numa faixa fixa na parte
+     * inferior da tela (.text-layer, ~36% — ver responsive.css), qualquer
+     * que seja o `side`/`anchor` configurado para desktop. Para nunca
+     * deixar essa faixa cobrir o rosto (seção 4: "configure uma área de
+     * exclusão... se não houver espaço suficiente, reposicione..."),
+     * calcula o deslocamento necessário para que `faceExclusion` (ver
+     * includes/procedures.php — calibrada visualmente para cada um dos
+     * 10 estados, inclusive os sem hotspot de região específica) nunca
+     * ultrapasse o topo da faixa de texto, sem deslocar mais do que o
+     * necessário. No desktop o texto já fica nas colunas laterais
+     * livres, fora da imagem, então o centro nunca é deslocado.
+     */
+    _verticalCenter(drawH, fy, exclusion) {
+        if (!this.isMobile || !exclusion) return this.stageH / 2;
+        const naturalCenter = this.stageH / 2;
+        const safeBoundary = this.stageH * (1 - this.config.mobileSafeBottomFraction);
+        const exclusionBottomPct = (exclusion.cy + exclusion.ry) / 100;
+        const maxCenter = safeBoundary - drawH * (exclusionBottomPct - fy / 100);
+        return Math.min(naturalCenter, maxCenter);
+    }
+
+    /**
+     * Pinta o fundo real do estúdio (extraído do vídeo-fonte, ver
+     * docs/ASSETS_PENDENTES.md) em todo o canvas antes de desenhar o
+     * quadro. Evita a "caixa de player": quando o quadro é desenhado
+     * menor que o stage (zoom < cobertura total), a área ao redor da
+     * imagem já nasce na mesma cor do fundo da página, em vez de ficar
+     * transparente/com uma cor divergente por trás.
+     */
+    _paintBackground() {
         const ctx = this.ctx;
-        const scale = Math.min(this.stageW / img.naturalWidth, this.stageH / img.naturalHeight) * zoom;
+        if (!this._bgGradientCache || this._bgGradientCache.w !== this.stageW) {
+            const styles = getComputedStyle(document.documentElement);
+            const left = styles.getPropertyValue('--background-video-left').trim() || '#E8E4DA';
+            const right = styles.getPropertyValue('--background-video-right').trim() || '#DFD9CE';
+            const g = ctx.createLinearGradient(0, 0, this.stageW, 0);
+            g.addColorStop(0, left);
+            g.addColorStop(1, right);
+            this._bgGradientCache = { w: this.stageW, gradient: g };
+        }
+        ctx.fillStyle = this._bgGradientCache.gradient;
+        ctx.fillRect(0, 0, this.stageW, this.stageH);
+    }
+
+    _getOffscreen(w, h) {
+        if (!this._offscreen) {
+            this._offscreen = document.createElement('canvas');
+            this._offscreenCtx = this._offscreen.getContext('2d');
+        }
+        if (this._offscreen.width !== w || this._offscreen.height !== h) {
+            this._offscreen.width = w;
+            this._offscreen.height = h;
+        }
+        return this._offscreenCtx;
+    }
+
+    /**
+     * Desenha o quadro preservando integralmente a proporção original
+     * (equivalente a object-fit: contain — nunca deforma, nunca corta
+     * por CSS). Quando o enquadramento atual deixa a borda do quadro
+     * visível dentro do stage (zoom afastado o bastante para que a
+     * imagem não cubra toda a tela em algum eixo), a borda real da
+     * imagem é esmaecida em um gradiente muito discreto para dentro do
+     * fundo já pintado por _paintBackground — nunca sobre a pele, pois
+     * o esmaecimento ocorre apenas nos últimos ~6% da imagem, sempre
+     * fundo de estúdio vazio (seção 3 do briefing).
+     */
+    _drawImageFocused(img, fx, fy, zoom, alpha, exclusion) {
+        const ctx = this.ctx;
+        const scale = this._baseScale(img) * zoom;
         const drawW = img.naturalWidth * scale;
         const drawH = img.naturalHeight * scale;
         const dx = this.stageW / 2 - (fx / 100) * drawW;
-        const dy = this.stageH / 2 - (fy / 100) * drawH;
+        const dy = this._verticalCenter(drawH, fy, exclusion) - (fy / 100) * drawH;
+
+        // Cada borda é avaliada de forma independente — não basta
+        // comparar drawW/drawH com o stage: o deslocamento vertical do
+        // foco (ver _verticalCenter, usado no mobile para reservar a
+        // faixa de texto) pode abrir um vão só embaixo (ou só em cima),
+        // mesmo quando a imagem, centralizada, cobriria o stage inteiro.
+        const gapLeft = dx > 0.5;
+        const gapRight = dx + drawW < this.stageW - 0.5;
+        const gapTop = dy > 0.5;
+        const gapBottom = dy + drawH < this.stageH - 0.5;
+
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.drawImage(img, dx, dy, drawW, drawH);
+
+        if (gapLeft || gapRight || gapTop || gapBottom) {
+            const w = Math.max(1, Math.round(drawW));
+            const h = Math.max(1, Math.round(drawH));
+            const octx = this._getOffscreen(w, h);
+            octx.clearRect(0, 0, w, h);
+            octx.drawImage(img, 0, 0, w, h);
+
+            const featherX = Math.max(20, w * 0.06);
+            const featherY = Math.max(20, h * 0.06);
+            octx.globalCompositeOperation = 'destination-in';
+            if (gapLeft || gapRight) {
+                const stop0 = gapLeft ? Math.min(featherX / w, 0.45) : 0;
+                const stop1 = gapRight ? Math.max(1 - featherX / w, 0.55) : 1;
+                const gx = octx.createLinearGradient(0, 0, w, 0);
+                gx.addColorStop(0, gapLeft ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
+                gx.addColorStop(stop0, 'rgba(0,0,0,1)');
+                gx.addColorStop(stop1, 'rgba(0,0,0,1)');
+                gx.addColorStop(1, gapRight ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
+                octx.fillStyle = gx;
+                octx.fillRect(0, 0, w, h);
+            }
+            if (gapTop || gapBottom) {
+                const stop0 = gapTop ? Math.min(featherY / h, 0.45) : 0;
+                const stop1 = gapBottom ? Math.max(1 - featherY / h, 0.55) : 1;
+                const gy = octx.createLinearGradient(0, 0, 0, h);
+                gy.addColorStop(0, gapTop ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
+                gy.addColorStop(stop0, 'rgba(0,0,0,1)');
+                gy.addColorStop(stop1, 'rgba(0,0,0,1)');
+                gy.addColorStop(1, gapBottom ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
+                octx.fillStyle = gy;
+                octx.fillRect(0, 0, w, h);
+            }
+            octx.globalCompositeOperation = 'source-over';
+            ctx.drawImage(this._offscreen, dx, dy);
+        } else {
+            ctx.drawImage(img, dx, dy, drawW, drawH);
+        }
+
         ctx.restore();
     }
 }

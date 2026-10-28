@@ -35,9 +35,11 @@
         min-height: 0;
     }
 
-    .face-poster, #face-canvas {
-        max-height: 62dvh;
-    }
+    /* O canvas ocupa o stage inteiro (100dvh menos o cabeçalho); são os
+       valores de focalY/zoom de cada procedimento (includes/procedures.php)
+       que mantêm o rosto na parte superior, fora da faixa de texto abaixo —
+       não um corte de altura do canvas, que apenas re-achataria a imagem
+       (ver _drawImageFocused em face-player.js: a proporção nunca muda). */
 
     /* No mobile, o texto não fica sobre a imagem: ocupa uma faixa fixa
        na parte inferior da tela, abaixo do enquadramento do rosto. */

@@ -57,7 +57,7 @@ class ScrollController {
         if (Math.abs(delta) < 0.0004) this.renderedProgress = this.targetProgress;
 
         const state = this.cameraController.getState(this.renderedProgress);
-        this.facePlayer.draw(state.frameIndex, state.fx, state.fy, state.zoom);
+        this.facePlayer.draw(state.frameIndex, state.fx, state.fy, state.zoom, state.procedure.faceExclusion || null);
         this.procedureController.update(state);
         this.hotspotLayer.render(state.procedure);
 

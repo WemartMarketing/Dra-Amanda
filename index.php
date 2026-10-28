@@ -105,7 +105,10 @@ window.AUREA_CONFIG = {
         mobile: 'assets/media/posters/poster_mobile.webp',
         lqip: 'assets/media/posters/poster_lqip.webp'
     },
-    mobileBreakpoint: 760
+    mobileBreakpoint: 760,
+    // Deve acompanhar a altura reservada para o texto no mobile
+    // (.text-layer, 32dvh + folga do scroll-cue — ver responsive.css).
+    mobileSafeBottomFraction: 0.36
 };
 </script>
 
