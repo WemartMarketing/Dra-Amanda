@@ -1,0 +1,87 @@
+/* ------------------------------------------------------------------ */
+/* Tablet                                                               */
+/* ------------------------------------------------------------------ */
+@media (max-width: 1024px) {
+    .procedure-text { max-width: 18rem; padding: 0 var(--space-md); }
+    .procedure-title { font-size: 1.7rem; }
+    .procedure-title--hero { font-size: 2.6rem; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile — recomposição vertical (seção 12)                           */
+/* Nunca sobrepor texto ao rosto: o texto sai da área da imagem e      */
+/* ocupa uma faixa própria acima/abaixo do enquadramento do rosto.     */
+/* ------------------------------------------------------------------ */
+@media (max-width: 760px) {
+    .site-header {
+        padding: var(--space-sm) var(--space-md);
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+    }
+    .brand-name { font-size: 1.2rem; letter-spacing: 0.2em; }
+    .main-nav { gap: var(--space-md); }
+    .nav-link { font-size: 0.75rem; }
+
+    .experience {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+    }
+
+    .experience__stage {
+        position: relative;
+        inset: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    .face-poster, #face-canvas {
+        max-height: 62dvh;
+    }
+
+    /* No mobile, o texto não fica sobre a imagem: ocupa uma faixa fixa
+       na parte inferior da tela, abaixo do enquadramento do rosto. */
+    .text-layer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        height: 32dvh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: var(--space-sm) var(--space-md);
+        background: linear-gradient(to top, var(--background-video) 55%, rgba(229,223,213,0));
+    }
+
+    .procedure-text {
+        position: static;
+        transform: none !important;
+        max-width: 100%;
+        width: 100%;
+        text-align: center !important;
+        padding: 0;
+    }
+
+    .procedure-title { font-size: 1.4rem; }
+    .procedure-title--hero { font-size: 2rem; }
+    .procedure-description { font-size: 0.85rem; }
+
+    .progress-indicator {
+        right: var(--space-xs);
+        gap: 0.4rem;
+    }
+
+    .scroll-cue { bottom: 34dvh; }
+
+    .overlay-panel__inner {
+        width: calc(100% - var(--space-md) * 2);
+        padding: var(--space-lg) var(--space-md) var(--space-md);
+    }
+}
+
+@media (max-width: 420px) {
+    .procedure-title--hero { font-size: 1.7rem; }
+    .text-layer { height: 36dvh; }
+}

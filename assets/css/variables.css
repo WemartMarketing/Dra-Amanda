@@ -1,0 +1,38 @@
+:root {
+    /* Paleta — ouro envelhecido (seção 5) */
+    --gold-primary: #9B7A46;
+    --gold-dark: #806339;
+    --gold-soft: #AD9369;
+
+    /* Texto */
+    --text-primary: #342E29;
+    --text-secondary: #50483E;
+
+    /* Fundo — cor real extraída do vídeo-fonte (média de 4 cantos, 20 quadros) */
+    --background-video: #E5DFD5;
+    /* Extensão sutil para as laterais: o estúdio é levemente mais claro à
+       esquerda e mais escuro/quente à direita (ver docs/ASSETS_PENDENTES.md) */
+    --background-video-left: #E8E4DA;
+    --background-video-right: #DFD9CE;
+
+    /* Tipografia */
+    --font-display: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+    --font-title: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+
+    /* Espaçamento */
+    --space-xs: 0.5rem;
+    --space-sm: 1rem;
+    --space-md: 1.75rem;
+    --space-lg: 3rem;
+    --space-xl: 5rem;
+
+    /* Camadas */
+    --z-stage: 1;
+    --z-hotspots: 5;
+    --z-text: 10;
+    --z-header: 50;
+    --z-overlay: 100;
+
+    --transition-smooth: 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}

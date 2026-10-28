@@ -1,0 +1,39 @@
+# AURÉA — configuração para hospedagem compartilhada (HostGator / Apache)
+# Apenas ajustes seguros e amplamente suportados: nada que exija módulos
+# incomuns ou acesso root ao servidor.
+
+DirectoryIndex index.php
+
+# Impede acesso direto aos includes PHP (são usados apenas via require/include)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} ^/includes/ [NC]
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# Compressão (se o módulo estiver disponível no plano de hospedagem)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# Cache de assets estáticos (mídia, CSS, JS) — ajuste a validade conforme a
+# frequência de atualização do conteúdo
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType font/woff2 "access plus 30 days"
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(webp|png|jpe?g|svg|css|js|woff2?)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+</IfModule>
+
+# Impede listagem de diretórios
+Options -Indexes
