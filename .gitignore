@@ -1,2 +1,6 @@
 # Pacote de publicação gerado localmente para envio à HostGator
 /wemart-sales-deploy.zip
+
+# Credenciais reais de banco de dados — cada ambiente (dev, produção)
+# cria o seu a partir de includes/config.example.php, nunca commitado.
+/includes/config.php
