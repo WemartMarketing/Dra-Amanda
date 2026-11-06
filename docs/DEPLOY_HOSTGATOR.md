@@ -70,7 +70,12 @@ define('DB_PASS', 'a-senha-que-voce-criou');
 
 ## O que ainda não está pronto (ver docs/README.md)
 
-Geofencing completo das roletas, integração com Meta Ads, exportação
-Excel, gráficos de Relatórios e o editor de permissões granulares ficam
-para a próxima etapa do projeto — as telas já existem e não quebram, mas
-mostram "Em desenvolvimento" onde ainda não há lógica real.
+Relatórios, Roletas e Usuários e acessos já funcionam de verdade contra o
+banco (KPIs, gráficos, CRUD). Ficam para a próxima etapa apenas: a
+distribuição automática de leads por geolocalização ao vivo (hoje a tela
+Roletas gerencia a configuração e mostra a última presença registrada,
+mas não decide sozinha quem recebe o próximo lead), a integração
+automática com Meta Ads, a exportação Excel de verdade, e a criação de
+cargos/permissões personalizados (os 8 cargos continuam fixos). Onde
+ainda não há lógica real, a tela mostra claramente "Em desenvolvimento"
+em vez de fingir que funciona.
