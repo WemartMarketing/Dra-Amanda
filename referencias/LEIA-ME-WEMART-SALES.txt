@@ -1,0 +1,36 @@
+WeMart Sales — Protótipo de UX/UI
+
+O protótipo é estático, feito em HTML/CSS/JavaScript puro, com dados fictícios. NÃO tem banco de dados, login real, geolocalização real ou integração com Meta Ads. A finalidade é servir como referência visual e de usabilidade para desenvolvimento posterior no Claude Code.
+
+Abra 'wemart-sales-prototipo.html' no navegador. Navegue usando a barra lateral ou, no celular, o menu inferior. É possível abrir o lead a partir do Kanban e exportar um exemplo de relatório CSV.
+
+TELAS
+01 — Início do corretor: tarefas urgentes, situação do plantão, atalhos e KPIs simples.
+02 — Kanban: coluna por etapa com cartões de clientes e status.
+03 — Ficha do lead: contato, etapa, notas, próximo passo, tarefas e histórico.
+04 — Relatórios do gestor: KPIs, gráficos, conversão, desempenho por produto e perdas; exportação compatível com Excel.
+05 — Roletas: plantões, raio de 300 m e corretores habilitados.
+06 — Usuários e acessos: cargos e escopos de visualização.
+07 — Mobile: tela inicial adaptada para celular.
+
+DIREÇÃO DE DESIGN
+- Interface limpa e contemporânea, fundo claro e navegação lateral escura.
+- Cor principal: #635BFA; fundo: #F6F7FB; texto: #182039; sucesso: #189D72.
+- Tipografia grande, textos simples, ações principais destacadas, rótulos sempre visíveis.
+- Especial atenção a corretores de 18 a 70+ anos: botões grandes, contraste, passos curtos, facilidade no celular.
+- Corretor vê o próprio Kanban e suas tarefas; gestor vê relatórios gráficos e números consolidados.
+
+REQUISITOS FUNCIONAIS A IMPLEMENTAR NO PRODUTO REAL
+- Multiempresa (SaaS), com separação rigorosa de dados e Master por empresa.
+- RBAC por cargo mais escopo: empreendimento, superintendência, gerente, equipe, corretor.
+- Roletas por plantão; vários empreendimentos e corretores por roleta.
+- Controle de entrada na roleta por horário e presença geográfica (raio configurável inicialmente 300 m).
+- Entrada automatizada de leads de Meta Ads com atribuição da roleta apropriada.
+- Oferta ativa por importação e recuperação de leads sem feedback após 4 dias.
+- Lead transferido deixa de ser visível para os gestores anteriores quando sai do escopo.
+- Perdas por inatividade aparecem em relatórios agregados da equipe anterior.
+- Gerentes, GPs e superintendentes têm relatórios filtrados por seu escopo; corretor só vê próprios leads.
+- Exportação Excel e auditoria de eventos.
+- Stack para HostGator: PHP, HTML, CSS, JavaScript puro e MySQL; sem Node.js.
+
+Todas as métricas e nomes exibidos são ilustrativos.
