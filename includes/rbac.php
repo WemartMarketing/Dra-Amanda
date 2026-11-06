@@ -73,6 +73,18 @@ function rbac_pode_ver_lead(array $usuario, int $leadId): bool
     return (bool) $stmt->fetch();
 }
 
+/**
+ * Verdadeiro se o cargo pode gerenciar roletas/usuários/configurações da
+ * empresa (telas Roletas e Usuários e acessos). Corretor nunca gerencia —
+ * só enxerga essas telas em modo leitura. Checada tanto para esconder os
+ * controles de edição na página quanto, de forma independente, dentro de
+ * cada endpoint de escrita em api/ (nunca confiar só em esconder botão).
+ */
+function rbac_pode_gerenciar(array $usuario): bool
+{
+    return $usuario['cargo'] !== 'corretor';
+}
+
 /** Rótulos legíveis dos cargos, para a UI (ver tela "Usuários e acessos"). */
 function rbac_rotulo_cargo(string $cargo): string
 {

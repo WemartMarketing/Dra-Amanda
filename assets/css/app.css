@@ -253,6 +253,81 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .stub-card h2 { font-size: 20px; margin: 0 0 8px; }
 .stub-card p { color: #8893a4; max-width: 420px; margin: 0 auto; font-size: 14px; }
 
+/* ------------------------------------------------------------ Relatórios */
+@media (min-width: 1101px) { .kpi-grid-5 { grid-template-columns: repeat(5, 1fr); } }
+
+.bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 220px; padding-top: 10px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+.bar { width: 100%; max-width: 26px; background: linear-gradient(180deg, #8c7bff, var(--accent)); border-radius: 6px 6px 2px 2px; transition: height .25s ease; }
+.bar-label { margin-top: 8px; font-size: 10px; color: #99a3b5; white-space: nowrap; }
+
+.funnel { display: flex; flex-direction: column; gap: 12px; }
+.funnel-row { display: grid; grid-template-columns: 150px 1fr 46px; align-items: center; gap: 10px; }
+.funnel-label { font-size: 13px; color: #4b5570; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.funnel-track { height: 10px; background: #eef0f6; border-radius: 6px; overflow: hidden; }
+.funnel-fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width .25s ease; }
+.funnel-track-red { background: #fbe9eb; }
+.funnel-fill-red { background: var(--red); }
+.funnel-value { text-align: right; font-weight: 800; font-size: 13.5px; }
+.funnel-total { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; font-size: 13.5px; color: #4b5570; }
+.funnel-total strong { font-size: 18px; color: var(--ink); }
+
+.report-table { width: 100%; border-collapse: collapse; }
+.report-table thead th { text-align: left; font-size: 11.5px; text-transform: uppercase; color: #99a3b5; padding: 10px 6px; font-weight: 800; }
+.report-table tbody tr { border-top: 1px solid var(--line); }
+.report-table tbody td { padding: 12px 6px; font-size: 13.5px; }
+.empty-note { color: #8893a4; font-size: 14px; text-align: center; padding: 14px 0; }
+
+.perdas-headline { display: flex; align-items: center; gap: 16px; }
+.perdas-headline strong { font-size: 34px; font-weight: 800; color: var(--red); }
+.perdas-headline div b { display: block; font-size: 14px; }
+.perdas-headline div span { font-size: 12.5px; color: #8893a4; }
+
+/* ------------------------------------------------------------ Modais genéricos */
+.modal-overlay { position: fixed; inset: 0; background: rgba(16, 22, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+.modal-overlay[hidden] { display: none; }
+.modal-box { background: #fff; border-radius: var(--radius); padding: 28px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 25px 70px rgba(0, 0, 0, .25); }
+.modal-box.modal-wide { max-width: 640px; }
+.modal-box h2 { margin: 0 0 6px; font-size: 19px; }
+.modal-box .overlay-close { position: absolute; top: 16px; right: 16px; border: 0; background: #f1f2f8; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; line-height: 1; color: #6b7690; }
+.modal-box .field { margin-bottom: 14px; }
+.modal-box .btn { width: 100%; justify-content: center; margin-top: 6px; }
+
+/* ------------------------------------------------------------ Roletas */
+.roleta-layout { display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; align-items: start; }
+@media (max-width: 1150px) { .roleta-layout { grid-template-columns: 1fr; } }
+.roleta-row { display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.roleta-row:hover { border-color: #ccd3e6; }
+.roleta-row.is-active { border-color: var(--accent); background: #faf9ff; }
+.roleta-row .who-info { flex: 1; min-width: 0; }
+.radius-vis { width: 100%; aspect-ratio: 16/9; background: repeating-linear-gradient(90deg, #f3f4f8 0 1px, transparent 1px 40px), repeating-linear-gradient(180deg, #f3f4f8 0 1px, transparent 1px 40px); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; position: relative; overflow: hidden; }
+.radius-circle { border: 2px dashed var(--accent); border-radius: 50%; width: 55%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+.radius-circle::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.roleta-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.roleta-detail-row:first-of-type { border-top: 0; }
+.roleta-detail-row span.label { color: #8893a4; }
+.corretor-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.corretor-row:first-of-type { border-top: 0; }
+.corretor-row .who-info { flex: 1; min-width: 0; }
+.corretor-row .who-info strong { display: block; font-size: 14px; }
+.corretor-row .who-info span { font-size: 12px; color: #8893a4; }
+.remove-link { color: #99a3b5; font-size: 12px; font-weight: 700; background: none; border: 0; padding: 4px; }
+.remove-link:hover { color: var(--red); }
+.add-row { display: flex; gap: 8px; margin-top: 14px; }
+.add-row select { flex: 1; }
+.checkbox-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.checkbox-row input { width: 18px; height: 18px; }
+
+/* ------------------------------------------------------------ Usuários e acessos */
+.user-row { display: flex; align-items: center; gap: 14px; padding: 14px 6px; border-top: 1px solid var(--line); }
+.user-row:first-of-type { border-top: 0; }
+.user-row .who-info { flex: 1; min-width: 0; }
+.user-row .who-info strong { display: block; font-size: 14px; }
+.user-row .who-info span { font-size: 12.5px; color: #8893a4; }
+.user-row-actions { display: flex; align-items: center; gap: 10px; }
+.link-btn { background: none; border: 0; color: var(--accent); font-size: 12.5px; font-weight: 700; padding: 4px; }
+.link-btn:hover { text-decoration: underline; }
+
 /* ------------------------------------------------------------ Mobile */
 .mobile-topbar { display: none; }
 .bottom-nav { display: none; }
@@ -289,4 +364,24 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, input:focus-vis
 
     .lead-grid { grid-template-columns: 1fr; }
     .lead-contact-btns { flex-direction: column; }
+
+    .funnel-row { grid-template-columns: 96px 1fr 34px; gap: 6px; }
+    .funnel-label { font-size: 11.5px; }
+    .bar-label { display: none; }
+    .bar-chart { height: 160px; }
+    .perdas-headline strong { font-size: 28px; }
+    .modal-box { padding: 20px; }
+    .report-table { font-size: 12.5px; }
+    .report-table thead th:nth-child(3), .report-table tbody td:nth-child(3) { display: none; }
+
+    /* O nome/e-mail/cargo não cabe ao lado do status + Editar/Desativar
+       na mesma linha em 390px — força os dois grupos para linhas
+       separadas em vez de espremer who-info até quebrar em várias
+       linhas (o que fazia o status/ações, centralizados na vertical,
+       ficarem por cima do texto quebrado). */
+    .user-row { flex-wrap: wrap; row-gap: 8px; }
+    .user-row .who-info { flex: 1 1 100%; order: 1; }
+    .user-row .avatar { order: 0; }
+    .user-row .pill { order: 2; }
+    .user-row-actions { order: 3; margin-left: auto; }
 }
