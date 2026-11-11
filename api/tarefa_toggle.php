@@ -4,6 +4,13 @@ require_once __DIR__ . '/../includes/rbac.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $usuario = auth_require();
+
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false]);
+    exit;
+}
+
 $dados = json_decode(file_get_contents('php://input'), true) ?: [];
 $tarefaId = (int) ($dados['tarefa_id'] ?? 0);
 $concluida = !empty($dados['concluida']) ? 1 : 0;

@@ -1,15 +1,16 @@
 <?php
+require_once __DIR__ . '/funcoes.php';
+
 /**
- * RBAC — escopo de visibilidade de leads por cargo.
+ * RBAC — visibilidade de leads (por escopo da função) e permissões de
+ * ação (por permissão da função), ambos resolvidos a partir de
+ * usuarios.funcao_id (ver includes/auth.php). A coluna legada
+ * usuarios.cargo não é mais lida por nenhuma destas funções.
  *
- * Cada cargo definido em usuarios.cargo enxerga um subconjunto de
- * leads dentro da própria empresa (ver comentário acima da tabela
- * `usuarios` em sql/schema.sql). Esta é a ÚNICA função que decide esse
- * escopo — nenhuma página deve montar essa lógica por conta própria,
- * para não haver dois lugares com regras diferentes.
- *
- * Retorna um fragmento SQL (para usar depois de WHERE) e os parâmetros
- * nomeados correspondentes. Sempre inclui o filtro de empresa.
+ * rbac_leads_scope()      → filtro de LINHA (quais leads o usuário vê).
+ * usuario_tem_permissao() → filtro de AÇÃO (o que o usuário pode fazer).
+ * São checados de forma independente; nenhuma página deve montar essa
+ * lógica por conta própria.
  */
 function rbac_leads_scope(array $usuario): array
 {
@@ -19,15 +20,13 @@ function rbac_leads_scope(array $usuario): array
     $base = 'leads.empresa_id = :rbac_empresa_id';
     $params = ['rbac_empresa_id' => $empresaId];
 
-    switch ($usuario['cargo']) {
-        case 'master_wemart':
-        case 'master_empresa':
-        case 'gp_lider':
-        case 'gerente_geral':
+    switch ($usuario['escopo']) {
+        case 'toda_empresa':
+        case 'todos_produtos':
             // Enxergam todos os produtos/leads da empresa ativa.
             return ['sql' => $base, 'params' => $params];
 
-        case 'gp_produto':
+        case 'produtos_vinculados':
             $params['rbac_uid'] = $uid;
             return [
                 'sql' => $base . ' AND leads.empreendimento_id IN (
@@ -36,7 +35,7 @@ function rbac_leads_scope(array $usuario): array
                 'params' => $params,
             ];
 
-        case 'superintendente':
+        case 'superintendencia':
             $params['rbac_uid'] = $uid;
             return [
                 'sql' => $base . ' AND leads.equipe_id IN (
@@ -47,7 +46,7 @@ function rbac_leads_scope(array $usuario): array
                 'params' => $params,
             ];
 
-        case 'gerente':
+        case 'equipe':
             $params['rbac_uid'] = $uid;
             return [
                 'sql' => $base . ' AND leads.equipe_id IN (
@@ -56,7 +55,7 @@ function rbac_leads_scope(array $usuario): array
                 'params' => $params,
             ];
 
-        case 'corretor':
+        case 'propria_carteira':
         default:
             $params['rbac_uid'] = $uid;
             return ['sql' => $base . ' AND leads.responsavel_id = :rbac_uid', 'params' => $params];
@@ -66,6 +65,9 @@ function rbac_leads_scope(array $usuario): array
 /** Verdadeiro se o usuário pode ver/editar este lead específico. */
 function rbac_pode_ver_lead(array $usuario, int $leadId): bool
 {
+    if (!empty($usuario['eh_superadmin'])) {
+        return false; // Superadmin não acessa leads de empresas (ver seção 4 do prompt mestre).
+    }
     $scope = rbac_leads_scope($usuario);
     $sql = 'SELECT 1 FROM leads WHERE leads.id = :lead_id AND ' . $scope['sql'] . ' LIMIT 1';
     $stmt = db()->prepare($sql);
@@ -74,28 +76,22 @@ function rbac_pode_ver_lead(array $usuario, int $leadId): bool
 }
 
 /**
- * Verdadeiro se o cargo pode gerenciar roletas/usuários/configurações da
- * empresa (telas Roletas e Usuários e acessos). Corretor nunca gerencia —
- * só enxerga essas telas em modo leitura. Checada tanto para esconder os
- * controles de edição na página quanto, de forma independente, dentro de
- * cada endpoint de escrita em api/ (nunca confiar só em esconder botão).
+ * Verdadeiro se a função do usuário tem esta permissão (ver tabela
+ * `permissoes` / sql/migration_002_funcoes_permissoes.sql). Checada
+ * tanto para esconder os controles de edição na página quanto, de
+ * forma independente, dentro de cada endpoint de escrita em api/
+ * (nunca confiar só em esconder botão).
  */
-function rbac_pode_gerenciar(array $usuario): bool
+function usuario_tem_permissao(array $usuario, string $permissao): bool
 {
-    return $usuario['cargo'] !== 'corretor';
+    if (!empty($usuario['eh_superadmin'])) {
+        return true;
+    }
+    return in_array($permissao, $usuario['permissoes'] ?? [], true);
 }
 
-/** Rótulos legíveis dos cargos, para a UI (ver tela "Usuários e acessos"). */
-function rbac_rotulo_cargo(string $cargo): string
+/** Rótulo legível do escopo, para a UI (tela "Usuários e acessos"). */
+function rbac_rotulo_escopo(string $escopo): string
 {
-    return [
-        'master_wemart'   => 'Master WeMart',
-        'master_empresa'  => 'Master da empresa',
-        'gp_lider'        => 'GP Líder',
-        'gerente_geral'   => 'Gerente Geral',
-        'gp_produto'      => 'GP do Produto',
-        'superintendente' => 'Superintendente',
-        'gerente'         => 'Gerente',
-        'corretor'        => 'Corretor',
-    ][$cargo] ?? $cargo;
+    return funcoes_rotulos_escopo()[$escopo] ?? $escopo;
 }

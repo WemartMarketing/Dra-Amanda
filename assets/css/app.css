@@ -317,6 +317,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .add-row select { flex: 1; }
 .checkbox-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
 .checkbox-row input { width: 18px; height: 18px; }
+.checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; padding: 4px 0; }
+@media (max-width: 560px) { .checkbox-grid { grid-template-columns: 1fr; } }
 
 /* ------------------------------------------------------------ Usuários e acessos */
 .user-row { display: flex; align-items: center; gap: 14px; padding: 14px 6px; border-top: 1px solid var(--line); }

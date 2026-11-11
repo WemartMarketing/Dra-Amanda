@@ -1,11 +1,19 @@
 // WeMart Sales — JS vanilla (sem dependências externas)
 
+// Token CSRF da sessão atual (ver <meta name="csrf-token"> em
+// includes/layout_start.php e login.php) — toda escrita que não parte
+// de um <form> com csrf_field() precisa anexar isto manualmente.
+function csrfToken() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.content : '';
+}
+
 (function () {
     async function moverLead(leadId, destino, cardEl) {
         const r = await fetch('/api/lead_mover_etapa.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lead_id: leadId, etapa: destino }),
+            body: JSON.stringify({ lead_id: leadId, etapa: destino, csrf_token: csrfToken() }),
         });
         if (r.ok) {
             location.reload();
@@ -146,7 +154,7 @@
                     formUsuario.id.value = btn.dataset.id;
                     formUsuario.nome.value = btn.dataset.nome;
                     formUsuario.email.value = btn.dataset.email;
-                    formUsuario.cargo.value = btn.dataset.cargo;
+                    formUsuario.funcao_id.value = btn.dataset.funcaoId;
                     formUsuario.equipe_id.value = btn.dataset.equipeId || '';
                     formUsuario.ativo.checked = btn.dataset.ativo === '1';
                     campoAtivo.style.display = 'flex';
@@ -166,11 +174,50 @@
         });
     }
 
+    // --------------------------------------------------------------
+    // Funções e permissões — mesmo padrão do modal de usuário: um
+    // único modal reaproveitado para criar e editar, incluindo as
+    // funções padrão do sistema (editar permissões é sempre permitido).
+    // --------------------------------------------------------------
+    var modalFuncao = document.getElementById('modal-funcao');
+    if (modalFuncao) {
+        var formFuncao = modalFuncao.querySelector('[data-form-funcao]');
+        var tituloFuncao = document.getElementById('modal-funcao-titulo');
+
+        document.querySelectorAll('[data-open-modal="modal-funcao"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                formFuncao.reset();
+                formFuncao.querySelectorAll('input[name="permissoes[]"]').forEach(function (cb) { cb.checked = false; });
+                if (btn.dataset.modo === 'editar') {
+                    tituloFuncao.textContent = 'Editar função';
+                    formFuncao.id.value = btn.dataset.id;
+                    formFuncao.nome.value = btn.dataset.nome;
+                    formFuncao.escopo.value = btn.dataset.escopo;
+                    var permissoesAtuais = (btn.dataset.permissoes || '').split(',').filter(Boolean);
+                    permissoesAtuais.forEach(function (chave) {
+                        var cb = formFuncao.querySelector('input[name="permissoes[]"][value="' + chave + '"]');
+                        if (cb) cb.checked = true;
+                    });
+                } else {
+                    tituloFuncao.textContent = 'Criar função';
+                    formFuncao.id.value = '';
+                }
+            });
+        });
+
+        formFuncao.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const r = await fetch('/api/funcao_salvar.php', { method: 'POST', body: new FormData(formFuncao) });
+            const data = await r.json().catch(function () { return {}; });
+            if (r.ok && data.ok) { location.reload(); } else { alert(data.erro || 'Não foi possível salvar a função.'); }
+        });
+    }
+
     document.querySelectorAll('[data-toggle-ativo]').forEach(function (btn) {
         btn.addEventListener('click', async function () {
             const acao = btn.dataset.ativoAtual === '1' ? 'desativar' : 'ativar';
             if (!confirm('Tem certeza que deseja ' + acao + ' este usuário?')) return;
-            const r = await fetch('/api/usuario_toggle_ativo.php', { method: 'POST', body: new URLSearchParams({ id: btn.dataset.toggleAtivo }) });
+            const r = await fetch('/api/usuario_toggle_ativo.php', { method: 'POST', body: new URLSearchParams({ id: btn.dataset.toggleAtivo, csrf_token: csrfToken() }) });
             const data = await r.json().catch(function () { return {}; });
             if (r.ok && data.ok) { location.reload(); } else { alert(data.erro || 'Não foi possível atualizar.'); }
         });
@@ -180,13 +227,13 @@
         return new URLSearchParams(location.search).get('id') || '';
     }
     async function roletaCorretorAcao(roletaId, usuarioId, acao) {
-        const body = new URLSearchParams({ roleta_id: roletaId, usuario_id: usuarioId, acao: acao });
+        const body = new URLSearchParams({ roleta_id: roletaId, usuario_id: usuarioId, acao: acao, csrf_token: csrfToken() });
         const r = await fetch('/api/roleta_corretor.php', { method: 'POST', body: body });
         const data = await r.json().catch(function () { return {}; });
         if (r.ok && data.ok) { location.reload(); } else { alert(data.erro || 'Não foi possível atualizar.'); }
     }
     async function roletaEmpreendimentoAcao(roletaId, empreendimentoId, acao) {
-        const body = new URLSearchParams({ roleta_id: roletaId, empreendimento_id: empreendimentoId, acao: acao });
+        const body = new URLSearchParams({ roleta_id: roletaId, empreendimento_id: empreendimentoId, acao: acao, csrf_token: csrfToken() });
         const r = await fetch('/api/roleta_empreendimento.php', { method: 'POST', body: body });
         const data = await r.json().catch(function () { return {}; });
         if (r.ok && data.ok) { location.reload(); } else { alert(data.erro || 'Não foi possível atualizar.'); }

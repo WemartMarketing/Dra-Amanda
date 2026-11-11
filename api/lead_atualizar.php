@@ -11,6 +11,11 @@ require_once __DIR__ . '/../includes/leads.php';
 $usuario = auth_require();
 $leadId = (int) ($_POST['lead_id'] ?? 0);
 
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    exit('Token de segurança inválido.');
+}
+
 if (!$leadId || !rbac_pode_ver_lead($usuario, $leadId)) {
     http_response_code(403);
     exit('Acesso negado.');
@@ -45,6 +50,7 @@ if ($nota !== '') {
 }
 if ($novaEtapa && $novaEtapa !== $etapaAnterior) {
     lead_registrar_evento($leadId, (int) $usuario['id'], 'mudanca_etapa', 'Etapa alterada de "' . lead_etapa_rotulo($etapaAnterior) . '" para "' . lead_etapa_rotulo($novaEtapa) . '"');
+    auditoria_registrar((int) $usuario['empresa_ativa_id'], (int) $usuario['id'], 'lead.etapa_alterada', 'lead', $leadId, ['de' => $etapaAnterior, 'para' => $novaEtapa]);
 }
 
 header('Location: /pages/lead.php?id=' . $leadId);

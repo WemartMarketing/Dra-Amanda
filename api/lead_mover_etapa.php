@@ -16,6 +16,12 @@ if (!auth_check()) {
     exit;
 }
 
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
+    exit;
+}
+
 $usuario = current_user();
 $dados = json_decode(file_get_contents('php://input'), true) ?: [];
 $leadId = (int) ($dados['lead_id'] ?? 0);
@@ -51,6 +57,7 @@ if ($lead['etapa'] !== $novaEtapa) {
         'mudanca_etapa',
         'Etapa alterada de "' . lead_etapa_rotulo($lead['etapa']) . '" para "' . lead_etapa_rotulo($novaEtapa) . '"'
     );
+    auditoria_registrar((int) $usuario['empresa_ativa_id'], (int) $usuario['id'], 'lead.etapa_alterada', 'lead', $leadId, ['de' => $lead['etapa'], 'para' => $novaEtapa]);
 }
 
 echo json_encode(['ok' => true]);

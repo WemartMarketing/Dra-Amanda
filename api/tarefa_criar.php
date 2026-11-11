@@ -3,6 +3,12 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 
 $usuario = auth_require();
+
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    exit('Token de segurança inválido.');
+}
+
 $leadId = (int) ($_POST['lead_id'] ?? 0);
 $titulo = trim($_POST['titulo'] ?? '');
 

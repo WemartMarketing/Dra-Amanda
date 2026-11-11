@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/leads.php';
 $usuario = auth_require();
 $empresaId = (int) $usuario['empresa_ativa_id'];
 $uid = (int) $usuario['id'];
-$ehCorretor = $usuario['cargo'] === 'corretor';
+$ehCorretor = $usuario['escopo'] === 'propria_carteira';
 
 // KPIs — para cargos de gestão, soma a empresa toda (ainda sem o relatório
 // completo de gestor, que é a tela 04 / pages/relatorios.php).

@@ -2,8 +2,8 @@
 /**
  * POST /api/roleta_salvar.php  { id?, nome, raio_presenca_metros, horario_inicio, horario_fim, ativa }
  * Cria uma roleta nova (sem id) ou atualiza uma existente da própria
- * empresa. Apenas cargos de gestão (rbac_pode_gerenciar) — nunca corretor,
- * checado aqui de novo mesmo que a tela já esconda o formulário dele.
+ * empresa. Exige a permissão gerenciar_roletas, checada aqui de novo
+ * mesmo que a tela já esconda o formulário de quem não a tem.
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
@@ -17,9 +17,15 @@ if (!auth_check()) {
 }
 
 $usuario = current_user();
-if (!rbac_pode_gerenciar($usuario)) {
+if (!usuario_tem_permissao($usuario, 'gerenciar_roletas')) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Seu cargo não pode gerenciar roletas.']);
+    echo json_encode(['ok' => false, 'erro' => 'Sua função não pode gerenciar roletas.']);
+    exit;
+}
+
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
     exit;
 }
 

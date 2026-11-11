@@ -4,8 +4,19 @@ require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/leads.php';
 
 $usuario = auth_require();
+
+if (!usuario_tem_permissao($usuario, 'visualizar_indicadores')) {
+    $pageTitle = 'Acesso restrito — ' . APP_NAME;
+    $crumb = 'Relatórios';
+    $activeNav = 'relatorios';
+    require __DIR__ . '/../includes/layout_start.php';
+    echo '<div class="card stub-card"><div class="stub-icon">' . icon('alert') . '</div><h2>Acesso restrito</h2><p>Sua função não tem a permissão "Visualizar indicadores/dashboard".</p></div>';
+    require __DIR__ . '/../includes/layout_end.php';
+    exit;
+}
+
 $empresaId = (int) $usuario['empresa_ativa_id'];
-$scope = rbac_leads_scope($usuario); // sempre aplicado primeiro — os filtros abaixo só restringem ainda mais, nunca abrem exceção ao escopo do cargo.
+$scope = rbac_leads_scope($usuario); // sempre aplicado primeiro — os filtros abaixo só restringem ainda mais, nunca abrem exceção ao escopo da função.
 
 // --------------------------------------------------------------
 // Filtros (GET) — período fixo + empreendimento/superintendência/

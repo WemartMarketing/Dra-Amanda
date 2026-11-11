@@ -16,9 +16,15 @@ if (!auth_check()) {
 }
 
 $usuario = current_user();
-if (!rbac_pode_gerenciar($usuario)) {
+if (!usuario_tem_permissao($usuario, 'gerenciar_roletas')) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Seu cargo não pode gerenciar roletas.']);
+    echo json_encode(['ok' => false, 'erro' => 'Sua função não pode gerenciar roletas.']);
+    exit;
+}
+
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
     exit;
 }
 

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/rbac.php';
 
 $usuario = auth_require();
 $empresaId = (int) $usuario['empresa_ativa_id'];
-$podeGerenciar = rbac_pode_gerenciar($usuario);
+$podeGerenciar = usuario_tem_permissao($usuario, 'gerenciar_roletas');
 
 $stmt = db()->prepare('
     SELECT roletas.*,
@@ -51,7 +51,7 @@ if ($selecionadaId) {
     $empreendimentosVinculados = $stmt->fetchAll();
 
     if ($podeGerenciar) {
-        $stmt = db()->prepare("SELECT id, nome FROM usuarios WHERE empresa_id = :empresa_id AND cargo = 'corretor' AND ativo = 1 AND id NOT IN (SELECT usuario_id FROM roleta_corretores WHERE roleta_id = :roleta_id) ORDER BY nome");
+        $stmt = db()->prepare("SELECT usuarios.id, usuarios.nome FROM usuarios INNER JOIN funcoes ON funcoes.id = usuarios.funcao_id WHERE usuarios.empresa_id = :empresa_id AND funcoes.escopo = 'propria_carteira' AND usuarios.ativo = 1 AND usuarios.id NOT IN (SELECT usuario_id FROM roleta_corretores WHERE roleta_id = :roleta_id) ORDER BY usuarios.nome");
         $stmt->execute(['empresa_id' => $empresaId, 'roleta_id' => $selecionadaId]);
         $corretoresDisponiveis = $stmt->fetchAll();
 
@@ -176,6 +176,7 @@ require __DIR__ . '/../includes/layout_start.php';
         <h2>Nova roleta</h2>
         <p style="color:#8893a4;font-size:13.5px;margin:0 0 16px;">Depois de criar, vincule empreendimentos e corretores na tela.</p>
         <form data-form-roleta>
+            <?= csrf_field() ?>
             <div class="field"><label>Nome</label><input type="text" name="nome" required placeholder="Ex.: Casa HM — Zona Leste"></div>
             <div class="field"><label>Raio de presença (metros)</label><input type="text" name="raio_presenca_metros" placeholder="Ex.: 300 (deixe vazio para desativar)"></div>
             <div class="field"><label>Horário permitido</label>
@@ -195,6 +196,7 @@ require __DIR__ . '/../includes/layout_start.php';
         <button type="button" class="overlay-close" data-close-modal="modal-editar-roleta">&times;</button>
         <h2>Editar regras</h2>
         <form data-form-roleta>
+            <?= csrf_field() ?>
             <input type="hidden" name="id" value="<?= $roleta['id'] ?? '' ?>">
             <div class="field"><label>Nome</label><input type="text" name="nome" required value="<?= htmlspecialchars($roleta['nome'] ?? '') ?>"></div>
             <div class="field"><label>Raio de presença (metros)</label><input type="text" name="raio_presenca_metros" value="<?= htmlspecialchars((string) ($roleta['raio_presenca_metros'] ?? '')) ?>" placeholder="Deixe vazio para desativar"></div>

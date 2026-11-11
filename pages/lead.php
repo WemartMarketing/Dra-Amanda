@@ -12,7 +12,9 @@ if (!$leadId) {
     $erroCriacao = '';
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nome = trim($_POST['nome'] ?? '');
-        if ($nome === '') {
+        if (!csrf_validar_requisicao()) {
+            $erroCriacao = 'Sessão expirada, tente novamente.';
+        } elseif ($nome === '') {
             $erroCriacao = 'Informe ao menos o nome do cliente.';
         } else {
             $stmt = db()->prepare('
@@ -51,6 +53,7 @@ if (!$leadId) {
     <div class="card" style="max-width:560px;">
         <?php if ($erroCriacao): ?><div class="login-error"><?= htmlspecialchars($erroCriacao) ?></div><?php endif; ?>
         <form method="post">
+            <?= csrf_field() ?>
             <div class="field"><label>Nome do cliente</label><input type="text" name="nome" required value="<?= htmlspecialchars($_POST['nome'] ?? '') ?>"></div>
             <div class="field"><label>Telefone</label><input type="text" name="telefone" placeholder="(11) 90000-0000" value="<?= htmlspecialchars($_POST['telefone'] ?? '') ?>"></div>
             <div class="field"><label>E-mail</label><input type="text" name="email" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"></div>
@@ -174,6 +177,7 @@ require __DIR__ . '/../includes/layout_start.php';
         <p style="margin:0 0 18px;color:#8893a4;font-size:13px;">Registre o que aconteceu com o cliente.</p>
 
         <form method="post" action="/api/lead_atualizar.php" id="form-atendimento">
+            <?= csrf_field() ?>
             <input type="hidden" name="lead_id" value="<?= $lead['id'] ?>">
             <div class="field">
                 <label>Etapa atual</label>
@@ -235,6 +239,7 @@ require __DIR__ . '/../includes/layout_start.php';
             <?php endforeach; ?>
         </div>
         <form id="form-nova-tarefa" style="display:flex;gap:8px;margin-top:4px;">
+            <?= csrf_field() ?>
             <input type="hidden" name="lead_id" value="<?= $lead['id'] ?>">
             <input type="text" name="titulo" placeholder="Nova tarefa..." style="flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13px;" required>
             <button type="submit" class="btn btn-ghost"><?= icon('plus') ?></button>
@@ -255,7 +260,7 @@ document.querySelectorAll('[data-toggle-tarefa]').forEach(function (cb) {
     cb.addEventListener('change', async function () {
         await fetch('/api/tarefa_toggle.php', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tarefa_id: this.dataset.toggleTarefa, concluida: this.checked ? 1 : 0 }),
+            body: JSON.stringify({ tarefa_id: this.dataset.toggleTarefa, concluida: this.checked ? 1 : 0, csrf_token: csrfToken() }),
         });
         this.closest('.next-task').classList.toggle('done', this.checked);
     });

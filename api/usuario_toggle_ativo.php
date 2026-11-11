@@ -18,9 +18,15 @@ if (!auth_check()) {
 }
 
 $usuarioLogado = current_user();
-if (!rbac_pode_gerenciar($usuarioLogado)) {
+if (!usuario_tem_permissao($usuarioLogado, 'administrar_usuarios')) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Seu cargo não pode gerenciar usuários.']);
+    echo json_encode(['ok' => false, 'erro' => 'Sua função não pode gerenciar usuários.']);
+    exit;
+}
+
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
     exit;
 }
 
@@ -42,7 +48,10 @@ if (!$row) {
     exit;
 }
 
+$novoAtivo = $row['ativo'] ? 0 : 1;
 db()->prepare('UPDATE usuarios SET ativo = :ativo WHERE id = :id')
-    ->execute(['ativo' => $row['ativo'] ? 0 : 1, 'id' => $id]);
+    ->execute(['ativo' => $novoAtivo, 'id' => $id]);
+
+auditoria_registrar($empresaId, (int) $usuarioLogado['id'], $novoAtivo ? 'usuario.ativado' : 'usuario.desativado', 'usuario', $id);
 
 echo json_encode(['ok' => true]);

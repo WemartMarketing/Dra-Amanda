@@ -17,9 +17,15 @@ if (!auth_check()) {
 }
 
 $usuario = current_user();
-if (!rbac_pode_gerenciar($usuario)) {
+if (!usuario_tem_permissao($usuario, 'gerenciar_roletas')) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Seu cargo não pode gerenciar roletas.']);
+    echo json_encode(['ok' => false, 'erro' => 'Sua função não pode gerenciar roletas.']);
+    exit;
+}
+
+if (!csrf_validar_requisicao()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
     exit;
 }
 
@@ -42,7 +48,7 @@ if (!$stmt->fetch()) {
     exit;
 }
 
-$stmt = db()->prepare("SELECT id FROM usuarios WHERE id = :id AND empresa_id = :empresa_id AND cargo = 'corretor'");
+$stmt = db()->prepare("SELECT usuarios.id FROM usuarios INNER JOIN funcoes ON funcoes.id = usuarios.funcao_id WHERE usuarios.id = :id AND usuarios.empresa_id = :empresa_id AND funcoes.escopo = 'propria_carteira'");
 $stmt->execute(['id' => $usuarioId, 'empresa_id' => $empresaId]);
 if (!$stmt->fetch()) {
     http_response_code(404);

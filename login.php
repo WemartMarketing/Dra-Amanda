@@ -2,20 +2,27 @@
 require_once __DIR__ . '/includes/auth.php';
 
 if (auth_check()) {
-    header('Location: /pages/inicio.php');
+    $u = current_user();
+    header('Location: ' . (!empty($u['eh_superadmin']) ? '/pages/superadmin.php' : '/pages/inicio.php'));
     exit;
 }
 
 $erro = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $senha = (string) ($_POST['senha'] ?? '');
-    $usuario = $email !== '' && $senha !== '' ? auth_login($email, $senha) : null;
-    if ($usuario) {
-        header('Location: /pages/inicio.php');
-        exit;
+    if (!csrf_validar_requisicao()) {
+        $erro = 'Sessão expirada, tente novamente.';
+    } else {
+        $email = trim($_POST['email'] ?? '');
+        $senha = (string) ($_POST['senha'] ?? '');
+        $resultado = $email !== '' && $senha !== '' ? auth_login($email, $senha) : ['ok' => false, 'bloqueado' => false];
+        if ($resultado['ok']) {
+            header('Location: ' . (!empty($resultado['usuario']['eh_superadmin']) ? '/pages/superadmin.php' : '/pages/inicio.php'));
+            exit;
+        }
+        $erro = !empty($resultado['bloqueado'])
+            ? 'Muitas tentativas. Tente novamente em alguns minutos.'
+            : 'E-mail ou senha inválidos.';
     }
-    $erro = 'E-mail ou senha inválidos.';
 }
 ?>
 <!doctype html>
@@ -23,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="<?= htmlspecialchars(csrf_token()) ?>">
 <title>Entrar — <?= htmlspecialchars(APP_NAME) ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
 </head>
@@ -38,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="post" action="/login.php">
+            <?= csrf_field() ?>
             <div class="field">
                 <label for="email">E-mail</label>
                 <input type="email" id="email" name="email" required autofocus value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
@@ -52,7 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="login-demo">
             <b>Conta de demonstração</b><br>
             corretor: carlos@hmvendas.demo · senha: demo123<br>
-            gestor: fernanda.gestora@hmvendas.demo · senha: demo123
+            gestor: fernanda.gestora@hmvendas.demo · senha: demo123<br>
+            superadmin: superadmin@wemart.demo · senha: demo123
         </div>
     </div>
 </div>
