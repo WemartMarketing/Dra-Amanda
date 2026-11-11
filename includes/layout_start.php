@@ -116,7 +116,8 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
         </header>
 
         <div class="mobile-topbar">
-            <div class="crumb">WeMart Sales / <strong><?= htmlspecialchars($crumb ?? '') ?></strong></div>
+            <a href="<?= $inicioHref ?>" class="mobile-brand" aria-label="WeMart Sales — página inicial"><?= logo_html('claro') ?></a>
+            <div class="crumb mobile-crumb"><strong><?= htmlspecialchars($crumb ?? '') ?></strong></div>
             <a href="/pages/perfil.php" class="avatar" aria-label="Meu perfil"><?= htmlspecialchars($avatarIniciais) ?></a>
         </div>
 
