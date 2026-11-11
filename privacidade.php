@@ -41,7 +41,7 @@ if ($lista) { $html .= '</ul>'; }
 </head>
 <body>
 <main class="legal-doc card">
-    <div class="brand" style="padding-left:0"><?= logo_html() ?></div>
+    <div class="brand" style="padding-left:0"><?= logo_html('claro') ?></div>
     <?= $html ?: '<p>Documento indisponível.</p>' ?>
     <p><a href="/login.php">Voltar</a></p>
 </main>

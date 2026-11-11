@@ -271,9 +271,12 @@ Etapa 5, o webhook do Meta Ads chamam as mesmas funções).
 ## Logo
 
 A marca é desenhada em um único lugar: `includes/logo.php` (menu, login e
-página de privacidade). Para usar o logo oficial, salve o arquivo em
-`assets/img/logo.svg` (ou `.png`) e troque o retorno de `logo_html()` por
-`'<img src="/assets/img/logo.svg" alt="WeMart Sales" class="brand-logo">'`.
+página de privacidade). O logotipo oficial fica em `assets/img/` com fundo
+transparente, em duas versões: `wemart-sales-logo-branco.png` (fundos
+escuros, como o menu lateral) e `wemart-sales-logo-escuro.png` (fundos
+claros, como o login). Use `logo_html()` ou `logo_html('claro')`. Ao trocar
+o arquivo, aumente o `?v=` em `logo_html()` para os navegadores não usarem
+a versão antiga em cache.
 
 ## Rodando localmente
 

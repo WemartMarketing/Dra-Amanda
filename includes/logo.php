@@ -1,13 +1,14 @@
 <?php
 /**
  * Marca do sistema — ÚNICO lugar onde ela é desenhada (menu lateral, login,
- * superadmin). Ainda não há arquivo oficial do logotipo: usamos a marca em
- * texto. Para trocar pelo logo oficial, salve a imagem em
- * assets/img/logo.svg (ou .png) e troque o conteúdo de logo_html() por
- *   '<img src="/assets/img/logo.svg" alt="WeMart Sales" class="brand-logo">'
- * — veja "Logo" no docs/README.md.
+ * página de privacidade). Logotipo oficial em PNG com fundo transparente:
+ *   - assets/img/wemart-sales-logo-branco.png → fundos escuros (menu lateral)
+ *   - assets/img/wemart-sales-logo-escuro.png → fundos claros (login, documentos)
+ *
+ * @param string $fundo 'escuro' (padrão, logo branca) ou 'claro' (logo azul-marinho)
  */
-function logo_html(): string
+function logo_html(string $fundo = 'escuro'): string
 {
-    return '<span class="brandmark" aria-hidden="true">W</span>WeMart <span class="hl">Sales</span>';
+    $arquivo = $fundo === 'claro' ? 'wemart-sales-logo-escuro.png' : 'wemart-sales-logo-branco.png';
+    return '<img src="/assets/img/' . $arquivo . '?v=1" alt="WeMart Sales" class="brand-logo" width="1269" height="148">';
 }

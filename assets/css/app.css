@@ -54,6 +54,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, input:focus-vis
     display: grid; place-items: center; font-size: 21px; font-weight: 900; color: #fff;
 }
 .brand span.hl { color: #9c9bff; }
+.brand-logo { display: block; width: 100%; max-width: 196px; height: auto; }
+.login-card .brand-logo { max-width: 240px; margin: 0 auto; }
+.legal-doc .brand-logo { max-width: 220px; }
 
 .company-switch { position: relative; margin: 1px 8px 29px; }
 .company {

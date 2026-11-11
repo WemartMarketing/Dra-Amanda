@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <div class="login-shell">
     <div class="login-card">
-        <div class="brand"><?= logo_html() ?></div>
+        <div class="brand"><?= logo_html('claro') ?></div>
         <h1>Entrar na sua conta</h1>
         <p class="sub">Acesse seus leads e atendimentos.</p>
 
