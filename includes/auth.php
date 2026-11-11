@@ -66,6 +66,8 @@ function auth_login(string $email, string $senha): array
     auth_registrar_tentativa($email, true);
 
     unset($usuario['senha_hash']);
+    // Novo ID de sessão a cada login (evita fixação de sessão).
+    session_regenerate_id(true);
     $_SESSION['usuario_id'] = (int) $usuario['id'];
     $_SESSION['empresa_ativa_id'] = $usuario['empresa_id'] !== null ? (int) $usuario['empresa_id'] : null;
 

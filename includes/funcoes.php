@@ -36,13 +36,13 @@ function funcoes_rotulos_escopo(): array
 function funcoes_definicao_padrao(): array
 {
     return [
-        'master_empresa'  => ['nome' => 'Master da empresa', 'escopo' => 'toda_empresa',        'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'excluir_leads', 'redistribuir_leads', 'gerenciar_roletas', 'gerenciar_equipes', 'gerenciar_empreendimentos', 'gerenciar_plantoes', 'exportar_relatorios', 'visualizar_indicadores', 'administrar_usuarios']],
+        'master_empresa'  => ['nome' => 'Master da empresa', 'escopo' => 'toda_empresa',        'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'excluir_leads', 'redistribuir_leads', 'gerenciar_roletas', 'gerenciar_equipes', 'gerenciar_empreendimentos', 'gerenciar_plantoes', 'exportar_relatorios', 'visualizar_indicadores', 'administrar_usuarios', 'configurar_funil', 'acessar_arquivos_leads']],
         'gp_lider'        => ['nome' => 'GP Líder',          'escopo' => 'todos_produtos',       'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'exportar_relatorios']],
         'gerente_geral'   => ['nome' => 'Gerente Geral',     'escopo' => 'todos_produtos',       'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'exportar_relatorios', 'gerenciar_equipes']],
         'gp_produto'      => ['nome' => 'GP do Produto',     'escopo' => 'produtos_vinculados',  'permissoes' => ['visualizar_leads', 'visualizar_indicadores']],
-        'superintendente' => ['nome' => 'Superintendente',   'escopo' => 'superintendencia',     'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'redistribuir_leads', 'gerenciar_equipes']],
-        'gerente'         => ['nome' => 'Gerente',           'escopo' => 'equipe',               'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'redistribuir_leads', 'visualizar_indicadores']],
-        'corretor'        => ['nome' => 'Corretor',          'escopo' => 'propria_carteira',     'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads']],
+        'superintendente' => ['nome' => 'Superintendente',   'escopo' => 'superintendencia',     'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'redistribuir_leads', 'gerenciar_equipes', 'acessar_arquivos_leads']],
+        'gerente'         => ['nome' => 'Gerente',           'escopo' => 'equipe',               'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'redistribuir_leads', 'visualizar_indicadores', 'acessar_arquivos_leads']],
+        'corretor'        => ['nome' => 'Corretor',          'escopo' => 'propria_carteira',     'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'acessar_arquivos_leads']],
     ];
 }
 

@@ -9,3 +9,8 @@
 # .htaccess de proteção são versionados)
 /uploads/empreendimentos/*
 !/uploads/empreendimentos/.gitkeep
+
+# Documentos de leads (privados, só no servidor; a pasta e o .htaccess
+# que bloqueia o acesso direto são versionados)
+/storage/lead_arquivos/*
+!/storage/lead_arquivos/.gitkeep

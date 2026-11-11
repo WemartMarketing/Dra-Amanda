@@ -25,8 +25,8 @@ function api_erro(string $mensagem, int $status): void
     api_responder(['ok' => false, 'erro' => $mensagem], $status);
 }
 
-/** Valida sessão, CSRF e permissão; devolve o usuário logado. */
-function api_iniciar(string $permissao): array
+/** Valida sessão, CSRF e permissão (null = qualquer usuário de empresa logado); devolve o usuário logado. */
+function api_iniciar(?string $permissao): array
 {
     header('Content-Type: application/json; charset=utf-8');
 
@@ -39,14 +39,14 @@ function api_iniciar(string $permissao): array
     // POST acima de post_max_size chega vazio ao PHP (sem campos e sem o
     // token) — avisa o motivo real em vez de um falso "token inválido".
     if (empty($_POST) && empty($_FILES) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
-        api_erro('O envio foi grande demais para o servidor. Use uma imagem menor.', 413);
+        api_erro('O envio foi grande demais para o servidor. Use um arquivo menor.', 413);
     }
     if (!csrf_validar_requisicao()) {
         api_erro('Token de segurança inválido. Recarregue a página e tente de novo.', 403);
     }
 
     $usuario = current_user();
-    if (!empty($usuario['eh_superadmin']) || !usuario_tem_permissao($usuario, $permissao)) {
+    if (!empty($usuario['eh_superadmin']) || ($permissao !== null && !usuario_tem_permissao($usuario, $permissao))) {
         api_erro('Sua função não tem permissão para esta ação.', 403);
     }
     return $usuario;
@@ -84,4 +84,35 @@ function api_texto(?string $valor, int $max = 190): ?string
         return null;
     }
     return mb_substr($valor, 0, $max);
+}
+
+/** Lead visível ao usuário (empresa + escopo + não excluído) ou responde 404. */
+function api_lead(array $usuario, int $leadId): array
+{
+    require_once __DIR__ . '/leads.php';
+    $lead = lead_carregar($usuario, $leadId);
+    if (!$lead) {
+        api_erro('Lead não encontrado ou fora da sua carteira.', 404);
+    }
+    return $lead;
+}
+
+/** Data/hora vinda de <input type="datetime-local"> ou date+time; null se vazia, false se inválida. */
+function api_data_hora(?string $valor)
+{
+    $valor = trim((string) $valor);
+    if ($valor === '') {
+        return null;
+    }
+    $valor = str_replace('T', ' ', $valor);
+    foreach (['Y-m-d H:i', 'Y-m-d H:i:s', 'Y-m-d'] as $formato) {
+        $dt = DateTime::createFromFormat('!' . $formato, $valor);
+        if ($dt && $dt->format($formato) === $valor) {
+            if ($formato === 'Y-m-d') {
+                $dt->setTime(9, 0);
+            }
+            return $dt->format('Y-m-d H:i:s');
+        }
+    }
+    return false;
 }

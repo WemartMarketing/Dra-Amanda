@@ -8,6 +8,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/funcoes.php';
+require_once __DIR__ . '/../includes/funil.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -70,6 +71,7 @@ try {
     $empresaId = (int) $pdo->lastInsertId();
 
     $mapaFuncoes = funcoes_seed_padrao($empresaId);
+    funil_seed_padrao($empresaId);
     $funcaoMasterId = $mapaFuncoes['master_empresa'];
 
     $pdo->prepare('INSERT INTO usuarios (empresa_id, funcao_id, nome, email, senha_hash, cargo, ativo) VALUES (:empresa_id, :funcao_id, :nome, :email, :hash, :cargo, 1)')

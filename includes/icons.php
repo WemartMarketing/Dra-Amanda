@@ -31,6 +31,20 @@ function icon(string $name): string
         'image'    => '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
         'target'   => '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
         'alert'    => '<path d="M12 3 2 20h20Z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
+        'note'     => '<path d="M5 3h10l4 4v14H5Z"/><path d="M15 3v4h4"/><path d="M8 12h8M8 16h6"/>',
+        'file'     => '<path d="M6 3h8l5 5v13H6Z"/><path d="M14 3v5h5"/>',
+        'trash'    => '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
+        'edit'     => '<path d="M4 20h4L19 9l-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/>',
+        'download' => '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>',
+        'upload'   => '<path d="M12 20V9"/><path d="m7 14 5-5 5 5"/><path d="M5 4h14"/>',
+        'list'     => '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
+        'more'     => '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+        'x'        => '<path d="M6 6l12 12M18 6 6 18"/>',
+        'settings' => '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+        'lock'     => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+        'move'     => '<path d="M5 12h14"/><path d="m15 8 4 4-4 4"/><path d="M9 8 5 12l4 4"/>',
+        'up'       => '<path d="m6 15 6-6 6 6"/>',
+        'down'     => '<path d="m6 9 6 6 6-6"/>',
     ];
     $inner = $icons[$name] ?? $icons['home'];
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' . $inner . '</svg>';

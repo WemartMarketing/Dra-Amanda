@@ -23,20 +23,24 @@ if (!empty($usuario['eh_superadmin'])) {
     exit;
 }
 
+$ehCorretor = ($usuario['escopo'] ?? '') === 'propria_carteira';
 $navItems = [
-    ['key' => 'inicio',     'href' => '/pages/inicio.php',     'label' => 'Início',           'icon' => 'home',   'permissao' => null],
-    ['key' => 'kanban',     'href' => '/pages/kanban.php',     'label' => 'Meus leads',        'icon' => 'kanban', 'permissao' => null],
-    ['key' => 'ficha',      'href' => '/pages/kanban.php',     'label' => 'Ficha do lead',     'icon' => 'user',   'permissao' => null],
-    ['key' => 'relatorios', 'href' => '/pages/relatorios.php', 'label' => 'Relatórios',        'icon' => 'chart',  'permissao' => 'visualizar_indicadores'],
-    ['key' => 'equipes',    'href' => '/pages/equipes.php',    'label' => 'Equipes',            'icon' => 'users',  'permissao' => 'gerenciar_equipes'],
-    ['key' => 'empreendimentos', 'href' => '/pages/empreendimentos.php', 'label' => 'Empreendimentos', 'icon' => 'building', 'permissao' => 'visualizar_leads'],
-    ['key' => 'plantoes',   'href' => '/pages/plantoes.php',   'label' => 'Plantões',           'icon' => 'map',    'permissao' => 'gerenciar_plantoes'],
-    ['key' => 'roletas',    'href' => '/pages/roletas.php',    'label' => 'Roletas',            'icon' => 'pin',    'permissao' => null],
-    ['key' => 'usuarios',   'href' => '/pages/usuarios.php',   'label' => 'Usuários e acessos', 'icon' => 'shield', 'permissao' => 'administrar_usuarios'],
+    ['key' => 'inicio',     'href' => '/pages/inicio.php',     'label' => 'Início',                                     'icon' => 'home',     'mostrar' => true],
+    ['key' => 'leads',      'href' => '/pages/leads.php',      'label' => $ehCorretor ? 'Meus leads' : 'Leads',         'icon' => 'list',     'mostrar' => usuario_tem_permissao($usuario, 'visualizar_leads')],
+    ['key' => 'kanban',     'href' => '/pages/kanban.php',     'label' => $ehCorretor ? 'Meu Kanban' : 'Kanban',        'icon' => 'kanban',   'mostrar' => usuario_tem_permissao($usuario, 'visualizar_leads')],
+    ['key' => 'agenda',     'href' => '/pages/agenda.php',     'label' => $ehCorretor ? 'Minha agenda' : 'Agenda',      'icon' => 'calendar', 'mostrar' => true],
+    ['key' => 'roletas',    'href' => '/pages/roletas.php',    'label' => usuario_tem_permissao($usuario, 'gerenciar_roletas') ? 'Roletas' : 'Minha roleta', 'icon' => 'pin', 'mostrar' => true],
+    ['key' => 'relatorios', 'href' => '/pages/relatorios.php', 'label' => 'Relatórios',                                 'icon' => 'chart',    'mostrar' => usuario_tem_permissao($usuario, 'visualizar_indicadores')],
+    ['key' => 'equipes',    'href' => '/pages/equipes.php',    'label' => 'Equipes',                                    'icon' => 'users',    'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_equipes')],
+    ['key' => 'empreendimentos', 'href' => '/pages/empreendimentos.php', 'label' => 'Empreendimentos',                  'icon' => 'building', 'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_empreendimentos') || (!$ehCorretor && usuario_tem_permissao($usuario, 'visualizar_leads'))],
+    ['key' => 'plantoes',   'href' => '/pages/plantoes.php',   'label' => 'Plantões',                                   'icon' => 'map',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_plantoes')],
+    ['key' => 'usuarios',   'href' => '/pages/usuarios.php',   'label' => 'Usuários e acessos',                         'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'administrar_usuarios')],
+    ['key' => 'funil',      'href' => '/pages/funil.php',      'label' => 'Etapas do funil',                            'icon' => 'settings', 'mostrar' => usuario_tem_permissao($usuario, 'configurar_funil')],
+    ['key' => 'perfil',     'href' => '/pages/perfil.php',     'label' => 'Meu perfil',                                 'icon' => 'user',     'mostrar' => true],
 ];
-$navItems = array_filter($navItems, function ($item) use ($usuario) {
-    return $item['permissao'] === null || usuario_tem_permissao($usuario, $item['permissao']);
-});
+$navItems = array_values(array_filter($navItems, fn ($item) => $item['mostrar']));
+// A ficha de um lead destaca "Leads" no menu.
+$navAtivo = ($activeNav ?? '') === 'ficha' ? 'leads' : ($activeNav ?? '');
 
 $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(strrchr($usuario['nome'], ' ') ?: '', 1, 1));
 ?>
@@ -66,8 +70,8 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
         </div>
         <div class="navtitle">Área de trabalho</div>
         <nav class="nav">
-            <?php foreach ($navItems as $item): if ($item['key'] === 'ficha') continue; ?>
-                <a href="<?= $item['href'] ?>" class="<?= $activeNav === $item['key'] ? 'active' : '' ?>"><?= icon($item['icon']) ?><?= htmlspecialchars($item['label']) ?></a>
+            <?php foreach ($navItems as $item): ?>
+                <a href="<?= $item['href'] ?>" class="<?= $navAtivo === $item['key'] ? 'active' : '' ?>"<?= $navAtivo === $item['key'] ? ' aria-current="page"' : '' ?>><?= icon($item['icon']) ?><?= htmlspecialchars($item['label']) ?></a>
             <?php endforeach; ?>
         </nav>
         <div class="sidefooter">
@@ -84,7 +88,11 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
         <header class="topbar">
             <div class="crumb">WeMart Sales / <strong><?= htmlspecialchars($crumb ?? '') ?></strong></div>
             <div class="topright">
-                <div class="search"><?= icon('search') ?> Buscar lead, telefone ou produto...</div>
+                <form class="search" method="get" action="/pages/leads.php" role="search">
+                    <?= icon('search') ?>
+                    <label class="sr-only" for="busca-global">Buscar lead por nome ou telefone</label>
+                    <input id="busca-global" type="search" name="q" placeholder="Buscar lead por nome ou telefone..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>">
+                </form>
                 <button class="circle-btn" type="button" aria-label="Notificações"><?= icon('bell') ?></button>
                 <div class="who">
                     <div class="avatar"><?= htmlspecialchars($avatarIniciais) ?></div>
@@ -98,7 +106,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
 
         <div class="mobile-topbar">
             <div class="crumb">WeMart Sales / <strong><?= htmlspecialchars($crumb ?? '') ?></strong></div>
-            <div class="avatar"><?= htmlspecialchars($avatarIniciais) ?></div>
+            <a href="/pages/perfil.php" class="avatar" aria-label="Meu perfil"><?= htmlspecialchars($avatarIniciais) ?></a>
         </div>
 
         <main class="container">

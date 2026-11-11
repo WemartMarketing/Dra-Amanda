@@ -53,14 +53,61 @@ HostGator. O desenvolvimento segue as etapas do prompt mestre.
 - Duas permissões novas: *Gerenciar empreendimentos* e *Gerenciar
   plantões* (concedidas ao Master da empresa).
 
+### Etapa 3 — CRM
+- **Etapas do funil configuráveis** (*Etapas do funil*, permissão
+  *Configurar funil*): renomear, cor, ordem (↑/↓), mostrar ou não no Kanban,
+  ativar/desativar e criar etapas. Cada etapa aponta para uma **categoria**
+  fixa (Tentando contato, Em atendimento, Visita agendada…); `leads.etapa`
+  sempre recebe a categoria, então Relatórios e Início continuam contando
+  certo. Categoria de etapa com leads não muda; desativar etapa com leads
+  exige escolher o destino.
+- **Kanban** com as etapas ativas e coloridas, card com telefone,
+  empreendimento, tempo desde a última atividade, próxima ação, alerta de
+  atraso, prioridade, WhatsApp (`wa.me/55…`), ligar e ficha. Arrastar ou
+  botão **Mover etapa**. Filtros: empreendimento, período, etapa,
+  prioridade e (gestores) corretor. No celular, uma coluna por vez com abas.
+- **Leads** (lista): busca por nome/telefone, mesmos filtros, paginação e
+  transferência em lote para gestores.
+- **Cadastro de lead** com checagem de telefone duplicado que nunca revela
+  lead de outra carteira; gestor escolhe o corretor; a equipe vem do
+  responsável; entra na primeira etapa ativa com evento de atribuição.
+- **Ficha** com abas Resumo | Atendimento | Histórico | Agenda | Arquivos
+  (aba fica na URL). Ligar e WhatsApp registram o contato sozinhos.
+  Atendimento é um formulário único: o que aconteceu + etapa + próximo
+  contato (vira retorno na agenda). Histórico com ícones e filtro por tipo.
+  Excluir é exclusão lógica com confirmação e auditoria.
+- **Agenda** (Minha agenda): atrasados, hoje e próximos, visão semanal;
+  visita, retorno ou tarefa (com ou sem lead); realizado, cliente ausente,
+  reagendar (novo compromisso ligado ao anterior) e cancelar. Agendar
+  visita move o lead para "Visita agendada"; marcar realizada oferece mover
+  para "Visita realizada".
+- **Início do corretor**: contagens, atividades pendentes, próximos
+  compromissos, alertas de leads parados e os botões MEUS LEADS, MEU
+  KANBAN, MINHA AGENDA e ENTRAR NA ROLETA (o check-in com localização chega
+  na Etapa 4 — o botão leva à tela da roleta e diz isso). Gestores mantêm a
+  visão da equipe.
+- **Transferência de leads** (permissão *Redistribuir leads*): da ficha ou
+  em lote, só para corretores do próprio escopo. Grava em
+  `lead_transferencias` a estrutura de origem e destino (corretor, equipe,
+  gerente, superintendência). A estrutura anterior perde o acesso ao lead e
+  fica só com o número agregado em **Relatórios → Transferências e
+  perdas** (sem nomes nem telefones). Quando um corretor muda de equipe,
+  seus leads abertos vão junto (motivo *mudança de equipe*).
+- **Arquivos do lead** (permissão *Acessar arquivos de leads*): PDF, JPG,
+  PNG, WEBP, DOCX e XLSX validados pelo conteúdo, até 10 MB (ou o limite do
+  servidor). Ficam em `storage/lead_arquivos/` com nome aleatório e sem
+  extensão; `storage/` é bloqueado por `.htaccess` e o download só passa por
+  `api/lead_arquivo_baixar.php` (login + permissão + escopo do lead).
+- **Meu perfil**: nome, e-mail e troca de senha (exige a senha atual).
+- Menu do corretor: Início, Meus leads, Meu Kanban, Minha agenda, Minha
+  roleta e Meu perfil; no celular, barra inferior Início | Leads | Kanban |
+  Agenda | Mais.
+
 ### Limitações conhecidas (ficam para as próximas etapas)
-- **Etapa 3**: regras de visibilidade na transferência de leads (gerente
-  anterior perde acesso etc.). Hoje mover um corretor de equipe altera só a
-  estrutura — os leads mantêm o `equipe_id` gravado neles (fica registrado
-  na auditoria como `usuario.equipe_alterada`). Também: agenda, ficha com
-  abas completas e etapas do Kanban configuráveis.
-- **Etapa 4**: presença por geolocalização e distribuição automática da
-  roleta. Os plantões já guardam coordenadas e raio para isso.
+- **Etapa 4**: presença por geolocalização (check-in na roleta) e
+  distribuição automática da roleta, incluindo redistribuição automática
+  de leads parados (o motivo *inatividade* já existe em
+  `lead_transferencias`). Os plantões já guardam coordenadas e raio para isso.
 - **Etapa 5**: Meta Lead Ads, oferta ativa e recuperação automática.
 - **Etapa 6**: dashboards completos e exportação Excel (o botão existe e
   avisa que está em desenvolvimento).
@@ -88,10 +135,13 @@ mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_002_funcoes_permiss
 php sql/migration_002_backfill.php
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_003_estrutura_comercial.sql
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_003.sql
+mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_004_crm.sql
+mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_004.sql
 ```
 
-Observação: o `php -S` ignora `.htaccess`. Para testar as proteções de
-`uploads/`, `includes/` e `sql/`, use Apache com `AllowOverride All`.
+Observação: o `php -S` ignora `.htaccess` (inclusive o bloqueio de
+`storage/`). Para testar as proteções de `uploads/`, `storage/`,
+`includes/` e `sql/`, use Apache com `AllowOverride All`.
 
 ### Login de demonstração
 
@@ -127,6 +177,25 @@ Senha de todas as contas: **demo123**
 6. Entre como corretor: Equipes e Plantões mostram "Acesso restrito";
    Empreendimentos aparece só para consulta.
 
+### Como testar a Etapa 3
+1. Como Master → **Etapas do funil**: renomeie uma etapa, crie "Análise de
+   crédito" na categoria *Em atendimento* e suba-a com ↑. O Kanban mostra a
+   nova ordem; mova um lead para ela e veja Relatórios contar o lead em
+   *Em atendimento*. Tente desativá-la: o sistema pede o destino dos leads.
+2. Como corretor (`carlos@hmvendas.demo`): **Início** → MEU KANBAN, use
+   *Mover etapa*; abra uma ficha → aba **Atendimento**, registre o contato
+   com "Amanhã 10h" e confira o retorno em **Minha agenda**.
+3. Na agenda: *Reagendar*, *Cliente ausente* e *Realizado* (numa visita, o
+   sistema oferece mover o lead para "Visita realizada").
+4. Como Master, na ficha de um lead da Equipe Zona Oeste: *Mais →
+   Transferir lead* para a Juliana (Zona Sul). Entrando como
+   `ana.gerente@…`, a ficha passa a dar "Lead não encontrado" e Relatórios
+   mostra +1 em *Transferências e perdas*; `diego.gerente@…` passa a ver o
+   lead.
+5. Aba **Arquivos**: envie um PDF; um `.php` ou `.exe` (mesmo renomeado
+   para `.pdf`) é recusado.
+6. **Meu perfil**: trocar a senha exige a senha atual.
+
 Todos os nomes, leads e telefones do seed são **fictícios**.
 
 ## Estrutura
@@ -138,12 +207,18 @@ includes/
   funcoes.php                      funções padrão e catálogo de permissões
   api.php                          início comum dos endpoints (sessão → CSRF → permissão)
   estrutura.php                    rótulos e upload seguro de imagem
+  funil.php                        etapas do funil e lead_mudar_etapa() (única forma de mudar etapa)
+  leads.php, leads_lista.php       helpers de lead, telefone, filtros e consultas da lista/Kanban
+  lead_componentes.php             card do lead e modais (mover, transferir, agendar)
+  agenda.php, transferencia.php    agenda comercial e transferência de leads
+  arquivos.php                     upload/validação de arquivos de lead
   auditoria.php, db.php, layout_*  auditoria, PDO e layout
-pages/                             telas (inicio, kanban, lead, relatorios, equipes,
-                                   empreendimentos, empreendimento, plantoes, roletas,
-                                   usuarios, superadmin)
+pages/                             telas (inicio, leads, kanban, lead, agenda, funil, perfil,
+                                   relatorios, equipes, empreendimentos, empreendimento,
+                                   plantoes, roletas, usuarios, superadmin)
 api/                               endpoints POST chamados por fetch()
-uploads/                           imagens enviadas (protegido por .htaccess)
+uploads/                           imagens de empreendimentos (protegido por .htaccess)
+storage/                           arquivos privados de leads — nunca servidos direto (.htaccess nega tudo)
 assets/css/app.css, assets/js/app.js
 sql/                               schema, seeds e migrações (ordem acima)
 referencias/                       protótipo UX original (não é código de produção)

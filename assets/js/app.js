@@ -9,26 +9,21 @@ function csrfToken() {
 }
 
 (function () {
-    async function moverLead(leadId, destino, cardEl) {
-        const r = await fetch('/api/lead_mover_etapa.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lead_id: leadId, etapa: destino, csrf_token: csrfToken() }),
-        });
-        if (r.ok) {
+    async function moverLead(leadId, destino) {
+        const fd = new FormData();
+        fd.append('lead_id', leadId);
+        fd.append('etapa_id', destino);
+        fd.append('csrf_token', csrfToken());
+        const r = await fetch('/api/lead_mover_etapa.php', { method: 'POST', body: fd });
+        const j = await r.json().catch(function () { return {}; });
+        if (r.ok && j.ok) {
+            wmToast(j.mensagem || 'Etapa atualizada.', true);
             location.reload();
         } else {
-            alert('Não foi possível mover este lead.');
+            wmToast(j.erro || 'Não foi possível mover este lead.');
         }
     }
-
-    // Botões "Voltar"/"Avançar" nos cards (funcionam em qualquer dispositivo,
-    // inclusive sem suporte a drag-and-drop no celular).
-    document.querySelectorAll('[data-move]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            moverLead(this.dataset.move, this.dataset.destino, this.closest('.kcard'));
-        });
-    });
+    window.wmMoverLead = moverLead;
 
     // Drag-and-drop (desktop) entre colunas do Kanban.
     let arrastando = null;
@@ -430,4 +425,320 @@ function csrfToken() {
         const data = await r.json().catch(function () { return {}; });
         if (r.ok && data.ok) { location.reload(); } else { alert(data.erro || 'Não foi possível atualizar.'); }
     }
+})();
+
+// ======================================================================
+// CRM (Etapa 3) — formulários de API, ações rápidas, modais, abas.
+// Todas as escritas vão como FormData (nunca JSON) com csrf_token.
+// ======================================================================
+
+// Aviso rápido no rodapé. persistir=true guarda para depois do reload.
+function wmToast(msg, persistir) {
+    if (persistir) {
+        try { sessionStorage.setItem('wm-toast', msg); } catch (e) { /* sem storage */ }
+        return;
+    }
+    var t = document.getElementById('toast');
+    if (!t) { alert(msg); return; }
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(wmToast._timer);
+    wmToast._timer = setTimeout(function () { t.hidden = true; }, 4200);
+}
+
+(function () {
+    try {
+        var pend = sessionStorage.getItem('wm-toast');
+        if (pend) { sessionStorage.removeItem('wm-toast'); wmToast(pend); }
+    } catch (e) { /* sem storage */ }
+
+    function abrirModal(id) { var el = document.getElementById(id); if (el) { el.hidden = false; var f = el.querySelector('input:not([type=hidden]):not([type=radio]), select, textarea'); if (f) setTimeout(function () { f.focus(); }, 30); } }
+    function fecharModal(el) { var o = el.closest('.modal-overlay'); if (o) o.hidden = true; }
+
+    async function postar(url, fd) {
+        if (!fd.has('csrf_token')) fd.append('csrf_token', csrfToken());
+        var r;
+        try { r = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }); }
+        catch (e) { return { status: 0, json: { ok: false, erro: 'Sem conexão. Tente de novo.' } }; }
+        var j = await r.json().catch(function () { return { ok: false, erro: 'Resposta inválida do servidor (' + r.status + ').' }; });
+        return { status: r.status, json: j };
+    }
+
+    // ---------------------------------------------------- [data-api-form]
+    document.querySelectorAll('form[data-api-form]').forEach(function (form) {
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            var alerta = form.querySelector('[data-form-alerta]');
+            if (alerta) { alerta.hidden = true; alerta.innerHTML = ''; }
+            var arquivo = form.querySelector('input[type=file][data-limite]');
+            if (arquivo && arquivo.files[0] && arquivo.files[0].size > Number(arquivo.dataset.limite)) {
+                wmToast('Arquivo maior que o limite permitido.');
+                return;
+            }
+            var btn = form.querySelector('[type=submit]');
+            if (btn) btn.disabled = true;
+            var res = await postar(form.getAttribute('action'), new FormData(form));
+            if (btn) btn.disabled = false;
+            var j = res.json;
+            if (j.ok) {
+                var destino = form.dataset.redirecionar;
+                if (destino) {
+                    wmToast(j.mensagem || 'Salvo.', true);
+                    location.href = destino.replace('{id}', encodeURIComponent(j.id || ''));
+                } else {
+                    wmToast(j.mensagem || 'Salvo.', true);
+                    location.reload();
+                }
+                return;
+            }
+            var msg = j.erro || 'Não foi possível salvar.';
+            if (alerta) {
+                alerta.textContent = msg;
+                if (res.status === 409 && j.lead_id) {
+                    var a = document.createElement('a');
+                    a.href = '/pages/lead.php?id=' + encodeURIComponent(j.lead_id);
+                    a.textContent = ' Abrir o cadastro existente';
+                    alerta.appendChild(a);
+                }
+                alerta.hidden = false;
+            } else {
+                wmToast(msg);
+            }
+        });
+    });
+
+    // ------------------------------------- [data-api-acao] (botões simples)
+    var reservados = ['apiAcao', 'confirmar', 'irPara'];
+    document.querySelectorAll('[data-api-acao]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            if (btn.dataset.confirmar && !confirm(btn.dataset.confirmar)) return;
+            var fd = new FormData();
+            Object.keys(btn.dataset).forEach(function (k) { if (reservados.indexOf(k) === -1) fd.append(k, btn.dataset[k]); });
+            btn.disabled = true;
+            var res = await postar(btn.dataset.apiAcao, fd);
+            btn.disabled = false;
+            if (res.json.ok) {
+                wmToast(res.json.mensagem || 'Feito.', true);
+                if (btn.dataset.irPara) location.href = btn.dataset.irPara; else location.reload();
+            } else {
+                wmToast(res.json.erro || 'Não foi possível concluir.');
+            }
+        });
+    });
+
+    // --------------------------- Registro automático de ligação/WhatsApp
+    document.querySelectorAll('[data-registrar]').forEach(function (link) {
+        link.addEventListener('click', function () {
+            var fd = new FormData();
+            fd.append('lead_id', link.dataset.lead);
+            fd.append('tipo', link.dataset.registrar);
+            fd.append('csrf_token', csrfToken());
+            if (!(navigator.sendBeacon && navigator.sendBeacon('/api/lead_registrar.php', fd))) {
+                fetch('/api/lead_registrar.php', { method: 'POST', body: fd, keepalive: true });
+            }
+        });
+    });
+
+    // ----------------------------------------------- Modal "Mover etapa"
+    var leadMovendo = null;
+    document.querySelectorAll('[data-mover-lead]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            leadMovendo = btn.dataset.moverLead;
+            var modal = document.getElementById('modal-mover');
+            if (!modal) return;
+            var nome = modal.querySelector('[data-mover-nome]');
+            if (nome) nome.textContent = btn.dataset.leadNome || '';
+            modal.querySelectorAll('[data-destino-etapa]').forEach(function (op) {
+                var atual = op.dataset.destinoEtapa === btn.dataset.etapaAtual;
+                op.classList.toggle('is-current', atual);
+                op.disabled = atual;
+            });
+            modal.hidden = false;
+        });
+    });
+    document.querySelectorAll('[data-destino-etapa]').forEach(function (op) {
+        op.addEventListener('click', function () {
+            if (!leadMovendo) return;
+            op.disabled = true;
+            window.wmMoverLead(leadMovendo, op.dataset.destinoEtapa);
+        });
+    });
+
+    // ------------------------------------------------- Transferir lead(s)
+    function abrirTransferencia(ids) {
+        var modal = document.getElementById('modal-transferir');
+        if (!modal || !ids.length) return;
+        var box = modal.querySelector('[data-transferir-ids]');
+        box.innerHTML = '';
+        ids.forEach(function (id) {
+            var i = document.createElement('input');
+            i.type = 'hidden'; i.name = 'lead_ids[]'; i.value = id;
+            box.appendChild(i);
+        });
+        modal.querySelector('h2').textContent = ids.length > 1 ? 'Transferir ' + ids.length + ' leads' : 'Transferir lead';
+        modal.hidden = false;
+    }
+    document.querySelectorAll('[data-transferir-lead]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var d = btn.closest('details'); if (d) d.open = false;
+            abrirTransferencia([btn.dataset.transferirLead]);
+        });
+    });
+    var bulk = document.querySelector('[data-bulk-bar]');
+    function selecionados() { return Array.prototype.map.call(document.querySelectorAll('[data-selecionar-lead]:checked'), function (c) { return c.value; }); }
+    function atualizarBulk() {
+        if (!bulk) return;
+        var n = selecionados().length;
+        bulk.hidden = n === 0;
+        bulk.querySelector('[data-bulk-contagem]').textContent = n + (n === 1 ? ' selecionado' : ' selecionados');
+    }
+    document.querySelectorAll('[data-selecionar-lead]').forEach(function (c) { c.addEventListener('change', atualizarBulk); });
+    var todos = document.querySelector('[data-selecionar-todos]');
+    if (todos) todos.addEventListener('change', function () {
+        document.querySelectorAll('[data-selecionar-lead]').forEach(function (c) { c.checked = todos.checked; });
+        atualizarBulk();
+    });
+    var btnBulk = document.querySelector('[data-transferir-selecionados]');
+    if (btnBulk) btnBulk.addEventListener('click', function () { abrirTransferencia(selecionados()); });
+
+    // ------------------------------------------------------------ Agenda
+    document.querySelectorAll('[data-agenda-acao]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            var acao = btn.dataset.agendaAcao;
+            var fd = new FormData();
+            fd.append('id', btn.dataset.id);
+            fd.append('acao', acao);
+            if (acao === 'cancelar' && !confirm('Cancelar este compromisso?')) return;
+            if (acao === 'cliente_ausente' && !confirm('Registrar que o cliente não compareceu?')) return;
+            if (acao === 'realizado' && btn.dataset.tipo === 'visita' && btn.dataset.comLead === '1') {
+                if (confirm('Visita realizada! Mover o lead para "Visita realizada"?')) fd.append('mover_etapa', '1');
+            }
+            btn.disabled = true;
+            var res = await postar('/api/agenda_status.php', fd);
+            btn.disabled = false;
+            if (res.json.ok) { wmToast(res.json.mensagem || 'Compromisso atualizado.', true); location.reload(); }
+            else wmToast(res.json.erro || 'Não foi possível atualizar.');
+        });
+    });
+    document.querySelectorAll('[data-reagendar]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var modal = document.getElementById('modal-reagendar');
+            if (!modal) return;
+            modal.querySelector('input[name=id]').value = btn.dataset.reagendar;
+            modal.querySelector('[data-reagendar-titulo]').textContent = btn.dataset.titulo || '';
+            modal.querySelector('input[name=novo_inicio]').value = btn.dataset.inicio || '';
+            modal.hidden = false;
+        });
+    });
+    function atualizarSoVisita(form) {
+        var marcado = form.querySelector('[data-tipo-agenda]:checked');
+        form.querySelectorAll('[data-so-visita]').forEach(function (el) {
+            var visita = marcado && marcado.value === 'visita';
+            el.hidden = !visita;
+            var cb = el.querySelector('input'); if (cb) cb.disabled = !visita;
+        });
+    }
+    document.querySelectorAll('[data-tipo-agenda]').forEach(function (r) {
+        r.addEventListener('change', function () { atualizarSoVisita(r.form); });
+    });
+    document.querySelectorAll('[data-agendar-tipo]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var modal = document.getElementById('modal-agendar');
+            if (!modal) return;
+            var r = modal.querySelector('[data-tipo-agenda][value="' + btn.dataset.agendarTipo + '"]');
+            if (r) { r.checked = true; atualizarSoVisita(r.form); }
+        });
+    });
+    document.querySelectorAll('#modal-agendar form').forEach(atualizarSoVisita);
+
+    // Atalhos de data ("Amanhã 10h"…) para inputs datetime-local.
+    function dtLocal(d) { var p = function (n) { return String(n).padStart(2, '0'); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+    document.querySelectorAll('[data-data-rapida]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var d = new Date(); var tipo = btn.dataset.dataRapida;
+            if (tipo === 'hoje18') d.setHours(18, 0, 0, 0);
+            if (tipo === 'amanha10') { d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); }
+            if (tipo === '2dias10') { d.setDate(d.getDate() + 2); d.setHours(10, 0, 0, 0); }
+            if (tipo === 'semana10') { d.setDate(d.getDate() + 7); d.setHours(10, 0, 0, 0); }
+            var input = btn.closest('.field').querySelector('input[type=datetime-local]');
+            if (input) input.value = dtLocal(d);
+            btn.parentNode.querySelectorAll('.chip-btn').forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+        });
+    });
+
+    // ------------------------------------------------ Registro rápido (ficha)
+    document.querySelectorAll('[data-registro-tipo]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var d = btn.closest('details'); if (d) d.open = false;
+            var modal = document.getElementById('modal-registro');
+            if (!modal) return;
+            var nota = btn.dataset.registroTipo === 'nota';
+            modal.querySelector('input[name=tipo]').value = btn.dataset.registroTipo;
+            modal.querySelector('[data-registro-titulo]').textContent = nota ? 'Adicionar observação' : 'Registrar contato';
+            modal.querySelector('[data-registro-label]').textContent = nota ? 'Observação' : 'O que aconteceu no contato?';
+        });
+    });
+    document.querySelectorAll('.more-menu [data-open-modal]').forEach(function (btn) {
+        btn.addEventListener('click', function () { var d = btn.closest('details'); if (d) d.open = false; });
+    });
+
+    // ------------------------------------------------------- Abas da ficha
+    var abas = document.querySelectorAll('[data-aba]');
+    function mostrarAba(chave, empurrar) {
+        var achou = false;
+        document.querySelectorAll('[data-painel]').forEach(function (p) { var ok = p.dataset.painel === chave; p.hidden = !ok; achou = achou || ok; });
+        if (!achou) return false;
+        abas.forEach(function (a) { var ok = a.dataset.aba === chave; a.classList.toggle('is-current', ok); a.setAttribute('aria-selected', ok ? 'true' : 'false'); if (ok && a.scrollIntoView) a.scrollIntoView({ block: 'nearest', inline: 'center' }); });
+        if (empurrar) { var u = new URL(location.href); u.searchParams.set('aba', chave); u.hash = ''; history.pushState({ aba: chave }, '', u); }
+        return true;
+    }
+    abas.forEach(function (a) {
+        a.addEventListener('click', function (e) { if (mostrarAba(a.dataset.aba, true)) e.preventDefault(); });
+    });
+    document.querySelectorAll('[data-ir-aba]').forEach(function (a) {
+        a.addEventListener('click', function (e) { if (mostrarAba(a.dataset.irAba, true)) { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
+    });
+    if (abas.length) window.addEventListener('popstate', function () { mostrarAba(new URL(location.href).searchParams.get('aba') || 'resumo', false); });
+
+    // Filtro do histórico por tipo.
+    document.querySelectorAll('[data-filtro-hist]').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+            var tipo = chip.dataset.filtroHist;
+            document.querySelectorAll('[data-filtro-hist]').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
+            document.querySelectorAll('[data-tipo-hist]').forEach(function (it) { it.hidden = tipo !== '' && it.dataset.tipoHist !== tipo; });
+        });
+    });
+
+    // Nome do arquivo escolhido.
+    document.querySelectorAll('input[type=file][data-mostrar-nome]').forEach(function (inp) {
+        inp.addEventListener('change', function () {
+            var alvo = inp.form.querySelector('[data-file-name]');
+            if (alvo) alvo.textContent = inp.files[0] ? inp.files[0].name : 'Nenhum arquivo escolhido';
+        });
+    });
+
+    // ----------------------------------------------- Kanban: abas no celular
+    document.querySelectorAll('[data-coluna-tab]').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            var id = tab.dataset.colunaTab;
+            document.querySelectorAll('[data-coluna-tab]').forEach(function (t) { var ok = t === tab; t.classList.toggle('is-current', ok); t.setAttribute('aria-selected', ok ? 'true' : 'false'); });
+            document.querySelectorAll('.kcol[data-coluna]').forEach(function (c) { c.classList.toggle('is-current', c.dataset.coluna === id); });
+            tab.scrollIntoView({ block: 'nearest', inline: 'center' });
+            var u = new URL(location.href); u.searchParams.set('coluna', id); history.replaceState(null, '', u);
+        });
+    });
+
+    document.querySelectorAll('[data-toggle-filtros]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var box = btn.parentNode.querySelector('[data-filtros-extra]');
+            if (!box) return;
+            var aberto = box.classList.toggle('is-open');
+            btn.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+        });
+    });
+
+    // Filtros que se aplicam sozinhos ao mudar.
+    document.querySelectorAll('[data-auto-filtro]').forEach(function (sel) {
+        sel.addEventListener('change', function () { if (sel.form) sel.form.submit(); });
+    });
 })();

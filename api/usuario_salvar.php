@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/funcoes.php';
+require_once __DIR__ . '/../includes/transferencia.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -75,9 +76,10 @@ if ($equipeId) {
 
 try {
     if ($id) {
-        $stmt = db()->prepare('SELECT id FROM usuarios WHERE id = :id AND empresa_id = :empresa_id');
+        $stmt = db()->prepare('SELECT id, equipe_id FROM usuarios WHERE id = :id AND empresa_id = :empresa_id');
         $stmt->execute(['id' => $id, 'empresa_id' => $empresaId]);
-        if (!$stmt->fetch()) {
+        $usuarioAntes = $stmt->fetch();
+        if (!$usuarioAntes) {
             http_response_code(404);
             echo json_encode(['ok' => false, 'erro' => 'Usuário não encontrado.']);
             exit;
@@ -121,6 +123,12 @@ foreach ($empreendimentosVinculados as $empId) {
     $ins->execute(['uid' => $id, 'eid' => $empId]);
 }
 
-auditoria_registrar($empresaId, (int) $usuarioLogado['id'], $acao, 'usuario', $id, ['funcao_id' => $funcaoId, 'ativo' => $ativo, 'empreendimentos' => $empreendimentosVinculados]);
+// Mudou de equipe pelo cadastro: leads abertos acompanham (mesma regra da tela Equipes).
+$leadsMovidos = 0;
+if (!empty($usuarioAntes) && (int) $usuarioAntes['equipe_id'] !== (int) $equipeId) {
+    $leadsMovidos = transferencia_acompanhar_mudanca_equipe($empresaId, $id, $usuarioLogado);
+}
+
+auditoria_registrar($empresaId, (int) $usuarioLogado['id'], $acao, 'usuario', $id, ['funcao_id' => $funcaoId, 'ativo' => $ativo, 'empreendimentos' => $empreendimentosVinculados, 'leads_acompanharam' => $leadsMovidos]);
 
 echo json_encode(['ok' => true]);

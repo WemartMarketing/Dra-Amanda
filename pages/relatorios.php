@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/leads.php';
+require_once __DIR__ . '/../includes/lead_componentes.php';
 
 $usuario = auth_require();
 
@@ -140,6 +141,27 @@ $perdasPorMotivo = $stmt->fetchAll();
 $maxPerdas = max(1, $perdasInatividade);
 
 // --------------------------------------------------------------
+// Transferências e perdas — só contagens agregadas, pela estrutura de
+// ORIGEM gravada na transferência (sem nomes nem telefones).
+// --------------------------------------------------------------
+require_once __DIR__ . '/../includes/transferencia.php';
+$tScope = rbac_transferencias_scope($usuario);
+$tSql = $tScope['sql'] . ' AND t.criado_em >= :t_inicio';
+$tParams = $tScope['params'] + ['t_inicio' => $dataInicio];
+if ($filtroEmpreendimento) { $tSql .= ' AND t.empreendimento_id = :t_emp'; $tParams['t_emp'] = $filtroEmpreendimento; }
+if ($filtroEquipe) { $tSql .= ' AND t.de_equipe_id = :t_eq'; $tParams['t_eq'] = $filtroEquipe; }
+elseif ($filtroSuperintendencia) { $tSql .= ' AND t.de_superintendencia_id = :t_su'; $tParams['t_su'] = $filtroSuperintendencia; }
+$stmt = db()->prepare("SELECT t.motivo, COUNT(*) AS total, SUM(t.para_equipe_id IS NULL OR t.de_equipe_id IS NULL OR t.para_equipe_id <> t.de_equipe_id) AS saiu_da_equipe FROM lead_transferencias t WHERE {$tSql} GROUP BY t.motivo");
+$stmt->execute($tParams);
+$transfPorMotivo = [];
+foreach ($stmt->fetchAll() as $row) {
+    $transfPorMotivo[$row['motivo']] = ['total' => (int) $row['total'], 'saiu' => (int) $row['saiu_da_equipe']];
+}
+$transfTotal = array_sum(array_column($transfPorMotivo, 'total'));
+$transfSaiu = array_sum(array_column($transfPorMotivo, 'saiu'));
+$maxTransf = max(1, ...array_column($transfPorMotivo, 'total') ?: [1]);
+
+// --------------------------------------------------------------
 // Opções dos filtros
 // --------------------------------------------------------------
 $empreendimentosOpt = db()->prepare('SELECT id, nome FROM empreendimentos WHERE empresa_id = :empresa_id ORDER BY nome');
@@ -274,6 +296,30 @@ require __DIR__ . '/../includes/layout_start.php';
             <p class="empty-note">Nenhuma oportunidade perdida no período — ótimo sinal.</p>
         <?php endif; ?>
     </div>
+</div>
+
+<div class="card transf-card">
+    <div class="card-head">
+        <div><h2>Transferências e perdas</h2><p>Leads que saíram da sua estrutura no período, por motivo. Números agregados — sem dados dos clientes.</p></div>
+        <span class="pill <?= $transfTotal ? 'pill-amber' : 'pill-muted' ?>"><?= $transfTotal ?> no período</span>
+    </div>
+    <div class="transf-grid">
+        <div class="perdas-headline"><strong><?= $transfSaiu ?></strong><div><b>Saíram da equipe</b><span>Foram para outra equipe ou estrutura.</span></div></div>
+        <div class="perdas-headline"><strong><?= $perdasInatividade ?></strong><div><b>Perdidos por inatividade</b><span>Leads encerrados sem atuação.</span></div></div>
+    </div>
+    <?php if ($transfPorMotivo): ?>
+        <div class="funnel" style="margin-top:14px;">
+            <?php foreach (transferencia_motivos() as $motivo => $rotulo): if (empty($transfPorMotivo[$motivo])) continue; $m = $transfPorMotivo[$motivo]; ?>
+                <div class="funnel-row">
+                    <span class="funnel-label"><?= e($rotulo) ?></span>
+                    <div class="funnel-track"><div class="funnel-fill" style="width: <?= max(2, round($m['total'] / $maxTransf * 100)) ?>%"></div></div>
+                    <span class="funnel-value" title="<?= $m['saiu'] ?> saíram da equipe"><?= $m['total'] ?></span>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p class="empty-note">Nenhuma transferência saindo da sua estrutura no período.</p>
+    <?php endif; ?>
 </div>
 
 <div class="modal-overlay" id="modal-excel" hidden>
