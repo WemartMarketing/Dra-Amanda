@@ -8,12 +8,24 @@ $podeGerenciar = usuario_tem_permissao($usuario, 'gerenciar_roletas');
 
 $stmt = db()->prepare('
     SELECT roletas.*,
+        plantoes.nome AS plantao_nome, plantoes.endereco AS plantao_endereco, plantoes.bairro AS plantao_bairro,
+        plantoes.cidade AS plantao_cidade, plantoes.estado AS plantao_estado, plantoes.raio_metros AS plantao_raio,
+        plantoes.latitude AS plantao_latitude, plantoes.ativo AS plantao_ativo,
         (SELECT COUNT(*) FROM roleta_empreendimentos WHERE roleta_empreendimentos.roleta_id = roletas.id) AS total_empreendimentos,
         (SELECT COUNT(*) FROM roleta_corretores WHERE roleta_corretores.roleta_id = roletas.id) AS total_corretores
-    FROM roletas WHERE empresa_id = :empresa_id ORDER BY nome
+    FROM roletas
+    LEFT JOIN plantoes ON plantoes.id = roletas.plantao_id AND plantoes.empresa_id = roletas.empresa_id
+    WHERE roletas.empresa_id = :empresa_id ORDER BY roletas.nome
 ');
 $stmt->execute(['empresa_id' => $empresaId]);
 $roletas = $stmt->fetchAll();
+
+$plantoesOpcoes = [];
+if ($podeGerenciar) {
+    $stmt = db()->prepare('SELECT id, nome, ativo FROM plantoes WHERE empresa_id = :empresa_id ORDER BY ativo DESC, nome');
+    $stmt->execute(['empresa_id' => $empresaId]);
+    $plantoesOpcoes = $stmt->fetchAll();
+}
 
 $selecionadaId = (int) ($_GET['id'] ?? 0);
 if (!$selecionadaId || !in_array($selecionadaId, array_column($roletas, 'id'), true)) {
@@ -85,7 +97,7 @@ require __DIR__ . '/../includes/layout_start.php';
 <div class="roleta-layout">
     <div class="card">
         <div class="card-head">
-            <div><h2>Plantões cadastrados</h2><p><?= $podeGerenciar ? 'Selecione uma roleta para ver e editar os detalhes.' : 'Dados desta empresa — edição disponível só para cargos de gestão.' ?></p></div>
+            <div><h2>Roletas cadastradas</h2><p><?= $podeGerenciar ? 'Selecione uma roleta para ver e editar os detalhes.' : 'Dados desta empresa — edição disponível só para cargos de gestão.' ?></p></div>
             <span class="pill pill-muted"><?= count($roletas) ?> roleta(s)</span>
         </div>
         <?php foreach ($roletas as $r): ?>
@@ -93,7 +105,7 @@ require __DIR__ . '/../includes/layout_start.php';
                 <div class="plantao-icon"><?= icon('pin') ?></div>
                 <div class="who-info">
                     <strong><?= htmlspecialchars($r['nome']) ?></strong>
-                    <span><?= (int) $r['total_empreendimentos'] ?> empreendimento(s) · <?= (int) $r['total_corretores'] ?> corretor(es)</span>
+                    <span><?= $r['plantao_nome'] && $r['plantao_nome'] !== $r['nome'] ? 'Plantão: ' . htmlspecialchars($r['plantao_nome']) . ' · ' : '' ?><?= !$r['plantao_nome'] ? 'Sem plantão · ' : '' ?><?= (int) $r['total_empreendimentos'] ?> empreendimento(s) · <?= (int) $r['total_corretores'] ?> corretor(es)</span>
                 </div>
                 <span class="pill <?= $r['ativa'] ? 'pill-green' : 'pill-muted' ?>"><?= $r['ativa'] ? 'Ativa' : 'Pausada' ?></span>
             </a>
@@ -112,8 +124,21 @@ require __DIR__ . '/../includes/layout_start.php';
                 <div class="radius-circle"></div>
             </div>
 
-            <div class="roleta-detail-row"><span class="label">Presença por geolocalização</span><span class="pill <?= $roleta['raio_presenca_metros'] ? 'pill-green' : 'pill-muted' ?>"><?= $roleta['raio_presenca_metros'] ? 'Ativada' : 'Desativada' ?></span></div>
-            <div class="roleta-detail-row"><span class="label">Raio de presença</span><strong><?= $roleta['raio_presenca_metros'] ? (int) $roleta['raio_presenca_metros'] . ' metros' : '—' ?></strong></div>
+            <?php
+            $temPlantao = !empty($roleta['plantao_nome']);
+            $temCoordenadas = $temPlantao && $roleta['plantao_latitude'] !== null;
+            $enderecoPlantao = implode(' · ', array_filter([$roleta['plantao_endereco'] ?? null, $roleta['plantao_bairro'] ?? null, trim(($roleta['plantao_cidade'] ?? '') . ($roleta['plantao_estado'] ? '/' . $roleta['plantao_estado'] : ''), '/')]));
+            ?>
+            <div class="roleta-detail-row"><span class="label">Plantão</span>
+                <?php if ($temPlantao): ?>
+                    <span style="text-align:right;"><strong><?= htmlspecialchars($roleta['plantao_nome']) ?></strong><?php if (!$roleta['plantao_ativo']): ?> <span class="pill pill-muted">Inativo</span><?php endif; ?>
+                    <?php if ($enderecoPlantao): ?><br><small class="muted"><?= htmlspecialchars($enderecoPlantao) ?></small><?php endif; ?></span>
+                <?php else: ?>
+                    <span class="pill pill-amber">Sem plantão vinculado</span>
+                <?php endif; ?>
+            </div>
+            <div class="roleta-detail-row"><span class="label">Presença por geolocalização</span><span class="pill <?= $temCoordenadas ? 'pill-green' : 'pill-muted' ?>"><?= $temCoordenadas ? 'Ativada' : ($temPlantao ? 'Plantão sem coordenadas' : 'Desativada') ?></span></div>
+            <div class="roleta-detail-row"><span class="label">Raio de presença</span><strong><?= $temPlantao ? (int) $roleta['plantao_raio'] . ' metros' : '—' ?></strong></div>
             <div class="roleta-detail-row"><span class="label">Horário permitido</span><strong><?= $roleta['horario_inicio'] ? substr($roleta['horario_inicio'], 0, 5) . ' às ' . substr($roleta['horario_fim'], 0, 5) : '—' ?></strong></div>
             <div class="roleta-detail-row"><span class="label">Empreendimentos</span>
                 <span>
@@ -178,7 +203,13 @@ require __DIR__ . '/../includes/layout_start.php';
         <form data-form-roleta>
             <?= csrf_field() ?>
             <div class="field"><label>Nome</label><input type="text" name="nome" required placeholder="Ex.: Casa HM — Zona Leste"></div>
-            <div class="field"><label>Raio de presença (metros)</label><input type="text" name="raio_presenca_metros" placeholder="Ex.: 300 (deixe vazio para desativar)"></div>
+            <div class="field"><label>Plantão</label>
+                <select name="plantao_id">
+                    <option value="">Sem plantão (sem geolocalização)</option>
+                    <?php foreach ($plantoesOpcoes as $p): ?><option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nome']) ?><?= $p['ativo'] ? '' : ' (inativo)' ?></option><?php endforeach; ?>
+                </select>
+                <small class="field-hint">Endereço e raio de presença vêm do plantão — cadastre em <a href="/pages/plantoes.php">Plantões</a>.</small>
+            </div>
             <div class="field"><label>Horário permitido</label>
                 <div style="display:flex;gap:10px;">
                     <input type="time" name="horario_inicio" style="flex:1;">
@@ -199,7 +230,13 @@ require __DIR__ . '/../includes/layout_start.php';
             <?= csrf_field() ?>
             <input type="hidden" name="id" value="<?= $roleta['id'] ?? '' ?>">
             <div class="field"><label>Nome</label><input type="text" name="nome" required value="<?= htmlspecialchars($roleta['nome'] ?? '') ?>"></div>
-            <div class="field"><label>Raio de presença (metros)</label><input type="text" name="raio_presenca_metros" value="<?= htmlspecialchars((string) ($roleta['raio_presenca_metros'] ?? '')) ?>" placeholder="Deixe vazio para desativar"></div>
+            <div class="field"><label>Plantão</label>
+                <select name="plantao_id">
+                    <option value="">Sem plantão (sem geolocalização)</option>
+                    <?php foreach ($plantoesOpcoes as $p): ?><option value="<?= $p['id'] ?>" <?= (int) ($roleta['plantao_id'] ?? 0) === (int) $p['id'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nome']) ?><?= $p['ativo'] ? '' : ' (inativo)' ?></option><?php endforeach; ?>
+                </select>
+                <small class="field-hint">Endereço e raio de presença vêm do plantão — cadastre em <a href="/pages/plantoes.php">Plantões</a>.</small>
+            </div>
             <div class="field"><label>Horário permitido</label>
                 <div style="display:flex;gap:10px;">
                     <input type="time" name="horario_inicio" style="flex:1;" value="<?= substr((string) ($roleta['horario_inicio'] ?? ''), 0, 5) ?>">

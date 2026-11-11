@@ -1,6 +1,9 @@
 <?php
 /**
- * POST /api/usuario_salvar.php  { id?, nome, email, senha?, funcao_id, equipe_id?, ativo? }
+ * POST /api/usuario_salvar.php  { id?, nome, email, senha?, funcao_id, equipe_id?, ativo?, empreendimentos[] }
+ * `empreendimentos[]` só vale para funções de escopo "produtos_vinculados"
+ * (GP do Produto): define usuario_empreendimentos, que limita os leads
+ * visíveis (ver rbac_leads_scope). Para outros escopos os vínculos são limpos.
  * Cria ou atualiza um usuário da própria empresa. Nunca cria/edita um
  * Superadmin por aqui (fora do escopo de gestão de uma empresa — ver
  * api/empresa_criar.php) nem vincula a outra empresa.
@@ -102,6 +105,22 @@ try {
     throw $e;
 }
 
-auditoria_registrar($empresaId, (int) $usuarioLogado['id'], $acao, 'usuario', $id, ['funcao_id' => $funcaoId, 'ativo' => $ativo]);
+$empreendimentosVinculados = [];
+if ($escopoFuncao === 'produtos_vinculados') {
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['empreendimentos'] ?? [])))));
+    if ($ids) {
+        $marcadores = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = db()->prepare("SELECT id FROM empreendimentos WHERE empresa_id = ? AND id IN ({$marcadores})");
+        $stmt->execute(array_merge([$empresaId], $ids));
+        $empreendimentosVinculados = array_map('intval', array_column($stmt->fetchAll(), 'id'));
+    }
+}
+db()->prepare('DELETE FROM usuario_empreendimentos WHERE usuario_id = :id')->execute(['id' => $id]);
+$ins = db()->prepare('INSERT INTO usuario_empreendimentos (usuario_id, empreendimento_id) VALUES (:uid, :eid)');
+foreach ($empreendimentosVinculados as $empId) {
+    $ins->execute(['uid' => $id, 'eid' => $empId]);
+}
+
+auditoria_registrar($empresaId, (int) $usuarioLogado['id'], $acao, 'usuario', $id, ['funcao_id' => $funcaoId, 'ativo' => $ativo, 'empreendimentos' => $empreendimentosVinculados]);
 
 echo json_encode(['ok' => true]);

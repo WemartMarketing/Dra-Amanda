@@ -4,3 +4,8 @@
 # Credenciais reais de banco de dados — cada ambiente (dev, produção)
 # cria o seu a partir de includes/config.example.php, nunca commitado.
 /includes/config.php
+
+# Imagens enviadas pelos usuários (ficam só no servidor; a pasta e o
+# .htaccess de proteção são versionados)
+/uploads/empreendimentos/*
+!/uploads/empreendimentos/.gitkeep

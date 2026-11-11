@@ -1,0 +1,40 @@
+# WeMart Sales — pasta de arquivos enviados pelos usuários.
+# Aqui só podem existir imagens; nada é executado. Diretivas compatíveis com
+# hospedagem compartilhada (cada bloco só vale se o módulo existir, para não
+# gerar erro 500 em servidores com PHP-FPM/LSAPI).
+
+Options -Indexes -ExecCGI
+
+# 1) Bloqueia qualquer arquivo que não seja imagem (inclui .php, .phtml, .phar,
+#    .htaccess de terceiros, scripts e arquivos sem extensão).
+<IfModule mod_authz_core.c>
+    Require all denied
+    <FilesMatch "^[a-f0-9]{32}\.(jpg|png|webp)$">
+        Require all granted
+    </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+    <FilesMatch "^[a-f0-9]{32}\.(jpg|png|webp)$">
+        Order deny,allow
+        Allow from all
+    </FilesMatch>
+</IfModule>
+
+# 2) Mesmo que um script chegasse aqui, não seria interpretado.
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8 .phar .pht .phps .cgi .pl .py .sh
+    RemoveType .php .phtml .php3 .php4 .php5 .php7 .php8 .phar .pht .phps
+</IfModule>
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+
+# 3) Força o navegador a tratar o conteúdo como o tipo declarado.
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

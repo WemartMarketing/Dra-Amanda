@@ -72,9 +72,10 @@ function formatarQuando(?string $dataRetorno, string $criadoEm): string
 $plantao = null;
 if ($ehCorretor) {
     $stmt = db()->prepare('
-        SELECT roletas.*,
+        SELECT roletas.*, plantoes.raio_metros AS plantao_raio, plantoes.nome AS plantao_nome,
             (SELECT dentro_do_raio FROM roleta_presencas rp WHERE rp.roleta_id = roletas.id AND rp.usuario_id = :uid ORDER BY confirmado_em DESC LIMIT 1) AS presenca_ativa
         FROM roletas
+        LEFT JOIN plantoes ON plantoes.id = roletas.plantao_id
         INNER JOIN roleta_corretores rc ON rc.roleta_id = roletas.id
         WHERE rc.usuario_id = :uid2 AND roletas.empresa_id = :empresa_id
         LIMIT 1
@@ -169,7 +170,7 @@ require __DIR__ . '/../includes/layout_start.php';
                 <div class="plantao-icon"><?= icon('pin') ?></div>
                 <div>
                     <strong><?= htmlspecialchars($plantao['nome']) ?></strong>
-                    <span><?= $plantao['presenca_ativa'] ? 'Presença confirmada' : 'Presença não confirmada' ?><?= $plantao['raio_presenca_metros'] ? ' · dentro de ' . (int) $plantao['raio_presenca_metros'] . ' m' : '' ?></span>
+                    <span><?= $plantao['presenca_ativa'] ? 'Presença confirmada' : 'Presença não confirmada' ?><?= $plantao['plantao_raio'] ? ' · raio de ' . (int) $plantao['plantao_raio'] . ' m' : '' ?></span>
                 </div>
                 <span class="pill <?= $plantao['presenca_ativa'] ? 'pill-green' : 'pill-muted' ?>"><?= $plantao['presenca_ativa'] ? 'Ativo' : 'Inativo' ?></span>
             </div>

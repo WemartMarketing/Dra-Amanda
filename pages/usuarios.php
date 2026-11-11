@@ -48,6 +48,17 @@ $stmt = db()->prepare('SELECT usuarios.*, equipes.nome AS equipe_nome, funcoes.n
 $stmt->execute(['empresa_id' => $empresaId]);
 $usuariosLista = $stmt->fetchAll();
 
+$empreendimentosOpt = db()->prepare('SELECT id, nome, ativo FROM empreendimentos WHERE empresa_id = :empresa_id ORDER BY ativo DESC, nome');
+$empreendimentosOpt->execute(['empresa_id' => $empresaId]);
+$empreendimentosOpt = $empreendimentosOpt->fetchAll();
+
+$stmt = db()->prepare('SELECT ue.usuario_id, ue.empreendimento_id FROM usuario_empreendimentos ue INNER JOIN usuarios u ON u.id = ue.usuario_id WHERE u.empresa_id = :empresa_id');
+$stmt->execute(['empresa_id' => $empresaId]);
+$empreendimentosPorUsuario = [];
+foreach ($stmt->fetchAll() as $row) {
+    $empreendimentosPorUsuario[$row['usuario_id']][] = (int) $row['empreendimento_id'];
+}
+
 $equipesOpt = db()->prepare('SELECT id, nome FROM equipes WHERE empresa_id = :empresa_id ORDER BY nome');
 $equipesOpt->execute(['empresa_id' => $empresaId]);
 $equipesOpt = $equipesOpt->fetchAll();
@@ -115,7 +126,8 @@ require __DIR__ . '/../includes/layout_start.php';
             <div class="user-row-actions">
                 <button type="button" class="link-btn" data-open-modal="modal-usuario" data-modo="editar"
                     data-id="<?= $u['id'] ?>" data-nome="<?= htmlspecialchars($u['nome']) ?>" data-email="<?= htmlspecialchars($u['email']) ?>"
-                    data-funcao-id="<?= $u['funcao_id'] ?>" data-equipe-id="<?= $u['equipe_id'] ?? '' ?>" data-ativo="<?= $u['ativo'] ?>">Editar</button>
+                    data-funcao-id="<?= $u['funcao_id'] ?>" data-equipe-id="<?= $u['equipe_id'] ?? '' ?>" data-ativo="<?= $u['ativo'] ?>"
+                    data-empreendimentos="<?= implode(',', $empreendimentosPorUsuario[$u['id']] ?? []) ?>">Editar</button>
                 <?php if ((int) $u['id'] !== (int) $usuario['id']): ?>
                     <button type="button" class="link-btn" data-toggle-ativo="<?= $u['id'] ?>" data-ativo-atual="<?= $u['ativo'] ?>"><?= $u['ativo'] ? 'Desativar' : 'Ativar' ?></button>
                 <?php endif; ?>
@@ -137,8 +149,17 @@ require __DIR__ . '/../includes/layout_start.php';
             <div class="field"><label>Senha</label><input type="password" name="senha" placeholder="Deixe vazio para manter a atual" autocomplete="new-password"></div>
             <div class="field"><label>Função</label>
                 <select name="funcao_id" required>
-                    <?php foreach ($funcoesLista as $f): ?><option value="<?= $f['id'] ?>"><?= htmlspecialchars($f['nome']) ?></option><?php endforeach; ?>
+                    <?php foreach ($funcoesLista as $f): ?><option value="<?= $f['id'] ?>" data-escopo="<?= $f['escopo'] ?>"><?= htmlspecialchars($f['nome']) ?></option><?php endforeach; ?>
                 </select>
+            </div>
+            <div class="field" id="campo-empreendimentos-usuario" hidden>
+                <label>Empreendimentos que esta pessoa acompanha</label>
+                <small class="field-hint">Funções com escopo "Produtos vinculados" só enxergam os leads destes empreendimentos.</small>
+                <div class="checkbox-grid">
+                    <?php foreach ($empreendimentosOpt as $e): ?>
+                        <label class="checkbox-row"><input type="checkbox" name="empreendimentos[]" value="<?= $e['id'] ?>"> <?= htmlspecialchars($e['nome']) ?><?= $e['ativo'] ? '' : ' (inativo)' ?></label>
+                    <?php endforeach; ?>
+                </div>
             </div>
             <div class="field"><label>Equipe (opcional)</label>
                 <select name="equipe_id">

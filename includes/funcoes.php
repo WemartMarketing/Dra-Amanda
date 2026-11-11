@@ -36,7 +36,7 @@ function funcoes_rotulos_escopo(): array
 function funcoes_definicao_padrao(): array
 {
     return [
-        'master_empresa'  => ['nome' => 'Master da empresa', 'escopo' => 'toda_empresa',        'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'excluir_leads', 'redistribuir_leads', 'gerenciar_roletas', 'gerenciar_equipes', 'exportar_relatorios', 'visualizar_indicadores', 'administrar_usuarios']],
+        'master_empresa'  => ['nome' => 'Master da empresa', 'escopo' => 'toda_empresa',        'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'excluir_leads', 'redistribuir_leads', 'gerenciar_roletas', 'gerenciar_equipes', 'gerenciar_empreendimentos', 'gerenciar_plantoes', 'exportar_relatorios', 'visualizar_indicadores', 'administrar_usuarios']],
         'gp_lider'        => ['nome' => 'GP Líder',          'escopo' => 'todos_produtos',       'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'exportar_relatorios']],
         'gerente_geral'   => ['nome' => 'Gerente Geral',     'escopo' => 'todos_produtos',       'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'exportar_relatorios', 'gerenciar_equipes']],
         'gp_produto'      => ['nome' => 'GP do Produto',     'escopo' => 'produtos_vinculados',  'permissoes' => ['visualizar_leads', 'visualizar_indicadores']],

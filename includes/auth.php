@@ -84,7 +84,7 @@ function auth_logout(): void
 
 function auth_check(): bool
 {
-    return !empty($_SESSION['usuario_id']);
+    return !empty($_SESSION['usuario_id']) && current_user() !== null;
 }
 
 /**
@@ -118,7 +118,18 @@ function current_user(): ?array
     $stmt = db()->prepare('SELECT * FROM usuarios WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $_SESSION['usuario_id']]);
     $usuario = $stmt->fetch();
-    if (!$usuario) {
+    $empresaAtiva = true;
+    if ($usuario && empty($usuario['eh_superadmin']) && $usuario['empresa_id']) {
+        $stmt = db()->prepare('SELECT ativa FROM empresas WHERE id = :id');
+        $stmt->execute(['id' => $usuario['empresa_id']]);
+        $empresaAtiva = (bool) $stmt->fetchColumn();
+    }
+    // Desativar o usuário (ou a empresa) encerra sessões já abertas na próxima requisição.
+    if (!$usuario || empty($usuario['ativo']) || !$empresaAtiva) {
+        $_SESSION = [];
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy();
+        }
         return null;
     }
     unset($usuario['senha_hash']);

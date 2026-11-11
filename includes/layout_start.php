@@ -5,7 +5,8 @@
  * Variáveis esperadas, definidas pela página antes do include:
  *   $pageTitle  string  título da aba do navegador
  *   $crumb      string  rótulo da página atual na breadcrumb
- *   $activeNav  string  um de: inicio, kanban, ficha, relatorios, roletas, usuarios
+ *   $activeNav  string  um de: inicio, kanban, ficha, relatorios, equipes,
+ *                       empreendimentos, plantoes, roletas, usuarios
  */
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/rbac.php';
@@ -27,6 +28,9 @@ $navItems = [
     ['key' => 'kanban',     'href' => '/pages/kanban.php',     'label' => 'Meus leads',        'icon' => 'kanban', 'permissao' => null],
     ['key' => 'ficha',      'href' => '/pages/kanban.php',     'label' => 'Ficha do lead',     'icon' => 'user',   'permissao' => null],
     ['key' => 'relatorios', 'href' => '/pages/relatorios.php', 'label' => 'Relatórios',        'icon' => 'chart',  'permissao' => 'visualizar_indicadores'],
+    ['key' => 'equipes',    'href' => '/pages/equipes.php',    'label' => 'Equipes',            'icon' => 'users',  'permissao' => 'gerenciar_equipes'],
+    ['key' => 'empreendimentos', 'href' => '/pages/empreendimentos.php', 'label' => 'Empreendimentos', 'icon' => 'building', 'permissao' => 'visualizar_leads'],
+    ['key' => 'plantoes',   'href' => '/pages/plantoes.php',   'label' => 'Plantões',           'icon' => 'map',    'permissao' => 'gerenciar_plantoes'],
     ['key' => 'roletas',    'href' => '/pages/roletas.php',    'label' => 'Roletas',            'icon' => 'pin',    'permissao' => null],
     ['key' => 'usuarios',   'href' => '/pages/usuarios.php',   'label' => 'Usuários e acessos', 'icon' => 'shield', 'permissao' => 'administrar_usuarios'],
 ];

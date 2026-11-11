@@ -150,7 +150,7 @@ $superintendenciasOpt = db()->prepare('SELECT id, nome FROM superintendencias WH
 $superintendenciasOpt->execute(['empresa_id' => $empresaId]);
 $superintendenciasOpt = $superintendenciasOpt->fetchAll();
 
-$equipesOpt = db()->prepare("SELECT equipes.id, COALESCE(usuarios.nome, equipes.nome) AS rotulo FROM equipes LEFT JOIN usuarios ON usuarios.id = equipes.gerente_id WHERE equipes.empresa_id = :empresa_id ORDER BY rotulo");
+$equipesOpt = db()->prepare("SELECT equipes.id, IF(usuarios.nome IS NULL, equipes.nome, CONCAT(usuarios.nome, ' — ', equipes.nome)) AS rotulo FROM equipes LEFT JOIN usuarios ON usuarios.id = equipes.gerente_id WHERE equipes.empresa_id = :empresa_id ORDER BY rotulo");
 $equipesOpt->execute(['empresa_id' => $empresaId]);
 $equipesOpt = $equipesOpt->fetchAll();
 
