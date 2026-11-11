@@ -152,8 +152,8 @@ if ($pedido && $pedido !== $responsavelId) {
 $estrutura = estrutura_do_usuario($responsavelId);
 
 $colunas = array_keys($dados);
-db()->prepare('INSERT INTO leads (empresa_id, equipe_id, responsavel_id, etapa_id, etapa, ultima_atividade_em, ' . implode(', ', $colunas) . ')
-               VALUES (:empresa_id, :equipe_id, :responsavel_id, :etapa_id, :etapa, NOW(), :' . implode(', :', $colunas) . ')')
+db()->prepare('INSERT INTO leads (empresa_id, equipe_id, responsavel_id, etapa_id, etapa, ultima_atividade_em, ultimo_feedback_em, ' . implode(', ', $colunas) . ')
+               VALUES (:empresa_id, :equipe_id, :responsavel_id, :etapa_id, :etapa, NOW(), NOW(), :' . implode(', :', $colunas) . ')')
     ->execute($dados + [
         'empresa_id' => $empresaId, 'equipe_id' => $estrutura['equipe_id'], 'responsavel_id' => $responsavelId,
         'etapa_id' => $etapa['id'], 'etapa' => $etapa['categoria'],

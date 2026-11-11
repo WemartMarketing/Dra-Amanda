@@ -108,6 +108,29 @@ if ($ehCorretor) {
 }
 ?>
 
+<?php
+// Leads do próprio usuário que vão para recuperação por falta de feedback.
+require_once __DIR__ . '/../includes/recuperacao.php';
+$emRisco = recuperacao_em_risco($usuario, 6);
+if ($emRisco): $regraRec = recuperacao_regra($empresaId); ?>
+    <div class="card recup-card" role="alert">
+        <div class="card-head">
+            <div><h2><?= icon('alert') ?> Vai para recuperação</h2><p>Sem feedback válido há <?= $regraRec['dias_sem_feedback'] - $regraRec['avisar_dias_antes'] ?>+ dias. Registre o atendimento, mude a etapa ou agende uma visita/retorno para manter o lead com você.</p></div>
+            <span class="pill pill-red"><?= count($emRisco) ?></span>
+        </div>
+        <?php foreach ($emRisco as $l): ?>
+            <div class="task-row">
+                <div class="avatar"><?= e(lead_iniciais($l['nome'])) ?></div>
+                <div class="who-info">
+                    <strong><a href="/pages/lead.php?id=<?= (int) $l['id'] ?>"><?= e($l['nome']) ?></a></strong>
+                    <span class="txt-late">Vai para recuperação <?= e($l['quando']) ?> · último feedback <?= e(mb_strtolower(tempo_relativo($l['feedback_em']))) ?></span>
+                </div>
+                <a href="/pages/lead.php?id=<?= (int) $l['id'] ?>&aba=atendimento" class="btn btn-primary btn-sm"><?= icon('arrow-r') ?>Atender</a>
+            </div>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
+
 <?php if ($semAtualizacao || $compromissosVencidos): ?>
     <div class="alert-strip" role="status">
         <?= icon('alert') ?>

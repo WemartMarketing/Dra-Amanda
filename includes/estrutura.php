@@ -136,6 +136,7 @@ function empreendimento_remover_imagem(?string $imagem): void
 function pagina_acesso_restrito(string $crumb, string $activeNav, string $rotuloPermissao): void
 {
     global $usuario;
+    http_response_code(403);
     $pageTitle = 'Acesso restrito — ' . APP_NAME;
     require __DIR__ . '/layout_start.php';
     echo '<div class="card stub-card"><div class="stub-icon">' . icon('alert') . '</div><h2>Acesso restrito</h2><p>Sua função não tem a permissão "' . htmlspecialchars($rotuloPermissao) . '".</p></div>';

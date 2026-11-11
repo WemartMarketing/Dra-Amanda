@@ -148,10 +148,55 @@ Etapa 5, o webhook do Meta Ads chamam as mesmas funções).
 - **Relatórios → Resultados por roleta**: leads distribuídos, corretores que
   receberam, vendas e conversão (dentro do escopo de quem vê).
 
+### Etapa 5 — Integrações e oferta ativa
+- **Feedback válido** (`lead_registrar_feedback`, coluna `leads.ultimo_feedback_em`):
+  só reinicia o prazo de recuperação o que comprova atendimento — mudar a
+  etapa, *Registrar atendimento/contato* com texto, marcar visita/retorno
+  como realizado ou cliente ausente e receber o lead (cadastro, roleta,
+  transferência, divisão da oferta ativa). Anotação, arquivo, edição de
+  dados, clicar em Ligar/WhatsApp ou só criar um compromisso **não** contam.
+- **Recuperação automática** (`includes/recuperacao.php`, tela *Recuperação
+  de leads*, permissão *Configurar recuperação*): por padrão 4 dias sem
+  feedback válido nas etapas Tentando contato / Primeiro contato / Em
+  atendimento, sem visita ou retorno futuro agendado. O lead perde o
+  responsável, ganha a linha `inatividade` em `lead_transferencias` (estrutura
+  anterior completa; o destino é preenchido quando alguém recebe), evento no
+  histórico, auditoria e vai para a fila da roleta (origem *Recuperação*)
+  **sem voltar para quem o perdeu** (`evitar_usuario_id`; se só ele estiver
+  disponível, o lead espera). Um dia antes o corretor vê *“Vai para
+  recuperação amanhã”* no Início e no card do Kanban. Relatórios → *Perdas
+  por inatividade* agrega por corretor, equipe ou superintendência anterior
+  (só números — o gerente anterior não vê mais o cadastro).
+- **Meta Lead Ads** (`webhook/meta.php`, `includes/meta.php`, tela
+  *Integrações*, permissão *Gerenciar integrações*): verificação do webhook,
+  assinatura `X-Hub-Signature-256` obrigatória, avisos gravados em
+  `meta_eventos` antes de processar (deduplicados por `leadgen_id`), busca
+  dos dados na Graph API com o token da página **cifrado** (APP_KEY), lead
+  criado com origem Meta Ads e enviado para a roleta do empreendimento
+  ligado ao formulário. Telefone já cadastrado → registro no lead existente,
+  sem duplicar. Falhas: novas tentativas em 5, 15, 60 e 180 min (desiste após
+  6, com botão *Reprocessar*). Sem credenciais reais a tela diz claramente
+  que nada é recebido — não há simulação. Passo a passo:
+  `docs/INTEGRACAO_META.md`.
+- **Oferta ativa** (telas *Oferta ativa* e *Importar planilha*, permissão
+  *Importar listas e gerenciar oferta ativa*: Master, Gerente Geral,
+  Superintendente): CSV (`;` `,` ou tab; UTF-8 ou Windows-1252) e XLSX até 5 MB
+  / 5.000 linhas; prévia de 10 linhas com sugestão das colunas; relatório com
+  importados, duplicados (na empresa ou repetidos na planilha) e inválidos,
+  com o CSV das linhas recusadas. Os leads entram sem corretor e são
+  distribuídos *pela roleta* ou *divididos igualmente* entre corretores da
+  estrutura de quem distribui. Cada lista mostra andamento por etapa, por
+  corretor e o histórico; *Ver leads da lista* abre Leads/Kanban filtrados
+  (`?lista=ID`).
+- **Uma linha de cron** (`cron/rotinas.php`, a cada 15 min): presenças
+  vencidas, fila da roleta, novas tentativas do Meta, recuperação e limpeza
+  dos arquivos temporários de importação. `cron/processar_fila.php` continua
+  funcionando (delega para a nova rotina).
+
 ### Limitações conhecidas (ficam para as próximas etapas)
-- **Etapa 5**: webhook do Meta Lead Ads chamando `roleta_distribuir_lead`,
-  importação/oferta ativa e recuperação automática de leads parados (4 dias;
-  o motivo *inatividade* já existe em `lead_transferencias`).
+- A integração com a Meta só recebe leads depois que as credenciais reais
+  forem cadastradas (app da Meta aprovado, `META_APP_SECRET`,
+  `META_VERIFY_TOKEN`, `APP_KEY` e o token de cada página).
 - A presença depende da página aberta no celular: navegadores não permitem
   GPS em segundo plano numa página web.
 - **Etapa 6**: dashboards completos e exportação Excel (o botão existe e
@@ -263,6 +308,20 @@ sáb 09:00–18:00).
 4. **Novo lead** com empreendimento Smart Marquês: "Distribuir pela roleta"
    já vem marcado; a tela diz quem recebeu (ou que foi para a fila).
 
+### Como testar a Etapa 5
+1. Como `carlos@hmvendas.demo`: o Início mostra **Vai para recuperação**
+   para *Otávio Bezerra* (3 dias sem feedback). Uma anotação não tira o
+   aviso; mudar a etapa tira.
+2. Rode `php cron/rotinas.php`: *Sílvia Moraes* (5 dias, da Fernanda Costa)
+   sai da carteira, ganha o evento de recuperação e vai para a fila da roleta
+   sem voltar para a Fernanda Costa.
+3. Como `fernanda.gestora@hmvendas.demo`: **Oferta ativa** → *Feirão Zona
+   Sul — demonstração* (2 leads ainda sem corretor) → *Dividir igualmente*;
+   **Importar planilha** com um CSV seu; **Recuperação de leads** para mudar
+   a regra; **Relatórios → Perdas por inatividade**.
+4. **Integrações** mostra “Integração ainda não configurada” até você
+   cadastrar uma página real (ver `docs/INTEGRACAO_META.md`).
+
 Todos os nomes, leads e telefones do seed são **fictícios**.
 
 ## Estrutura
@@ -279,15 +338,20 @@ includes/
   lead_componentes.php             card do lead e modais (mover, transferir, agendar)
   agenda.php, transferencia.php    agenda comercial e transferência de leads
   roleta.php                       presença, rodízio, fila e distribuição (única fonte das regras)
+  recuperacao.php                  recuperação automática por inatividade e avisos
+  meta.php, cripto.php             Meta Lead Ads (Graph API, eventos) e cifragem de tokens
+  importacao.php                   leitura segura de CSV/XLSX e listas de oferta ativa
   arquivos.php                     upload/validação de arquivos de lead
   auditoria.php, db.php, layout_*  auditoria, PDO e layout
 pages/                             telas (inicio, leads, kanban, lead, agenda, funil, perfil,
                                    relatorios, equipes, empreendimentos, empreendimento,
-                                   plantoes, roletas, minha_roleta, usuarios, superadmin)
-cron/processar_fila.php            rotina da roleta (só linha de comando; HTTP → 403)
+                                   plantoes, roletas, minha_roleta, usuarios, superadmin,
+                                   oferta, importar, recuperacao, integracoes)
+cron/rotinas.php                   rotina única do cron (só linha de comando; HTTP → 403)
+webhook/meta.php                   webhook público do Meta Lead Ads (assinatura obrigatória)
 api/                               endpoints POST chamados por fetch()
 uploads/                           imagens de empreendimentos (protegido por .htaccess)
-storage/                           arquivos privados de leads — nunca servidos direto (.htaccess nega tudo)
+storage/                           arquivos privados de leads e temporários de importação — nunca servidos direto (.htaccess nega tudo)
 assets/css/app.css, assets/js/app.js
 sql/                               schema, seeds e migrações (ordem acima)
 referencias/                       protótipo UX original (não é código de produção)

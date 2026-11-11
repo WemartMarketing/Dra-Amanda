@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/lead_componentes.php';
 $usuario = auth_require();
 
 if (!usuario_tem_permissao($usuario, 'visualizar_indicadores')) {
+    http_response_code(403);
     $pageTitle = 'Acesso restrito — ' . APP_NAME;
     $crumb = 'Relatórios';
     $activeNav = 'relatorios';
@@ -177,6 +178,13 @@ $transfTotal = array_sum(array_column($transfPorMotivo, 'total'));
 $transfSaiu = array_sum(array_column($transfPorMotivo, 'saiu'));
 $maxTransf = max(1, ...array_column($transfPorMotivo, 'total') ?: [1]);
 
+// Perdas por inatividade (recuperação automática): pela estrutura anterior.
+require_once __DIR__ . '/../includes/recuperacao.php';
+$perdasRecuperacao = $transfPorMotivo['inatividade']['total'] ?? 0;
+$perdasAgrupar = in_array($_GET['perdas_por'] ?? '', ['corretor', 'equipe', 'superintendencia'], true) ? $_GET['perdas_por'] : 'corretor';
+$perdasAgregadas = recuperacao_perdas_agregadas($tSql, $tParams, $perdasAgrupar);
+$maxPerdasAgr = max(1, ...array_map('intval', array_column($perdasAgregadas, 'perdas')) ?: [1]);
+
 // --------------------------------------------------------------
 // Opções dos filtros
 // --------------------------------------------------------------
@@ -235,7 +243,7 @@ require __DIR__ . '/../includes/layout_start.php';
     <div class="kpi"><div class="kpi-top"><span class="label">Atendimentos</span><div class="kpi-icon"><?= icon('phone') ?></div></div><div class="kpi-value"><?= $atendimentos ?></div><div class="kpi-sub">registrados no período</div></div>
     <div class="kpi"><div class="kpi-top"><span class="label">Visitas agendadas</span><div class="kpi-icon"><?= icon('calendar') ?></div></div><div class="kpi-value"><?= $visitasAgendadas ?></div><div class="kpi-sub">visitas confirmadas</div></div>
     <div class="kpi"><div class="kpi-top"><span class="label">Vendas realizadas</span><div class="kpi-icon"><?= icon('check') ?></div></div><div class="kpi-value"><?= $vendasRealizadas ?></div><div class="kpi-sub">contratos assinados</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="label">Perdas por inatividade</span><div class="kpi-icon"><?= icon('clock') ?></div></div><div class="kpi-value"><?= $perdasInatividade ?></div><div class="kpi-sub">redistribuídos/perdidos</div></div>
+    <div class="kpi"><div class="kpi-top"><span class="label">Perdas por inatividade</span><div class="kpi-icon"><?= icon('clock') ?></div></div><div class="kpi-value"><?= $perdasRecuperacao ?></div><div class="kpi-sub">sem feedback no prazo</div></div>
 </div>
 
 <div class="grid-2">
@@ -345,7 +353,7 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
     <div class="transf-grid">
         <div class="perdas-headline"><strong><?= $transfSaiu ?></strong><div><b>Saíram da equipe</b><span>Foram para outra equipe ou estrutura.</span></div></div>
-        <div class="perdas-headline"><strong><?= $perdasInatividade ?></strong><div><b>Perdidos por inatividade</b><span>Leads encerrados sem atuação.</span></div></div>
+        <div class="perdas-headline"><strong><?= $perdasRecuperacao ?></strong><div><b>Perdidos por inatividade</b><span>Sem feedback válido no prazo; voltaram para a roleta.</span></div></div>
     </div>
     <?php if ($transfPorMotivo): ?>
         <div class="funnel" style="margin-top:14px;">
@@ -359,6 +367,34 @@ require __DIR__ . '/../includes/layout_start.php';
         </div>
     <?php else: ?>
         <p class="empty-note">Nenhuma transferência saindo da sua estrutura no período.</p>
+    <?php endif; ?>
+</div>
+
+<div class="card transf-card" id="perdas-inatividade">
+    <div class="card-head">
+        <div><h2>Perdas por inatividade</h2><p>Leads tirados por falta de feedback válido, pela estrutura que os tinha. Só números — a equipe anterior não vê mais os cadastros.</p></div>
+        <div class="segmented segmented-inline" role="tablist" aria-label="Agrupar perdas por">
+            <?php foreach (['corretor' => 'Corretor', 'equipe' => 'Equipe', 'superintendencia' => 'Superintendência'] as $g => $rot): ?>
+                <a class="seg-link<?= $perdasAgrupar === $g ? ' active' : '' ?>" href="?<?= e(http_build_query(array_merge($_GET, ['perdas_por' => $g]))) ?>#perdas-inatividade"><?= $rot ?></a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php if ($perdasAgregadas): ?>
+        <div class="table-wrap"><table class="report-table">
+            <thead><tr><th><?= ['corretor' => 'Corretor anterior', 'equipe' => 'Equipe anterior', 'superintendencia' => 'Superintendência anterior'][$perdasAgrupar] ?></th><th>Perdas</th><th>Já com novo corretor</th><th class="col-bar"></th></tr></thead>
+            <tbody>
+            <?php foreach ($perdasAgregadas as $row): ?>
+                <tr>
+                    <td><?= e($row['nome'] ?? 'Sem ' . ($perdasAgrupar === 'corretor' ? 'corretor' : ($perdasAgrupar === 'equipe' ? 'equipe' : 'superintendência'))) ?></td>
+                    <td><b><?= (int) $row['perdas'] ?></b></td>
+                    <td><?= (int) $row['redistribuidos'] ?></td>
+                    <td class="col-bar"><div class="funnel-track funnel-track-red"><div class="funnel-fill funnel-fill-red" style="width: <?= max(2, round($row['perdas'] / $maxPerdasAgr * 100)) ?>%"></div></div></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div>
+    <?php else: ?>
+        <p class="empty-note">Nenhuma perda por inatividade na sua estrutura no período.</p>
     <?php endif; ?>
 </div>
 

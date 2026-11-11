@@ -18,3 +18,22 @@ define('APP_NAME', 'WeMart Sales');
 
 // Fuso horário usado para exibir datas/horas.
 date_default_timezone_set('America/Sao_Paulo');
+
+// ----------------------------------------------------------------------
+// Chave de cifragem da aplicação (Etapa 5) — usada para guardar no banco,
+// cifrados, os tokens das páginas do Facebook. Gere UMA vez por servidor:
+//   php -r "echo base64_encode(random_bytes(32)), PHP_EOL;"
+// e nunca troque depois (tokens já salvos deixariam de abrir). Sem ela, a
+// tela Integrações recusa salvar tokens.
+// ----------------------------------------------------------------------
+define('APP_KEY', '');
+
+// ----------------------------------------------------------------------
+// Meta Lead Ads (Etapa 5) — credenciais do APLICATIVO da WeMart no
+// developers.facebook.com (ver docs/INTEGRACAO_META.md). Os tokens de cada
+// página ficam no banco (cifrados), cadastrados pela tela Integrações.
+// ----------------------------------------------------------------------
+define('META_APP_SECRET', '');     // Configurações do app → Básico → Chave secreta do aplicativo
+define('META_VERIFY_TOKEN', '');   // texto livre e longo que você inventa e cola no painel de Webhooks
+define('META_GRAPH_VERSION', 'v21.0'); // versão da Graph API; atualize quando a Meta descontinuar a atual
+define('META_GRAPH_BASE_URL', 'https://graph.facebook.com');

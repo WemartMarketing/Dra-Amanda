@@ -21,6 +21,8 @@ $colunasVisiveis = $filtros['etapa']
     : $etapasKanban;
 
 $leads = leads_listar($usuario, $filtros, 600);
+require_once __DIR__ . '/../includes/recuperacao.php';
+$riscoRecuperacao = recuperacao_mapa_risco($usuario); // [lead_id => 'amanhã'…] — só leads do próprio usuário
 $colunas = [];
 foreach ($colunasVisiveis as $etapa) {
     $colunas[(int) $etapa['id']] = ['etapa' => $etapa, 'leads' => []];
@@ -71,6 +73,10 @@ require __DIR__ . '/../includes/layout_start.php';
     <label class="sr-only" for="f-q">Buscar</label>
     <input class="select-filter filter-search" id="f-q" type="search" name="q" placeholder="Nome ou telefone" value="<?= e($filtros['q']) ?>">
     <button type="button" class="btn btn-outline btn-sm filters-toggle" data-toggle-filtros aria-expanded="<?= $temFiltroExtra ? 'true' : 'false' ?>"><?= icon('filter') ?>Filtros<?= $temFiltroExtra ? ' (' . count($temFiltroExtra) . ')' : '' ?></button>
+    <?php if ($filtros['lista']): $listaNome = leads_lista_oferta_nome($usuario, $filtros['lista']); ?>
+        <input type="hidden" name="lista" value="<?= (int) $filtros['lista'] ?>">
+        <span class="pill pill-blue filtro-lista"><?= icon('list') ?>Lista: <?= e($listaNome ?? 'não encontrada') ?> <a href="/pages/kanban.php" aria-label="Remover filtro da lista">&times;</a></span>
+    <?php endif; ?>
     <div class="filters-extra<?= $temFiltroExtra ? ' is-open' : '' ?>" data-filtros-extra>
     <label class="sr-only" for="f-emp">Empreendimento</label>
     <select class="select-filter" id="f-emp" name="empreendimento" data-auto-filtro>
@@ -131,7 +137,7 @@ require __DIR__ . '/../includes/layout_start.php';
                     <strong><span class="etapa-dot" style="background: <?= e($etapa['cor']) ?>"></span><?= e($etapa['nome']) ?></strong>
                     <span class="kcol-count"><?= count($col['leads']) ?></span>
                 </div>
-                <?php foreach ($col['leads'] as $lead) render_lead_card($lead, !$ehCorretor, $podeMover); ?>
+                <?php foreach ($col['leads'] as $lead) { $lead['recuperacao_quando'] = $riscoRecuperacao[(int) $lead['id']] ?? null; render_lead_card($lead, !$ehCorretor, $podeMover); } ?>
                 <?php if (!$col['leads']): ?><p class="kcol-empty">Nenhum lead nesta etapa.</p><?php endif; ?>
             </section>
         <?php endforeach; ?>

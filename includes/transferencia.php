@@ -61,6 +61,13 @@ function lead_transferir(array $lead, int $destinoUsuarioId, string $motivo, ?ar
 
     db()->prepare('UPDATE leads SET responsavel_id = :responsavel, equipe_id = :equipe WHERE id = :id AND empresa_id = :empresa_id')
         ->execute(['responsavel' => $destinoUsuarioId, 'equipe' => $para['equipe_id'], 'id' => $lead['id'], 'empresa_id' => $empresaId]);
+    // Novo dono recebe o prazo inteiro da recuperação (mudança de equipe não troca o dono).
+    if ($motivo !== 'mudanca_equipe') {
+        lead_registrar_feedback((int) $lead['id']);
+    }
+    // Lead recuperado por inatividade que agora ganhou dono: completa a
+    // estrutura de destino na linha da perda.
+    transferencia_completar_recuperacao((int) $lead['id'], $destinoUsuarioId);
 
     db()->prepare('
         INSERT INTO lead_transferencias
@@ -117,6 +124,20 @@ function transferencia_acompanhar_mudanca_equipe(int $empresaId, int $usuarioId,
         lead_transferir($lead, $usuarioId, 'mudanca_equipe', $executor);
     }
     return count($leads);
+}
+
+/**
+ * Completa os campos para_* da última perda por inatividade ainda sem
+ * destino (o lead ficou na fila de recuperação e acabou de ser atribuído).
+ */
+function transferencia_completar_recuperacao(int $leadId, int $destinoUsuarioId): void
+{
+    $para = estrutura_do_usuario($destinoUsuarioId);
+    db()->prepare("UPDATE lead_transferencias
+        SET para_usuario_id = :u, para_equipe_id = :eq, para_gerente_id = :g, para_superintendencia_id = :s
+        WHERE lead_id = :lead AND motivo = 'inatividade' AND para_usuario_id IS NULL
+        ORDER BY id DESC LIMIT 1")
+        ->execute(['u' => $destinoUsuarioId, 'eq' => $para['equipe_id'], 'g' => $para['gerente_id'], 's' => $para['superintendencia_id'], 'lead' => $leadId]);
 }
 
 function transferencia_motivos(): array

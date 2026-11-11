@@ -20,6 +20,8 @@ function leads_filtros_da_requisicao(array $get): array
         'prioridade' => array_key_exists($get['prioridade'] ?? '', lead_prioridades()) ? $get['prioridade'] : null,
         'responsavel' => (int) ($get['responsavel'] ?? 0) ?: null,
         'situacao' => in_array($get['situacao'] ?? '', ['abertos', 'atrasados', 'encerrados'], true) ? $get['situacao'] : null,
+        // Lista de oferta ativa (importação). Só restringe — o escopo continua valendo.
+        'lista' => (int) ($get['lista'] ?? 0) ?: null,
     ];
     $f['q'] = mb_substr($f['q'], 0, 80);
     return $f;
@@ -45,6 +47,7 @@ function leads_where(array $usuario, array $f): array
     if ($f['etapa']) { $sql .= ' AND leads.etapa_id = :f_etapa'; $params['f_etapa'] = $f['etapa']; }
     if ($f['prioridade']) { $sql .= ' AND leads.prioridade = :f_prio'; $params['f_prio'] = $f['prioridade']; }
     if ($f['responsavel']) { $sql .= ' AND leads.responsavel_id = :f_resp'; $params['f_resp'] = $f['responsavel']; }
+    if (!empty($f['lista'])) { $sql .= ' AND leads.oferta_lista_id = :f_lista'; $params['f_lista'] = $f['lista']; }
     if ($f['situacao'] === 'abertos' || $f['situacao'] === 'atrasados') {
         $sql .= " AND leads.etapa NOT IN ('sem_interesse','contrato_assinado','perdido')";
     }
@@ -137,4 +140,15 @@ function leads_responsaveis_filtro(array $usuario): array
         return [];
     }
     return rbac_usuarios_atribuiveis($usuario);
+}
+
+/** Nome da lista de oferta ativa do filtro (só se for da empresa do usuário). */
+function leads_lista_oferta_nome(array $usuario, ?int $listaId): ?string
+{
+    if (!$listaId) {
+        return null;
+    }
+    $stmt = db()->prepare('SELECT nome FROM oferta_listas WHERE id = :id AND empresa_id = :e');
+    $stmt->execute(['id' => $listaId, 'e' => (int) $usuario['empresa_ativa_id']]);
+    return $stmt->fetchColumn() ?: null;
 }

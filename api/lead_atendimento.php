@@ -36,6 +36,7 @@ if ($etapaId && !lead_mudar_etapa($lead, $etapaId, $usuario)) {
 if ($nota) {
     lead_registrar_evento((int) $lead['id'], (int) $usuario['id'], 'contato', $nota);
     $pdo->prepare('UPDATE leads SET ultimo_contato_em = NOW() WHERE id = :id')->execute(['id' => $lead['id']]);
+    lead_registrar_feedback((int) $lead['id']);
 }
 // Um contato registrado cumpre o retorno vencido; um novo próximo contato o substitui.
 $novoRetorno = $proximoContato ? substr($proximoContato, 0, 10) : $lead['data_retorno'];

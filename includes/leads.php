@@ -48,7 +48,33 @@ function lead_tipos_evento(): array
         'redistribuicao' => ['rotulo' => 'Redistribuição',     'icon' => 'users'],
         'arquivo'        => ['rotulo' => 'Arquivo',            'icon' => 'file'],
         'sistema'        => ['rotulo' => 'Sistema',            'icon' => 'zap'],
+        'recuperacao'    => ['rotulo' => 'Recuperação',        'icon' => 'alert'],
+        'importacao'     => ['rotulo' => 'Importação',         'icon' => 'list'],
+        'integracao'     => ['rotulo' => 'Meta Ads',           'icon' => 'zap'],
     ];
+}
+
+/**
+ * Marca um FEEDBACK VÁLIDO do atendimento (leads.ultimo_feedback_em), o
+ * relógio da recuperação automática por inatividade (seção 11).
+ *
+ * Só estas ações chamam aqui — elas comprovam atendimento real:
+ *   - mudança de etapa (lead_mudar_etapa)
+ *   - "Registrar atendimento" com o texto do que aconteceu preenchido
+ *   - "Registrar contato" com texto (registro rápido do tipo contato)
+ *   - compromisso da agenda marcado como realizado ou cliente ausente
+ *     (inclui visita realizada)
+ * e estas reiniciam o prazo para o novo dono:
+ *   - lead atribuído a um corretor (cadastro, roleta, transferência,
+ *     distribuição de lista de oferta ativa)
+ *
+ * NÃO contam (seção 11: "não considerar qualquer anotação"): observações,
+ * envio de arquivos, apertar os botões de WhatsApp/Ligar, editar dados do
+ * cadastro, apenas criar um compromisso na agenda, eventos de sistema.
+ */
+function lead_registrar_feedback(int $leadId): void
+{
+    db()->prepare('UPDATE leads SET ultimo_feedback_em = NOW() WHERE id = :id')->execute(['id' => $leadId]);
 }
 
 /** Grava uma linha no histórico (lead_eventos). Atividades de atendimento também atualizam ultima_atividade_em. */

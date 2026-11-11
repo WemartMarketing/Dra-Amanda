@@ -45,6 +45,24 @@ define('DB_PASS', 'a-senha-que-voce-criou');
 `includes/config.php` não é versionado: um `git pull` nunca sobrescreve
 este arquivo.
 
+A partir da Etapa 5 o `config.php` também precisa de:
+
+```php
+// Chave que cifra os tokens das páginas do Facebook no banco (32 bytes em base64).
+// Gere UMA vez no terminal do cPanel e guarde (trocar depois invalida os tokens salvos):
+//   php -r "echo base64_encode(random_bytes(32)), PHP_EOL;"
+define('APP_KEY', 'cole-aqui-o-resultado');
+// Meta Lead Ads (deixe vazio até ter o app aprovado — ver docs/INTEGRACAO_META.md)
+define('META_APP_SECRET', '');   // Painel do app → Configurações → Básico → Chave secreta
+define('META_VERIFY_TOKEN', ''); // um texto aleatório criado por você
+define('META_GRAPH_VERSION', 'v21.0');
+define('META_GRAPH_BASE_URL', 'https://graph.facebook.com');
+```
+
+Sem `APP_KEY` o sistema se recusa a guardar tokens; sem `META_APP_SECRET` e
+`META_VERIFY_TOKEN` o webhook responde 403 e a tela *Integrações* mostra que
+a integração não está configurada.
+
 ## 4. Criar/atualizar o banco — sempre nesta ordem
 
 Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
@@ -62,9 +80,15 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 8 | `sql/seed_004.sql` | **só para demonstração** — agenda, uma transferência e prioridades |
 | 9 | `sql/migration_005_roleta.sql` | Etapa 4 (roleta: presença, rodízio, fila de espera) |
 | 10 | `sql/seed_005.sql` | **só para demonstração** — regras das roletas, histórico e 2 leads na fila |
+| 11 | `sql/migration_006_integracoes_oferta.sql` | Etapa 5 (Meta Lead Ads, oferta ativa, recuperação automática) |
+| 12 | `sql/seed_006.sql` | **só para demonstração** — regra de recuperação, uma lista de oferta ativa, leads parados (não cria nada do Meta) |
 
-- Quem já rodou os passos 1–8 roda apenas o **9** (e o 10, se usa a base de
-  demonstração).
+- Quem já rodou os passos 1–10 roda apenas o **11** (e o 12, se usa a base
+  de demonstração).
+- Rode os arquivos **na ordem** numa instalação nova. Se precisar repetir
+  algum depois (por exemplo, se uma importação parou no meio), pode rodar de
+  novo inclusive uma migração antiga depois de uma mais nova: nenhuma delas
+  encolhe uma lista de valores que outra ampliou nem apaga dados.
 - **Todos** os arquivos acima podem ser executados mais de uma vez sem
   duplicar nada e funcionam do mesmo jeito em MySQL 5.7+/8.0 e MariaDB
   10.3+ — não é preciso descobrir qual banco a hospedagem usa.
@@ -74,20 +98,24 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
   **Superadmin** (`superadmin@wemart.demo` existe só se o seed foi
   importado — em produção crie o seu e troque a senha).
 
-## 5. Rotina da roleta (Cron Jobs do cPanel)
+## 5. Rotinas automáticas (Cron Jobs do cPanel)
 
-No cPanel → **Cron Jobs**, adicione (a cada 15 minutos), trocando
-`USUARIO` e o caminho pela pasta onde o sistema está:
+No cPanel → **Cron Jobs**, adicione **uma única linha** (a cada 15 minutos),
+trocando `USUARIO` e o caminho pela pasta onde o sistema está:
 
 ```
-*/15 * * * * /usr/local/bin/php /home/USUARIO/caminho/cron/processar_fila.php >/dev/null 2>&1
+*/15 * * * * /usr/local/bin/php /home/USUARIO/caminho/cron/rotinas.php >/dev/null 2>&1
 ```
 
-Ela encerra presenças vencidas e entrega os leads que esperavam na fila.
-Só roda pela linha de comando: aberta no navegador responde 403 (e a pasta
-`cron/` também é bloqueada pelo `.htaccess`). Duas execuções ao mesmo
-tempo não acontecem (trava `GET_LOCK`). Mesmo sem o cron, a fila é
-processada quando um corretor entra na roleta e pelo botão do gestor.
+Ela encerra presenças vencidas, entrega os leads da fila da roleta, tenta de
+novo os cadastros do Meta que falharam, aplica a recuperação automática por
+inatividade e apaga arquivos temporários de importação com mais de 1 hora.
+Se você já tinha a linha do `cron/processar_fila.php` (Etapa 4), troque por
+esta (a antiga continua funcionando e faz o mesmo, mas use só uma). Só roda
+pela linha de comando: aberta no navegador responde 403 (e a pasta `cron/`
+também é bloqueada pelo `.htaccess`). Duas execuções ao mesmo tempo não
+acontecem (trava `GET_LOCK`). **Sem o cron, a recuperação automática e as
+novas tentativas do Meta não acontecem.**
 
 **HTTPS é obrigatório para a roleta**: o celular só libera a localização
 (GPS) em páginas `https://`. Ative o SSL gratuito em cPanel → *SSL/TLS
@@ -119,11 +147,24 @@ de 10 MB).
    Minha agenda; na aba Arquivos, envie um PDF e baixe de volta.
 6. No celular: abra Plantões → *Novo plantão* → "Usar minha localização
    atual" (só funciona com HTTPS ativo).
-7. Abra `https://seudominio.com.br/cron/processar_fila.php`: deve dar
+7. Abra `https://seudominio.com.br/cron/rotinas.php`: deve dar
    **403**. No celular, como corretor, **Início → ENTRAR NA ROLETA** dentro
    do raio do plantão.
 
+8. Abra `https://seudominio.com.br/webhook/meta.php`: deve dar **403**
+   (sem o token de verificação). Siga `docs/INTEGRACAO_META.md` para ligar
+   o Meta.
+9. **Oferta ativa → Importar planilha** com um CSV de teste; depois
+   `https://seudominio.com.br/storage/importacoes/` deve dar **403**.
+
 ## Verificações de segurança incluídas
+
+- Webhook do Meta: assinatura HMAC-SHA256 obrigatória (sem ela, 403 e nada é
+  gravado), sem sessão; tokens das páginas cifrados no banco com `APP_KEY` e
+  nunca exibidos nem gravados em logs/erros.
+- Importação: CSV/XLSX lidos sem bibliotecas externas; XLSX com DOCTYPE/ENTITY
+  (XXE) ou grande demais descompactado é recusado; arquivo temporário em
+  `storage/` com nome aleatório ligado à sessão de quem enviou.
 
 - Roleta: a distância é calculada no servidor (nunca um "dentro do raio"
   vindo do navegador); o check-in usa sempre o usuário logado e só vale
@@ -146,5 +187,6 @@ de 10 MB).
 
 ## O que ainda não está pronto
 
-Ver "Limitações conhecidas" em `docs/README.md` (Meta Ads, oferta ativa,
-recuperação de leads parados, exportação Excel e logo oficial).
+Ver "Limitações conhecidas" em `docs/README.md` (dashboards completos,
+exportação Excel e logo oficial). O Meta Lead Ads está pronto no código, mas
+só recebe leads depois das credenciais reais.

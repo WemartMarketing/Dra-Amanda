@@ -129,7 +129,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, input:focus-vis
 .kpi-sub.up { color: var(--green); }
 .kpi-sub.down { color: var(--red); }
 
-.grid-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 1000px) { .grid-2 { grid-template-columns: 1fr; } }
 .card-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; gap: 10px; }
 .card-head h2 { margin: 0 0 4px; font-size: 17px; font-weight: 800; }
@@ -934,4 +934,81 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 @media (max-width: 880px) {
     .hist-table thead th:nth-child(3), .hist-table tbody td:nth-child(3) { display: table-cell; }
     .hist-table thead th:nth-child(4), .hist-table tbody td:nth-child(4) { display: none; }
+}
+
+/* ------------------------------------------------ Etapa 5: integrações, oferta ativa, recuperação */
+.kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 880px) { .kpi-grid-3 { grid-template-columns: 1fr; } }
+.txt-ok { color: var(--green); }
+.recup-card { border: 1px solid #f3c1c9; background: #fff8f9; margin-bottom: 18px; }
+.recup-card h2 { display: flex; align-items: center; gap: 8px; color: #b23348; }
+.recup-card h2 svg { width: 20px; height: 20px; }
+.kcard-recup { display: flex; gap: 6px; align-items: flex-start; background: #fdecef; color: #9b2c3f; border-radius: 9px; padding: 7px 9px; font-size: 13px; margin: 8px 0 4px; }
+.kcard-recup svg { width: 15px; height: 15px; margin-top: 2px; }
+.kcard.is-recup { border-color: #f0b8c1; }
+.regra-lista { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 9px; }
+.regra-lista li { display: flex; gap: 9px; align-items: flex-start; font-size: 14.5px; line-height: 1.4; }
+.regra-lista li svg { width: 17px; height: 17px; margin-top: 2px; }
+.regra-lista li.is-ok svg { color: var(--green); }
+.regra-lista li.is-no svg { color: var(--red); }
+.filtro-lista { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
+.filtro-lista a { font-size: 18px; line-height: 1; margin-left: 4px; }
+.lgpd-box { background: #eef6ff; color: #1f4f82; }
+.int-checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.int-check { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.int-check b { display: block; font-size: 14.5px; }
+.int-check span { font-size: 13.5px; color: var(--muted); }
+.int-check svg { width: 20px; height: 20px; margin-top: 1px; }
+.int-check.is-ok svg { color: var(--green); }
+.int-check.is-no svg { color: var(--red); }
+.int-contagem { margin-top: 10px; align-items: center; }
+.int-pagina { margin-top: 18px; }
+.int-pagina.is-inactive { opacity: .7; }
+.int-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.int-form-manual { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0 12px; align-items: end; margin-top: 14px; }
+.int-form-manual .form-alert { grid-column: 1 / -1; }
+.int-form-manual .btn { margin-bottom: 16px; }
+.int-forms .inline-pair { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.int-eventos td { vertical-align: top; }
+#eventos { margin-top: 18px; }
+.passos { list-style: none; display: flex; gap: 10px; padding: 0; margin: 0 0 20px; flex-wrap: wrap; }
+.passos li { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--muted); font-size: 14.5px; }
+.passos li span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #eceff6; font-size: 13.5px; }
+.passos li.is-atual { color: var(--ink); }
+.passos li.is-atual span { background: var(--accent); color: #fff; }
+.passos li.is-feito span { background: #d9f2e8; color: var(--green); }
+.passos li + li::before { content: ''; width: 22px; height: 2px; background: var(--line); }
+.map-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 12px; }
+.import-previa td, .import-previa th { white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.import-map .table-wrap { overflow-x: auto; margin-bottom: 14px; }
+.oferta-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.oferta-card { display: block; }
+.oferta-card:hover { border-color: #cfcaff; }
+.oferta-card-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.oferta-card h2 { font-size: 17px; margin: 0 0 4px; }
+.oferta-numeros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0 10px; }
+.oferta-numeros span { font-size: 12.5px; color: var(--muted); }
+.oferta-numeros b { display: block; font-size: 20px; color: var(--ink); }
+.distrib-opcao { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.distrib-opcao h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 16px; }
+.distrib-opcao .checkbox-row small { margin-left: 4px; }
+.hist-row { display: flex; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.hist-row:first-of-type { border-top: 0; }
+.hist-row b { flex: 0 0 auto; color: var(--muted); font-weight: 700; }
+.col-bar { width: 32%; }
+@media (max-width: 1100px) {
+    .int-checks { grid-template-columns: 1fr; }
+    .map-grid { grid-template-columns: repeat(2, 1fr); }
+    .int-form-manual { grid-template-columns: 1fr; }
+}
+@media (max-width: 880px) {
+    .regra-lista li, .int-check b, .hist-row, .passos li { font-size: 16px; }
+    .int-check span, .oferta-numeros span, .kcard-recup { font-size: 15px; }
+    .map-grid { grid-template-columns: 1fr; }
+    .oferta-lista { grid-template-columns: 1fr; }
+    .oferta-numeros { grid-template-columns: repeat(2, 1fr); }
+    .col-bar { display: none; }
+    .recup-card .task-row { flex-wrap: wrap; }
+    .recup-card .task-row .who-info { flex: 1 1 calc(100% - 60px); }
+    .recup-card .task-row .btn { margin-left: auto; }
 }

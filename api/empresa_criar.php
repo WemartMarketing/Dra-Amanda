@@ -72,6 +72,8 @@ try {
 
     $mapaFuncoes = funcoes_seed_padrao($empresaId);
     funil_seed_padrao($empresaId);
+    // Regras de recuperação padrão (4 dias sem feedback válido, aviso 1 dia antes).
+    $pdo->prepare('INSERT IGNORE INTO recuperacao_regras (empresa_id) VALUES (:e)')->execute(['e' => $empresaId]);
     $funcaoMasterId = $mapaFuncoes['master_empresa'];
 
     $pdo->prepare('INSERT INTO usuarios (empresa_id, funcao_id, nome, email, senha_hash, cargo, ativo) VALUES (:empresa_id, :funcao_id, :nome, :email, :hash, :cargo, 1)')

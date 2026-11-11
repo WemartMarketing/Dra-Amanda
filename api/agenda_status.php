@@ -40,6 +40,9 @@ switch ($acao) {
         if ($lead) {
             $tipoEvento = $compromisso['tipo'] === 'visita' && $status !== 'cancelado' ? 'visita' : 'agenda';
             lead_registrar_evento($leadId, (int) $usuario['id'], $tipoEvento, $tipoRotulo . ' de ' . date('d/m H\hi', strtotime($compromisso['inicio'])) . ': ' . mb_strtolower(agenda_status()[$status]) . ($observacao ? ' — ' . $observacao : ''));
+            if ($status === 'realizado' || $status === 'cliente_ausente') {
+                lead_registrar_feedback($leadId);
+            }
             if ($status === 'realizado' && $compromisso['tipo'] === 'visita' && !empty($_POST['mover_etapa']) && usuario_tem_permissao($usuario, 'editar_leads')) {
                 $etapa = funil_etapa_por_categoria($empresaId, 'visita_realizada');
                 if ($etapa && lead_mudar_etapa($lead, (int) $etapa['id'], $usuario, 'visita realizada')) {

@@ -32,6 +32,9 @@ function render_lead_card(array $lead, bool $mostrarResponsavel, bool $podeMover
             <?= icon($lead['atrasado'] ? 'alert' : 'calendar') ?>
             <span><?= $lead['atrasado'] ? '<b>Atrasado</b> · ' : '' ?><?= e(lead_proxima_acao($lead)) ?></span>
         </div>
+        <?php if (!empty($lead['recuperacao_quando'])): ?>
+            <div class="kcard-recup"><?= icon('alert') ?><span>Vai para recuperação <b><?= e($lead['recuperacao_quando']) ?></b> — registre o atendimento</span></div>
+        <?php endif; ?>
         <div class="kcard-foot"><?= icon('clock') ?> Última atividade: <?= e(mb_strtolower(tempo_relativo($lead['ultima_atividade_em'] ?? $lead['criado_em']))) ?></div>
         <div class="kcard-actions">
             <?php if ($whats): ?>

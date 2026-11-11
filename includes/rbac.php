@@ -143,7 +143,7 @@ function rbac_usuarios_atribuiveis(array $usuario): array
 {
     $u = rbac_usuarios_scope($usuario);
     $stmt = db()->prepare('
-        SELECT u.id, u.nome, u.equipe_id, equipes.nome AS equipe_nome, funcoes.nome AS funcao_nome
+        SELECT u.id, u.nome, u.equipe_id, equipes.nome AS equipe_nome, funcoes.nome AS funcao_nome, funcoes.escopo AS funcao_escopo
         FROM usuarios u
         INNER JOIN funcoes ON funcoes.id = u.funcao_id
         INNER JOIN funcao_permissoes fp ON fp.funcao_id = funcoes.id AND fp.permissao_chave = \'visualizar_leads\'

@@ -72,5 +72,5 @@ INSERT IGNORE INTO roleta_fila (id, empresa_id, lead_id, roleta_id, origem, moti
     (2, 1, 28, 1, 'manual', 'Nenhum corretor na roleta no momento', 1, NOW() - INTERVAL 15 MINUTE);
 
 INSERT IGNORE INTO lead_eventos (id, lead_id, usuario_id, tipo, descricao, criado_em) VALUES
-    (40, 27, NULL, 'sistema', 'Lead recebido do Meta Ads e colocado na fila de espera da roleta Casa HM — Zona Oeste', NOW() - INTERVAL 40 MINUTE),
-    (41, 28, NULL, 'sistema', 'Lead recebido do Meta Ads e colocado na fila de espera da roleta Casa HM — Zona Oeste', NOW() - INTERVAL 15 MINUTE);
+    (40, 27, NULL, 'sistema', 'Lead cadastrado pela gestão e colocado na fila de espera da roleta Casa HM — Zona Oeste', NOW() - INTERVAL 40 MINUTE),
+    (41, 28, NULL, 'sistema', 'Lead cadastrado pela gestão e colocado na fila de espera da roleta Casa HM — Zona Oeste', NOW() - INTERVAL 15 MINUTE);

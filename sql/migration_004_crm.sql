@@ -22,8 +22,11 @@ SET NAMES utf8mb4;
 -- leads: nova categoria 'sem_interesse', prioridade, exclusão lógica,
 -- etapa configurável, data da última atividade
 -- ------------------------------------------------------------------
-ALTER TABLE leads
-    MODIFY etapa ENUM('novo_lead','primeiro_contato','em_atendimento','visita_agendada','visita_realizada','sem_interesse','contrato_assinado','perdido') NOT NULL DEFAULT 'novo_lead';
+-- Só amplia a lista se ainda não tiver os valores novos: rodar de novo
+-- uma migração antiga nunca pode encolher um ENUM já ampliado depois.
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'etapa' AND COLUMN_TYPE LIKE '%''sem_interesse''%');
+SET @sql := IF(@x = 0, 'ALTER TABLE leads MODIFY etapa ENUM(''novo_lead'',''primeiro_contato'',''em_atendimento'',''visita_agendada'',''visita_realizada'',''sem_interesse'',''contrato_assinado'',''perdido'') NOT NULL DEFAULT ''novo_lead''', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'etapa_id');
 SET @sql := IF(@x = 0, 'ALTER TABLE leads ADD COLUMN etapa_id INT UNSIGNED NULL AFTER etapa', 'DO 0');
@@ -174,8 +177,11 @@ CREATE TABLE IF NOT EXISTS lead_arquivos (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- lead_eventos: novos tipos de atividade
-ALTER TABLE lead_eventos
-    MODIFY tipo ENUM('atribuicao','mudanca_etapa','contato','redistribuicao','nota','sistema','ligacao','whatsapp','visita','agenda','arquivo','transferencia') NOT NULL;
+-- Só amplia a lista se ainda não tiver os valores novos: rodar de novo
+-- uma migração antiga nunca pode encolher um ENUM já ampliado depois.
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lead_eventos' AND COLUMN_NAME = 'tipo' AND COLUMN_TYPE LIKE '%''transferencia''%');
+SET @sql := IF(@x = 0, 'ALTER TABLE lead_eventos MODIFY tipo ENUM(''atribuicao'',''mudanca_etapa'',''contato'',''redistribuicao'',''nota'',''sistema'',''ligacao'',''whatsapp'',''visita'',''agenda'',''arquivo'',''transferencia'') NOT NULL', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- ------------------------------------------------------------------
 -- Novas permissões

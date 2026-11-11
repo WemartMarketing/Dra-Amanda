@@ -6,7 +6,8 @@
  *   $pageTitle  string  título da aba do navegador
  *   $crumb      string  rótulo da página atual na breadcrumb
  *   $activeNav  string  um de: inicio, kanban, ficha, relatorios, equipes,
- *                       empreendimentos, plantoes, roletas, usuarios
+ *                       empreendimentos, plantoes, roletas, usuarios, oferta,
+ *                       recuperacao, integracoes
  */
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/rbac.php';
@@ -31,12 +32,15 @@ $navItems = [
     ['key' => 'agenda',     'href' => '/pages/agenda.php',     'label' => $ehCorretor ? 'Minha agenda' : 'Agenda',      'icon' => 'calendar', 'mostrar' => true],
     ['key' => 'minha_roleta', 'href' => '/pages/minha_roleta.php', 'label' => 'Minha roleta',                           'icon' => 'pin',      'mostrar' => usuario_tem_permissao($usuario, 'participar_roleta')],
     ['key' => 'roletas',    'href' => '/pages/roletas.php',    'label' => 'Roletas',                                    'icon' => 'zap',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_roletas') || (!$ehCorretor && usuario_tem_permissao($usuario, 'redistribuir_leads'))],
+    ['key' => 'oferta',     'href' => '/pages/oferta.php',     'label' => 'Oferta ativa',                               'icon' => 'upload',   'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_oferta_ativa')],
     ['key' => 'relatorios', 'href' => '/pages/relatorios.php', 'label' => 'Relatórios',                                 'icon' => 'chart',    'mostrar' => usuario_tem_permissao($usuario, 'visualizar_indicadores')],
     ['key' => 'equipes',    'href' => '/pages/equipes.php',    'label' => 'Equipes',                                    'icon' => 'users',    'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_equipes')],
     ['key' => 'empreendimentos', 'href' => '/pages/empreendimentos.php', 'label' => 'Empreendimentos',                  'icon' => 'building', 'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_empreendimentos') || (!$ehCorretor && usuario_tem_permissao($usuario, 'visualizar_leads'))],
     ['key' => 'plantoes',   'href' => '/pages/plantoes.php',   'label' => 'Plantões',                                   'icon' => 'map',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_plantoes')],
     ['key' => 'usuarios',   'href' => '/pages/usuarios.php',   'label' => 'Usuários e acessos',                         'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'administrar_usuarios')],
     ['key' => 'funil',      'href' => '/pages/funil.php',      'label' => 'Etapas do funil',                            'icon' => 'settings', 'mostrar' => usuario_tem_permissao($usuario, 'configurar_funil')],
+    ['key' => 'recuperacao', 'href' => '/pages/recuperacao.php', 'label' => 'Recuperação de leads',                     'icon' => 'clock',    'mostrar' => usuario_tem_permissao($usuario, 'configurar_recuperacao')],
+    ['key' => 'integracoes', 'href' => '/pages/integracoes.php', 'label' => 'Integrações',                              'icon' => 'zap',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_integracoes')],
     ['key' => 'perfil',     'href' => '/pages/perfil.php',     'label' => 'Meu perfil',                                 'icon' => 'user',     'mostrar' => true],
 ];
 $navItems = array_values(array_filter($navItems, fn ($item) => $item['mostrar']));

@@ -335,7 +335,7 @@ function roleta_recebidos_hoje(int $roletaId, ?int $usuarioId = null): array
  * Corretores aptos a receber AGORA, já na ordem do rodízio (o primeiro é o
  * próximo a receber). Não confere horário — quem chama confere a roleta.
  */
-function roleta_elegiveis(array $roleta): array
+function roleta_elegiveis(array $roleta, ?int $evitarUsuarioId = null): array
 {
     $presenca = !empty($roleta['exigir_presenca'])
         ? 'INNER JOIN roleta_sessoes s ON s.roleta_id = rc.roleta_id AND s.usuario_id = rc.usuario_id AND s.saiu_em IS NULL
@@ -349,7 +349,7 @@ function roleta_elegiveis(array $roleta): array
         FROM roleta_corretores rc
         INNER JOIN usuarios u ON u.id = rc.usuario_id AND u.ativo = 1 AND u.empresa_id = :e
         ' . $presenca . '
-        WHERE rc.roleta_id = :r AND rc.pausado = 0' . $limite . '
+        WHERE rc.roleta_id = :r AND rc.pausado = 0' . $limite . ($evitarUsuarioId ? ' AND rc.usuario_id <> ' . (int) $evitarUsuarioId : '') . '
         ORDER BY (rc.ultimo_lead_em IS NULL) DESC, rc.ultimo_lead_em ASC, rc.ordem ASC, rc.usuario_id ASC');
     $stmt->execute(['e' => (int) $roleta['empresa_id'], 'r' => (int) $roleta['id']]);
     return $stmt->fetchAll();
@@ -374,8 +374,14 @@ function roleta_candidatas(int $empresaId, ?int $empreendimentoId): array
  * Distribui um lead sem responsável pelo rodízio. Independente de tela:
  * cadastro manual, fila, cron e (Etapa 5) webhook do Meta Ads chamam aqui.
  *
- * $origem: manual | meta_ads | importacao | fila | reprocessamento
+ * $origem: manual | meta_ads | importacao | fila | reprocessamento | recuperacao
  * $executor: usuário que pediu (null = automático)
+ *
+ * Um lead pode passar pela roleta mais de uma vez (recuperação por
+ * inatividade): a idempotência vem de `responsavel_id IS NULL` + trava de
+ * linha, não de unicidade em roleta_distribuicoes. Se o lead está na fila
+ * com `evitar_usuario_id` (o corretor que o perdeu), esse corretor é pulado
+ * — se só ele estiver disponível, o lead continua esperando.
  *
  * Retorna ['status' => 'distribuido'|'fila'|'ja_atribuido'|'nao_encontrado',
  *          'usuario_id', 'usuario_nome', 'roleta_id', 'roleta_nome', 'motivo']
@@ -395,9 +401,15 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
     $empresaId = (int) $lead['empresa_id'];
     $executorId = $executor ? (int) $executor['id'] : null;
     roleta_fechar_expiradas($empresaId);
+    $stmt = $pdo->prepare('SELECT evitar_usuario_id FROM roleta_fila WHERE lead_id = :l AND resolvido_em IS NULL');
+    $stmt->execute(['l' => $leadId]);
+    $evitar = $stmt->fetchColumn();
+    $evitar = $evitar ? (int) $evitar : null;
 
     $candidatas = roleta_candidatas($empresaId, $lead['empreendimento_id'] ? (int) $lead['empreendimento_id'] : null);
-    $motivoFila = $candidatas ? 'Nenhum corretor disponível na roleta agora' : 'Nenhuma roleta ativa atende este empreendimento';
+    $motivoFila = $candidatas
+        ? ($evitar ? 'Nenhum outro corretor disponível na roleta agora' : 'Nenhum corretor disponível na roleta agora')
+        : 'Nenhuma roleta ativa atende este empreendimento';
 
     foreach ($candidatas as $roletaId) {
         // READ COMMITTED: depois de obter a trava da roleta, as leituras
@@ -419,14 +431,15 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
                 $pdo->commit();
                 continue;
             }
-            $elegiveis = roleta_elegiveis($roleta);
+            $elegiveis = roleta_elegiveis($roleta, $evitar);
             if (!$elegiveis) {
                 $pdo->commit();
                 continue;
             }
             $escolhido = $elegiveis[0];
             $uid = (int) $escolhido['usuario_id'];
-            $upd = $pdo->prepare('UPDATE leads SET responsavel_id = :u, equipe_id = :eq, ultima_atividade_em = NOW() WHERE id = :id AND responsavel_id IS NULL');
+            // ultimo_feedback_em = NOW(): o novo dono recebe o prazo inteiro da recuperação.
+            $upd = $pdo->prepare('UPDATE leads SET responsavel_id = :u, equipe_id = :eq, ultima_atividade_em = NOW(), ultimo_feedback_em = NOW() WHERE id = :id AND responsavel_id IS NULL');
             $upd->execute(['u' => $uid, 'eq' => $escolhido['equipe_id'], 'id' => $leadId]);
             if ($upd->rowCount() !== 1) {
                 $pdo->rollBack();
@@ -438,6 +451,7 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
             $pdo->prepare('INSERT INTO roleta_distribuicoes (empresa_id, roleta_id, lead_id, usuario_id, origem, executado_por) VALUES (:e, :r, :l, :u, :o, :x)')
                 ->execute(['e' => $empresaId, 'r' => $roletaId, 'l' => $leadId, 'u' => $uid, 'o' => $origem, 'x' => $executorId]);
             $pdo->prepare('UPDATE roleta_fila SET resolvido_em = NOW() WHERE lead_id = :l AND resolvido_em IS NULL')->execute(['l' => $leadId]);
+            transferencia_completar_recuperacao($leadId, $uid);
             lead_registrar_evento($leadId, $executorId, 'atribuicao', 'Recebido pela roleta ' . $roleta['nome'] . ' — atribuído a ' . $escolhido['nome']);
             auditoria_registrar($empresaId, $executorId, 'roleta.lead_distribuido', 'lead', $leadId, ['roleta_id' => $roletaId, 'usuario_id' => $uid, 'origem' => $origem]);
             $pdo->commit();
@@ -454,9 +468,12 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
     $stmt = $pdo->prepare('SELECT id, resolvido_em FROM roleta_fila WHERE lead_id = :l');
     $stmt->execute(['l' => $leadId]);
     $naFila = $stmt->fetch();
-    $origemFila = in_array($origem, ['manual', 'meta_ads', 'importacao', 'reprocessamento'], true) ? $origem : 'reprocessamento';
+    $origemFila = in_array($origem, ['manual', 'meta_ads', 'importacao', 'reprocessamento', 'recuperacao'], true) ? $origem : 'reprocessamento';
     $pdo->prepare('INSERT INTO roleta_fila (empresa_id, roleta_id, lead_id, origem, motivo) VALUES (:e, :r, :l, :o, :m)
-                   ON DUPLICATE KEY UPDATE tentativas = tentativas + 1, motivo = VALUES(motivo), roleta_id = VALUES(roleta_id), resolvido_em = NULL')
+                   ON DUPLICATE KEY UPDATE tentativas = tentativas + 1, motivo = VALUES(motivo), roleta_id = VALUES(roleta_id),
+                       origem = IF(resolvido_em IS NULL, origem, VALUES(origem)),
+                       evitar_usuario_id = IF(resolvido_em IS NULL, evitar_usuario_id, NULL),
+                       resolvido_em = NULL')
         ->execute(['e' => $empresaId, 'r' => $candidatas[0] ?? null, 'l' => $leadId, 'o' => $origemFila, 'm' => $motivoFila]);
     if (!$naFila || $naFila['resolvido_em'] !== null) {
         lead_registrar_evento($leadId, $executorId, 'sistema', 'Aguardando corretor disponível — ' . mb_strtolower($motivoFila) . '.');
@@ -477,7 +494,7 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
  */
 function roleta_processar_fila(?int $empresaId = null, ?int $roletaId = null, int $limite = 200): array
 {
-    $sql = 'SELECT f.lead_id FROM roleta_fila f INNER JOIN leads l ON l.id = f.lead_id AND l.excluido_em IS NULL WHERE f.resolvido_em IS NULL';
+    $sql = 'SELECT f.lead_id, f.origem FROM roleta_fila f INNER JOIN leads l ON l.id = f.lead_id AND l.excluido_em IS NULL WHERE f.resolvido_em IS NULL';
     $params = [];
     if ($empresaId) {
         $sql .= ' AND f.empresa_id = :e';
@@ -491,9 +508,10 @@ function roleta_processar_fila(?int $empresaId = null, ?int $roletaId = null, in
     $stmt->execute($params);
     $tentados = 0;
     $distribuidos = 0;
-    foreach (array_column($stmt->fetchAll(), 'lead_id') as $leadId) {
+    foreach ($stmt->fetchAll() as $fila) {
+        $leadId = (int) $fila['lead_id'];
         $tentados++;
-        $res = roleta_distribuir_lead((int) $leadId, 'fila', null);
+        $res = roleta_distribuir_lead($leadId, $fila['origem'] === 'recuperacao' ? 'recuperacao' : 'fila', null);
         if ($res['status'] === 'distribuido') {
             $distribuidos++;
         } elseif ($res['status'] === 'ja_atribuido' || $res['status'] === 'nao_encontrado') {
@@ -548,7 +566,7 @@ function roleta_motivo_saida_rotulo(?string $motivo): string
 
 function roleta_origem_rotulo(string $origem): string
 {
-    return ['manual' => 'Cadastro manual', 'meta_ads' => 'Meta Ads', 'importacao' => 'Importação', 'fila' => 'Fila de espera', 'reprocessamento' => 'Reprocessamento'][$origem] ?? $origem;
+    return ['manual' => 'Cadastro manual', 'meta_ads' => 'Meta Ads', 'importacao' => 'Importação', 'fila' => 'Fila de espera', 'reprocessamento' => 'Reprocessamento', 'recuperacao' => 'Recuperação'][$origem] ?? $origem;
 }
 
 /** Leads aguardando na fila, filtrados pelo escopo de quem vê. */

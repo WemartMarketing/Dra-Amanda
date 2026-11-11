@@ -57,6 +57,10 @@ require __DIR__ . '/../includes/layout_start.php';
     <label class="sr-only" for="f-q">Buscar</label>
     <input class="select-filter filter-search" id="f-q" type="search" name="q" placeholder="Nome ou telefone" value="<?= e($filtros['q']) ?>">
     <button type="button" class="btn btn-outline btn-sm filters-toggle" data-toggle-filtros aria-expanded="<?= $temFiltroExtra ? 'true' : 'false' ?>"><?= icon('filter') ?>Filtros<?= $temFiltroExtra ? ' (' . count($temFiltroExtra) . ')' : '' ?></button>
+    <?php if ($filtros['lista']): $listaNome = leads_lista_oferta_nome($usuario, $filtros['lista']); ?>
+        <input type="hidden" name="lista" value="<?= (int) $filtros['lista'] ?>">
+        <span class="pill pill-blue filtro-lista"><?= icon('list') ?>Lista: <?= e($listaNome ?? 'não encontrada') ?> <a href="/pages/leads.php" aria-label="Remover filtro da lista">&times;</a></span>
+    <?php endif; ?>
     <div class="filters-extra<?= $temFiltroExtra ? ' is-open' : '' ?>" data-filtros-extra>
     <label class="sr-only" for="f-situacao">Situação</label>
     <select class="select-filter" id="f-situacao" name="situacao" data-auto-filtro>

@@ -6,6 +6,7 @@ $empresaId = (int) $usuario['empresa_ativa_id'];
 $podeGerenciar = usuario_tem_permissao($usuario, 'administrar_usuarios');
 
 if (!$podeGerenciar) {
+    http_response_code(403);
     $pageTitle = 'Acesso restrito — ' . APP_NAME;
     $crumb = 'Usuários e acessos';
     $activeNav = 'usuarios';
