@@ -35,7 +35,7 @@ function importacao_dir(): string
 /** Campos do lead que podem receber uma coluna. */
 function importacao_campos(): array
 {
-    return ['nome' => 'Nome', 'telefone' => 'Telefone', 'email' => 'E-mail', 'interesse' => 'Interesse', 'observacao' => 'Observação'];
+    return ['nome' => 'Nome', 'telefone' => 'Telefone', 'email' => 'E-mail', 'interesse' => 'Interesse', 'campanha' => 'Campanha', 'observacao' => 'Observação'];
 }
 
 /** Caminho do arquivo temporário de um token (só hex — nunca vem do usuário sem validar). */
@@ -307,6 +307,7 @@ function importacao_sugerir(array $cabecalho): array
         'telefone' => '/(telefone|celular|fone|whats|phone|tel\b|contato tel)/',
         'email' => '/(e ?mail|correio)/',
         'interesse' => '/(interesse|produto|imovel|empreendimento|tipologia)/',
+        'campanha' => '/(campanha|campaign|utm.?campaign|anuncio)/',
         'observacao' => '/(obs|observ|coment|nota|anotac)/',
     ];
     $sug = [];
@@ -354,9 +355,9 @@ function importacao_executar(array $usuario, array $linhas, array $mapa, string 
         $pdo->prepare('INSERT INTO oferta_listas (empresa_id, nome, empreendimento_id, arquivo_nome, criado_por) VALUES (:e, :n, :emp, :a, :u)')
             ->execute(['e' => $empresaId, 'n' => $nomeLista, 'emp' => $empreendimentoId, 'a' => mb_substr($arquivoNome, 0, 255), 'u' => $uid]);
         $listaId = (int) $pdo->lastInsertId();
-        $insLead = $pdo->prepare("INSERT INTO leads (empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, origem, oferta_lista_id,
+        $insLead = $pdo->prepare("INSERT INTO leads (empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, campanha, origem, oferta_lista_id,
                 etapa_id, etapa, prioridade, ultima_atividade_em)
-            VALUES (:e, :emp, NULL, NULL, :nome, :tel, :email, :int, 'importacao', :lista, :etapa_id, :etapa, 'normal', NOW())");
+            VALUES (:e, :emp, NULL, NULL, :nome, :tel, :email, :int, :camp, 'importacao', :lista, :etapa_id, :etapa, 'normal', NOW())");
         $insEvento = $pdo->prepare('INSERT INTO lead_eventos (lead_id, usuario_id, tipo, descricao) VALUES (:l, :u, :t, :d)');
         $textoEvento = 'Importado na lista de oferta ativa "' . $nomeLista . '" (' . $arquivoNome . ') por ' . $usuario['nome'];
 
@@ -392,9 +393,10 @@ function importacao_executar(array $usuario, array $linhas, array $mapa, string 
             $email = $pega($l, 'email');
             $email = $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) ? mb_substr($email, 0, 190) : null;
             $interesse = mb_substr($pega($l, 'interesse'), 0, 190) ?: null;
+            $campanha = mb_substr($pega($l, 'campanha'), 0, 120) ?: null;
             $insLead->execute([
                 'e' => $empresaId, 'emp' => $empreendimentoId, 'nome' => $nome, 'tel' => lead_formatar_telefone($tel),
-                'email' => $email, 'int' => $interesse, 'lista' => $listaId, 'etapa_id' => $etapa['id'], 'etapa' => $etapa['categoria'],
+                'email' => $email, 'int' => $interesse, 'camp' => $campanha, 'lista' => $listaId, 'etapa_id' => $etapa['id'], 'etapa' => $etapa['categoria'],
             ]);
             $leadId = (int) $pdo->lastInsertId();
             $insEvento->execute(['l' => $leadId, 'u' => $uid, 't' => 'importacao', 'd' => $textoEvento]);

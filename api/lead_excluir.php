@@ -14,5 +14,5 @@ db()->prepare('UPDATE leads SET excluido_em = NOW(), excluido_por = :por WHERE i
     ->execute(['por' => $usuario['id'], 'id' => $lead['id'], 'empresa_id' => $usuario['empresa_ativa_id']]);
 db()->prepare("UPDATE agenda_compromissos SET status = 'cancelado' WHERE lead_id = :id AND status = 'agendado'")
     ->execute(['id' => $lead['id']]);
-auditoria_registrar((int) $usuario['empresa_ativa_id'], (int) $usuario['id'], 'lead.excluido', 'lead', (int) $lead['id'], ['nome' => $lead['nome']]);
+auditoria_registrar((int) $usuario['empresa_ativa_id'], (int) $usuario['id'], 'lead.excluido', 'lead', (int) $lead['id'], ['etapa' => $lead['etapa']]);
 api_responder(['ok' => true]);

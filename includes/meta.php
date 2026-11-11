@@ -299,13 +299,13 @@ function meta_processar_evento(int $eventoId, bool $forcar = false): string
         return $falhar('O funil da empresa não tem etapas ativas.');
     }
     try {
-        $pdo->prepare("INSERT INTO leads (empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, origem, meta_leadgen_id,
+        $pdo->prepare("INSERT INTO leads (empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, origem, campanha, meta_leadgen_id,
                 etapa_id, etapa, prioridade, ultima_atividade_em)
-            VALUES (:e, :emp, NULL, NULL, :nome, :tel, :email, :int, 'meta_ads', :lg, :etapa_id, :etapa, 'normal', NOW())")
+            VALUES (:e, :emp, NULL, NULL, :nome, :tel, :email, :int, 'meta_ads', :camp, :lg, :etapa_id, :etapa, 'normal', NOW())")
             ->execute([
                 'e' => $empresaId, 'emp' => $empreendimentoId, 'nome' => $campos['nome'],
                 'tel' => $campos['telefone'] !== '' ? lead_formatar_telefone($campos['telefone']) : null,
-                'email' => $campos['email'], 'int' => $campos['interesse'], 'lg' => $ev['leadgen_id'],
+                'email' => $campos['email'], 'int' => $campos['interesse'], 'camp' => $campanha !== '' ? $campanha : null, 'lg' => $ev['leadgen_id'],
                 'etapa_id' => $etapa['id'], 'etapa' => $etapa['categoria'],
             ]);
     } catch (PDOException $e) {

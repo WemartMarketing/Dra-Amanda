@@ -438,8 +438,10 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
             }
             $escolhido = $elegiveis[0];
             $uid = (int) $escolhido['usuario_id'];
-            // ultimo_feedback_em = NOW(): o novo dono recebe o prazo inteiro da recuperação.
-            $upd = $pdo->prepare('UPDATE leads SET responsavel_id = :u, equipe_id = :eq, ultima_atividade_em = NOW(), ultimo_feedback_em = NOW() WHERE id = :id AND responsavel_id IS NULL');
+            // Mesma regra de lead_marcar_atribuicao(): prazo inteiro da recuperação
+            // para o novo dono, atribuido_em agora e primeiro contato ainda por fazer.
+            $upd = $pdo->prepare('UPDATE leads SET responsavel_id = :u, equipe_id = :eq, ultima_atividade_em = NOW(), ultimo_feedback_em = NOW(),
+                atribuido_em = NOW(), primeiro_contato_em = NULL WHERE id = :id AND responsavel_id IS NULL');
             $upd->execute(['u' => $uid, 'eq' => $escolhido['equipe_id'], 'id' => $leadId]);
             if ($upd->rowCount() !== 1) {
                 $pdo->rollBack();

@@ -182,6 +182,8 @@ require __DIR__ . '/../includes/layout_start.php';
                     <button type="button" data-transferir-lead="<?= (int) $lead['id'] ?>"><?= icon('users') ?>Transferir lead</button>
                 <?php endif; ?>
                 <?php if ($podeExcluir): ?>
+                    <button type="button" data-open-modal="modal-titular"><?= icon('file') ?>Exportar dados do titular (LGPD)</button>
+                    <button type="button" class="danger" data-open-modal="modal-anonimizar"><?= icon('shield') ?>Anonimizar lead (LGPD)</button>
                     <button type="button" class="danger" data-api-acao="/api/lead_excluir.php" data-lead_id="<?= (int) $lead['id'] ?>" data-confirmar="Excluir o lead <?= e($lead['nome']) ?>? Ele some de todas as telas e relatórios." data-ir-para="/pages/leads.php"><?= icon('trash') ?>Excluir lead</button>
                 <?php endif; ?>
             </div>
@@ -208,6 +210,7 @@ require __DIR__ . '/../includes/layout_start.php';
                 <div><dt>Empreendimento</dt><dd><?= e($lead['empreendimento_nome'] ?? '—') ?></dd></div>
                 <div><dt>Origem</dt><dd><?= e(lead_origens()[$lead['origem']] ?? $lead['origem']) ?></dd></div>
                 <div><dt>Interesse</dt><dd><?= e($lead['interesse'] ?: '—') ?></dd></div>
+                <div><dt>Campanha</dt><dd><?= e($lead['campanha'] ?: '—') ?></dd></div>
                 <div><dt>Renda familiar</dt><dd><?= $lead['renda_informada'] ? 'R$ ' . number_format((float) $lead['renda_informada'], 0, ',', '.') : '—' ?></dd></div>
                 <div><dt>Responsável</dt><dd><?= e($lead['responsavel_nome'] ?? '—') ?><?= $lead['equipe_nome'] ? ' · ' . e($lead['equipe_nome']) : '' ?></dd></div>
                 <div><dt>Prioridade</dt><dd><?= e(lead_prioridades()[$lead['prioridade']] ?? '—') ?></dd></div>
@@ -417,6 +420,7 @@ require __DIR__ . '/../includes/layout_start.php';
                         <select id="ed-prio" name="prioridade"><?php foreach (lead_prioridades() as $v => $r): ?><option value="<?= $v ?>" <?= $lead['prioridade'] === $v ? 'selected' : '' ?>><?= $r ?></option><?php endforeach; ?></select>
                     </div>
                     <div class="field"><label for="ed-int">Interesse</label><input type="text" id="ed-int" name="interesse" value="<?= e($lead['interesse']) ?>"></div>
+                    <div class="field"><label for="ed-camp">Campanha</label><input type="text" id="ed-camp" name="campanha" maxlength="120" placeholder="Ex.: Lançamento março" value="<?= e($lead['campanha'] ?? '') ?>"></div>
                     <div class="field"><label for="ed-renda">Renda familiar</label><input type="text" id="ed-renda" name="renda_informada" inputmode="decimal" value="<?= $lead['renda_informada'] ? e(number_format((float) $lead['renda_informada'], 2, ',', '.')) : '' ?>"></div>
                 </div>
                 <div class="form-alert" data-form-alerta hidden></div>
@@ -427,6 +431,43 @@ require __DIR__ . '/../includes/layout_start.php';
 <?php endif; ?>
 <?php render_modal_compromisso(); ?>
 <?php if ($podeTransferir) render_modal_transferir($destinos); ?>
+
+<?php if ($podeExcluir): ?>
+<div class="modal-overlay" id="modal-titular" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-titular-titulo">
+        <button type="button" class="overlay-close" data-close-modal="modal-titular" aria-label="Fechar">&times;</button>
+        <h2 id="modal-titular-titulo">Exportar dados do titular</h2>
+        <p class="muted">Para atender um pedido de acesso pela LGPD: baixa um arquivo JSON com tudo o que o sistema guarda sobre <b><?= e($lead['nome']) ?></b> — cadastro, histórico, agenda, tarefas, lista de arquivos e transferências. Só deste lead.</p>
+        <form action="/api/lead_titular_exportar.php" method="post" data-exportar-form>
+            <?= csrf_field() ?><input type="hidden" name="lead_id" value="<?= (int) $lead['id'] ?>">
+            <div class="lgpd-aviso" role="note"><?= icon('shield') ?><div>Entregue o arquivo só ao próprio titular, por um canal seguro. A exportação fica registrada na auditoria.</div></div>
+            <div class="form-alert" data-form-alerta hidden></div>
+            <button type="submit" class="btn btn-primary"><?= icon('file') ?>Baixar dados (JSON)</button>
+        </form>
+    </div>
+</div>
+<div class="modal-overlay" id="modal-anonimizar" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-anonimizar-titulo">
+        <button type="button" class="overlay-close" data-close-modal="modal-anonimizar" aria-label="Fechar">&times;</button>
+        <h2 id="modal-anonimizar-titulo">Anonimizar este lead?</h2>
+        <div class="danger-box" role="alert"><b>Esta ação não pode ser desfeita.</b> Use quando o cliente pedir a eliminação dos dados dele (LGPD).
+            <ul>
+                <li>Nome, telefone, e-mail, interesse, campanha e renda são apagados.</li>
+                <li>Os arquivos anexados são excluídos.</li>
+                <li>Observações e textos de atendimento do histórico, da agenda e das tarefas são apagados.</li>
+                <li>Ficam só etapa, datas, origem, empreendimento e responsável — os relatórios não mudam.</li>
+            </ul>
+        </div>
+        <form action="/api/lead_anonimizar.php" method="post" data-api-form>
+            <?= csrf_field() ?><input type="hidden" name="lead_id" value="<?= (int) $lead['id'] ?>">
+            <div class="field"><label for="anon-conf">Para confirmar, digite <b>ANONIMIZAR</b></label>
+                <input type="text" id="anon-conf" name="confirmacao" required autocomplete="off" pattern="[Aa][Nn][Oo][Nn][Ii][Mm][Ii][Zz][Aa][Rr]" title="Digite ANONIMIZAR"></div>
+            <div class="form-alert" data-form-alerta hidden></div>
+            <button type="submit" class="btn btn-danger"><?= icon('shield') ?>Anonimizar definitivamente</button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
 
 <script>
 document.getElementById('form-nova-tarefa')?.addEventListener('submit', async function (e) {

@@ -5,14 +5,15 @@
  * Variáveis esperadas, definidas pela página antes do include:
  *   $pageTitle  string  título da aba do navegador
  *   $crumb      string  rótulo da página atual na breadcrumb
- *   $activeNav  string  um de: inicio, kanban, ficha, relatorios, equipes,
+ *   $activeNav  string  um de: dashboard, inicio, kanban, ficha, relatorios, equipes,
  *                       empreendimentos, plantoes, roletas, usuarios, oferta,
- *                       recuperacao, integracoes
+ *                       recuperacao, integracoes, auditoria
  */
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/rbac.php';
 require_once __DIR__ . '/icons.php';
 require_once __DIR__ . '/leads.php';
+require_once __DIR__ . '/logo.php';
 
 $usuario = auth_require();
 
@@ -25,7 +26,11 @@ if (!empty($usuario['eh_superadmin'])) {
 }
 
 $ehCorretor = ($usuario['escopo'] ?? '') === 'propria_carteira';
+// Gestores (quem vê indicadores) começam pelo Dashboard; corretores, pelo Início.
+$ehGestor = !$ehCorretor && usuario_tem_permissao($usuario, 'visualizar_indicadores');
+$inicioHref = $ehGestor ? '/pages/dashboard.php' : '/pages/inicio.php';
 $navItems = [
+    ['key' => 'dashboard',  'href' => '/pages/dashboard.php',  'label' => 'Dashboard',                                  'icon' => 'chart',    'mostrar' => $ehGestor],
     ['key' => 'inicio',     'href' => '/pages/inicio.php',     'label' => 'Início',                                     'icon' => 'home',     'mostrar' => true],
     ['key' => 'leads',      'href' => '/pages/leads.php',      'label' => $ehCorretor ? 'Meus leads' : 'Leads',         'icon' => 'list',     'mostrar' => usuario_tem_permissao($usuario, 'visualizar_leads')],
     ['key' => 'kanban',     'href' => '/pages/kanban.php',     'label' => $ehCorretor ? 'Meu Kanban' : 'Kanban',        'icon' => 'kanban',   'mostrar' => usuario_tem_permissao($usuario, 'visualizar_leads')],
@@ -33,7 +38,7 @@ $navItems = [
     ['key' => 'minha_roleta', 'href' => '/pages/minha_roleta.php', 'label' => 'Minha roleta',                           'icon' => 'pin',      'mostrar' => usuario_tem_permissao($usuario, 'participar_roleta')],
     ['key' => 'roletas',    'href' => '/pages/roletas.php',    'label' => 'Roletas',                                    'icon' => 'zap',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_roletas') || (!$ehCorretor && usuario_tem_permissao($usuario, 'redistribuir_leads'))],
     ['key' => 'oferta',     'href' => '/pages/oferta.php',     'label' => 'Oferta ativa',                               'icon' => 'upload',   'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_oferta_ativa')],
-    ['key' => 'relatorios', 'href' => '/pages/relatorios.php', 'label' => 'Relatórios',                                 'icon' => 'chart',    'mostrar' => usuario_tem_permissao($usuario, 'visualizar_indicadores')],
+    ['key' => 'relatorios', 'href' => '/pages/relatorios.php', 'label' => 'Perdas e transferências',                    'icon' => 'alert',    'mostrar' => usuario_tem_permissao($usuario, 'visualizar_indicadores')],
     ['key' => 'equipes',    'href' => '/pages/equipes.php',    'label' => 'Equipes',                                    'icon' => 'users',    'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_equipes')],
     ['key' => 'empreendimentos', 'href' => '/pages/empreendimentos.php', 'label' => 'Empreendimentos',                  'icon' => 'building', 'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_empreendimentos') || (!$ehCorretor && usuario_tem_permissao($usuario, 'visualizar_leads'))],
     ['key' => 'plantoes',   'href' => '/pages/plantoes.php',   'label' => 'Plantões',                                   'icon' => 'map',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_plantoes')],
@@ -41,6 +46,7 @@ $navItems = [
     ['key' => 'funil',      'href' => '/pages/funil.php',      'label' => 'Etapas do funil',                            'icon' => 'settings', 'mostrar' => usuario_tem_permissao($usuario, 'configurar_funil')],
     ['key' => 'recuperacao', 'href' => '/pages/recuperacao.php', 'label' => 'Recuperação de leads',                     'icon' => 'clock',    'mostrar' => usuario_tem_permissao($usuario, 'configurar_recuperacao')],
     ['key' => 'integracoes', 'href' => '/pages/integracoes.php', 'label' => 'Integrações',                              'icon' => 'zap',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_integracoes')],
+    ['key' => 'auditoria',  'href' => '/pages/auditoria.php',  'label' => 'Auditoria',                                  'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'visualizar_auditoria')],
     ['key' => 'perfil',     'href' => '/pages/perfil.php',     'label' => 'Meu perfil',                                 'icon' => 'user',     'mostrar' => true],
 ];
 $navItems = array_values(array_filter($navItems, fn ($item) => $item['mostrar']));
@@ -61,7 +67,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
 <body>
 <div class="shell">
     <aside class="side">
-        <a href="/pages/inicio.php" class="brand"><span class="brandmark">W</span>WeMart <span class="hl">Sales</span></a>
+        <a href="<?= $inicioHref ?>" class="brand" aria-label="WeMart Sales — página inicial"><?= logo_html() ?></a>
         <div class="company-switch">
             <?php
             $stmtEmpresa = db()->prepare('SELECT nome FROM empresas WHERE id = :id');

@@ -1,10 +1,15 @@
         </main>
+        <footer class="site-legal">WeMart Sales · Dados tratados conforme a LGPD — <a href="/privacidade.php">privacidade e uso dos dados</a></footer>
     </div>
 </div>
 
-<?php $principaisMobile = ['inicio', 'leads', 'kanban', 'agenda']; ?>
+<?php $principaisMobile = [$ehGestor ? 'dashboard' : 'inicio', 'leads', 'kanban', 'agenda']; ?>
 <nav class="bottom-nav" aria-label="Navegação principal">
-    <a href="/pages/inicio.php" class="<?= $navAtivo === 'inicio' ? 'active' : '' ?>"><?= icon('home') ?>Início</a>
+    <?php if ($ehGestor): ?>
+        <a href="/pages/dashboard.php" class="<?= $navAtivo === 'dashboard' ? 'active' : '' ?>"><?= icon('chart') ?>Dashboard</a>
+    <?php else: ?>
+        <a href="/pages/inicio.php" class="<?= $navAtivo === 'inicio' ? 'active' : '' ?>"><?= icon('home') ?>Início</a>
+    <?php endif; ?>
     <a href="/pages/leads.php" class="<?= $navAtivo === 'leads' ? 'active' : '' ?>"><?= icon('list') ?>Leads</a>
     <a href="/pages/kanban.php" class="<?= $navAtivo === 'kanban' ? 'active' : '' ?>"><?= icon('kanban') ?>Kanban</a>
     <a href="/pages/agenda.php" class="<?= $navAtivo === 'agenda' ? 'active' : '' ?>"><?= icon('calendar') ?>Agenda</a>

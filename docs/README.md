@@ -6,6 +6,9 @@ HostGator. O desenvolvimento segue as etapas do prompt mestre.
 
 ## Etapas entregues
 
+As seis etapas do prompt mestre estão entregues (Fundação, Estrutura
+comercial, CRM, Roleta, Integrações/oferta ativa e Dashboards).
+
 ### Etapa 1 — Fundação
 - Login por sessão com senha em hash, **bloqueio após 5 tentativas
   erradas em 15 min** (`login_tentativas`).
@@ -152,8 +155,10 @@ Etapa 5, o webhook do Meta Ads chamam as mesmas funções).
 - **Feedback válido** (`lead_registrar_feedback`, coluna `leads.ultimo_feedback_em`):
   só reinicia o prazo de recuperação o que comprova atendimento — mudar a
   etapa, *Registrar atendimento/contato* com texto, marcar visita/retorno
-  como realizado ou cliente ausente e receber o lead (cadastro, roleta,
-  transferência, divisão da oferta ativa). Anotação, arquivo, edição de
+  como realizado ou cliente ausente. Receber o lead (cadastro, roleta,
+  transferência, divisão da oferta ativa) também reinicia o prazo, mas por
+  outra função (`lead_marcar_atribuicao`, Etapa 6), que nunca conta como
+  contato. Anotação, arquivo, edição de
   dados, clicar em Ligar/WhatsApp ou só criar um compromisso **não** contam.
 - **Recuperação automática** (`includes/recuperacao.php`, tela *Recuperação
   de leads*, permissão *Configurar recuperação*): por padrão 4 dias sem
@@ -193,17 +198,82 @@ Etapa 5, o webhook do Meta Ads chamam as mesmas funções).
   dos arquivos temporários de importação. `cron/processar_fila.php` continua
   funcionando (delega para a nova rotina).
 
+### Etapa 6 — Dashboards, relatórios, exportação, auditoria, backup e LGPD
+- **Dashboard do gestor** (`pages/dashboard.php`, permissão *Visualizar
+  indicadores*; corretores continuam no Início). Gestores entram direto nele
+  depois do login e ele é o primeiro item do menu. Período (hoje, 7, 30 e
+  90 dias, mês atual, mês anterior, personalizado até 1 ano) e filtros de
+  empreendimento, superintendência, equipe, gerente, corretor, origem e
+  campanha — as opções só mostram o que está no recorte de quem vê.
+  10 indicadores com variação contra o período anterior de mesmo tamanho e
+  um **?** que explica cada um em uma linha: leads recebidos, distribuídos,
+  sem atendimento (com corretor há mais de 2 h sem contato — ajustável por
+  `DASH_HORAS_SEM_ATENDIMENTO` no `config.php`), taxa de primeiro contato,
+  tempo médio e mediana até o primeiro contato ("1 h 20 min"), visitas
+  agendadas e realizadas, contratos assinados, conversão e perdidos por
+  inatividade. Gráficos em HTML/CSS/SVG (sem biblioteca): leads por dia
+  (por semana acima de 92 dias), funil, origem (rosca), empreendimento e
+  campanha, sempre com "Ver como tabela". **Produtividade** por corretor,
+  equipe, gerente, superintendência, empreendimento, campanha ou origem
+  (tabela ordenável com totais) e **resultados por roleta**.
+- Todas as contas ficam em `includes/dashboard.php` e respeitam
+  `rbac_leads_scope()`; perdas usam `rbac_transferencias_scope()` (estrutura
+  anterior). Nenhum gráfico ou tabela mostra nome ou telefone de lead.
+- Colunas novas em `leads` (migração 007): `atribuido_em` (quando o
+  corretor atual recebeu), `primeiro_contato_em` (primeiro feedback válido
+  depois disso — zera a cada nova atribuição), `contrato_assinado_em` e
+  `campanha` (Meta Ads preenche sozinho; editável na ficha; coluna
+  mapeável na importação).
+- **Perdas e transferências** (`pages/relatorios.php`): perdas por
+  inatividade e transferências administrativas separadas, tendência,
+  agrupadas por corretor, equipe, gerente, superintendência ou
+  empreendimento (gerente vê a própria equipe; superintendente o agregado),
+  e motivos dos leads encerrados sem venda.
+- **Exportação** (permissão *Exportar relatórios*): botão *Exportar* no
+  Dashboard, em Perdas e na lista de Leads. Gera **.xlsx** de verdade com o
+  ZipArchive do PHP (cabeçalho em negrito, números como números, datas como
+  datas); sem ZipArchive, **CSV** (UTF-8 com BOM, `;`, CRLF) — o diálogo
+  diz qual formato sai. Mesmos filtros e escopo da tela, proteção contra
+  fórmulas (`= + - @` ganham `'`), até 50.000 linhas, nada fica guardado no
+  servidor, cada exportação vai para a auditoria. A lista de leads (dados
+  pessoais) pede a confirmação da LGPD antes.
+- **Auditoria** (`pages/auditoria.php`, permissão nova *Ver registro de
+  auditoria*, dada ao Master): filtros de período, usuário, ação e item,
+  paginação, ações em português e detalhes com qualquer campo de segredo
+  mascarado. A exclusão de lead deixou de gravar o nome na auditoria.
+- **Backup** (`cron/backup.php`, uma vez por dia): `.sql.gz` em
+  `storage/backups/` só com PDO (sem `mysqldump`), mantém os 7 últimos;
+  testado restaurando num banco vazio com as mesmas contagens.
+- **LGPD**: na ficha, *Mais → Anonimizar lead* (permissão *Excluir leads*,
+  exige digitar ANONIMIZAR, irreversível, auditado) e *Exportar dados do
+  titular* (JSON com tudo de um único lead, auditado). Rodapé e login
+  levam a `privacidade.php`, que mostra `docs/LGPD.md`.
+
 ### Limitações conhecidas (ficam para as próximas etapas)
 - A integração com a Meta só recebe leads depois que as credenciais reais
   forem cadastradas (app da Meta aprovado, `META_APP_SECRET`,
   `META_VERIFY_TOKEN`, `APP_KEY` e o token de cada página).
 - A presença depende da página aberta no celular: navegadores não permitem
   GPS em segundo plano numa página web.
-- **Etapa 6**: dashboards completos e exportação Excel (o botão existe e
-  avisa que está em desenvolvimento).
 - Logo oficial da WeMart ainda não foi enviada — o sistema usa o texto
-  "WeMart Sales". As 5 referências visuais recebidas são variações entre
-  si e servem de guia, não de molde literal.
+  "WeMart Sales" (ver **Logo** abaixo para trocar).
+- Dashboard: contratos e visitas de leads que trocaram de dono são
+  contados para o dono **atual**; o histórico de primeiro contato de leads
+  anteriores à Etapa 6 vem do histórico de eventos (aproximação).
+- Exportação: limite de 50.000 linhas por planilha; o backup do banco fica
+  no mesmo servidor — baixe cópias periodicamente.
+- Anonimizar funciona em leads ativos (a ficha precisa abrir); um lead já
+  excluído precisa ser restaurado pelo suporte antes.
+- Depois de importar muitos dados de uma vez, rode *Analisar tabela* no
+  phpMyAdmin (ou `ANALYZE TABLE leads`) para o MySQL voltar a escolher os
+  índices certos.
+
+## Logo
+
+A marca é desenhada em um único lugar: `includes/logo.php` (menu, login e
+página de privacidade). Para usar o logo oficial, salve o arquivo em
+`assets/img/logo.svg` (ou `.png`) e troque o retorno de `logo_html()` por
+`'<img src="/assets/img/logo.svg" alt="WeMart Sales" class="brand-logo">'`.
 
 ## Rodando localmente
 
@@ -229,11 +299,17 @@ mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_004_crm.sql
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_004.sql
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_005_roleta.sql
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_005.sql
+mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_006_integracoes_oferta.sql
+mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_006.sql
+mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_007_dashboards.sql
 ```
+
+(Use `--default-character-set=utf8mb4` no `mysql` se o terminal não for UTF-8.)
 
 Todas as migrações e seeds rodam mais de uma vez sem duplicar nada e
 funcionam igual em MySQL 5.7+/8.0 e MariaDB 10.3+ (sem procedures,
-funções ou triggers). Para a fila da roleta: `php cron/processar_fila.php`.
+funções ou triggers). Rotinas: `php cron/rotinas.php`; backup:
+`php cron/backup.php`.
 
 Observação: o `php -S` ignora `.htaccess` (inclusive o bloqueio de
 `storage/`). Para testar as proteções de `uploads/`, `storage/`,
@@ -254,7 +330,14 @@ Senha de todas as contas: **demo123**
 | Superintendente (Zona Sul) | camila.super@hmvendas.demo |
 | Gerente (Equipe Zona Oeste) | ana.gerente@hmvendas.demo |
 | Gerente (Equipe Zona Sul) | diego.gerente@hmvendas.demo |
-| Corretor | carlos@hmvendas.demo |
+| Corretor (Zona Oeste) | carlos@hmvendas.demo, fernanda.costa@hmvendas.demo, rafael.nunes@hmvendas.demo |
+| Corretor (Zona Sul) | juliana.prado@hmvendas.demo, marcelo.diniz@hmvendas.demo |
+
+Quem entra em qual tela: corretor → Início (sem Dashboard, Perdas,
+Auditoria ou Exportar); gerente, superintendente, GP do Produto, GP Líder,
+Gerente Geral e Master → Dashboard; Exportar só aparece para quem tem
+*Exportar relatórios* (Master, Gerente Geral, GP Líder); Auditoria só para
+o Master.
 
 ### Como testar a Etapa 2
 1. Entre como Master → **Equipes**: crie uma superintendência, uma equipe
@@ -322,6 +405,19 @@ sáb 09:00–18:00).
 4. **Integrações** mostra “Integração ainda não configurada” até você
    cadastrar uma página real (ver `docs/INTEGRACAO_META.md`).
 
+### Como testar a Etapa 6
+Roteiro completo: `docs/CHECKLIST_TESTES.md`. Em resumo:
+1. `fernanda.gestora@…` cai no **Dashboard**; troque o período, filtre um
+   empreendimento, toque nos **?**, ordene a Produtividade e mude o
+   agrupamento.
+2. *Exportar* → baixa um .xlsx; abra no Excel/LibreOffice. **Leads →
+   Exportar** pede a confirmação da LGPD.
+3. `ana.gerente@…`: o Dashboard só mostra a Equipe Zona Oeste;
+   `carlos@…` recebe 403 no Dashboard.
+4. **Auditoria**: as exportações aparecem lá.
+5. Numa ficha: *Mais → Exportar dados do titular* e *Anonimizar lead*.
+6. `php cron/backup.php` → arquivo novo em `storage/backups/`.
+
 Todos os nomes, leads e telefones do seed são **fictícios**.
 
 ## Estrutura
@@ -342,16 +438,22 @@ includes/
   meta.php, cripto.php             Meta Lead Ads (Graph API, eventos) e cifragem de tokens
   importacao.php                   leitura segura de CSV/XLSX e listas de oferta ativa
   arquivos.php                     upload/validação de arquivos de lead
+  dashboard.php, dashboard_ui.php  contas dos dashboards/relatórios (uma fonte só) e componentes de tela
+  exportacao.php                   .xlsx (ZipArchive) / CSV, proteção contra fórmulas
+  lgpd.php                         anonimização e exportação dos dados do titular
+  logo.php                         a marca (único lugar)
   auditoria.php, db.php, layout_*  auditoria, PDO e layout
 pages/                             telas (inicio, leads, kanban, lead, agenda, funil, perfil,
                                    relatorios, equipes, empreendimentos, empreendimento,
                                    plantoes, roletas, minha_roleta, usuarios, superadmin,
-                                   oferta, importar, recuperacao, integracoes)
+                                   oferta, importar, recuperacao, integracoes, dashboard, auditoria)
+privacidade.php                    página pública de privacidade (docs/LGPD.md)
 cron/rotinas.php                   rotina única do cron (só linha de comando; HTTP → 403)
+cron/backup.php                    backup diário do banco (.sql.gz em storage/backups/)
 webhook/meta.php                   webhook público do Meta Lead Ads (assinatura obrigatória)
 api/                               endpoints POST chamados por fetch()
 uploads/                           imagens de empreendimentos (protegido por .htaccess)
-storage/                           arquivos privados de leads e temporários de importação — nunca servidos direto (.htaccess nega tudo)
+storage/                           arquivos privados de leads, temporários de importação e backups — nunca servidos direto (.htaccess nega tudo)
 assets/css/app.css, assets/js/app.js
 sql/                               schema, seeds e migrações (ordem acima)
 referencias/                       protótipo UX original (não é código de produção)

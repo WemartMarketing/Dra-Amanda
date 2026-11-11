@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/logo.php';
+require_once __DIR__ . '/includes/rbac.php';
 
 if (auth_check()) {
     $u = current_user();
-    header('Location: ' . (!empty($u['eh_superadmin']) ? '/pages/superadmin.php' : '/pages/inicio.php'));
+    header('Location: ' . rbac_pagina_inicial($u));
     exit;
 }
 
@@ -16,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $senha = (string) ($_POST['senha'] ?? '');
         $resultado = $email !== '' && $senha !== '' ? auth_login($email, $senha) : ['ok' => false, 'bloqueado' => false];
         if ($resultado['ok']) {
-            header('Location: ' . (!empty($resultado['usuario']['eh_superadmin']) ? '/pages/superadmin.php' : '/pages/inicio.php'));
+            header('Location: ' . rbac_pagina_inicial(current_user()));
             exit;
         }
         $erro = !empty($resultado['bloqueado'])
@@ -37,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <div class="login-shell">
     <div class="login-card">
-        <div class="brand"><span class="brandmark">W</span>WeMart <span class="hl">Sales</span></div>
+        <div class="brand"><?= logo_html() ?></div>
         <h1>Entrar na sua conta</h1>
         <p class="sub">Acesse seus leads e atendimentos.</p>
 
@@ -65,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             superadmin: superadmin@wemart.demo · senha: demo123
         </div>
     </div>
+    <p class="login-legal">Ao entrar você concorda com o uso dos dados conforme a LGPD — <a href="/privacidade.php">privacidade e uso dos dados</a>.</p>
 </div>
 </body>
 </html>

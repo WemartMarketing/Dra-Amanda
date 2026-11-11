@@ -1,410 +1,117 @@
 <?php
+/**
+ * Relatórios de perdas e transferências (seção 12). Agregado pela estrutura
+ * ANTERIOR do lead (rbac_transferencias_scope): o gerente vê a própria
+ * equipe, o superintendente o agregado das equipes dele. Nunca mostra nome
+ * ou telefone de lead — só contagens e nomes de pessoas/estruturas.
+ */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
-require_once __DIR__ . '/../includes/leads.php';
-require_once __DIR__ . '/../includes/lead_componentes.php';
+require_once __DIR__ . '/../includes/estrutura.php';
+require_once __DIR__ . '/../includes/dashboard_ui.php';
 
 $usuario = auth_require();
-
-if (!usuario_tem_permissao($usuario, 'visualizar_indicadores')) {
-    http_response_code(403);
-    $pageTitle = 'Acesso restrito — ' . APP_NAME;
-    $crumb = 'Relatórios';
-    $activeNav = 'relatorios';
-    require __DIR__ . '/../includes/layout_start.php';
-    echo '<div class="card stub-card"><div class="stub-icon">' . icon('alert') . '</div><h2>Acesso restrito</h2><p>Sua função não tem a permissão "Visualizar indicadores/dashboard".</p></div>';
-    require __DIR__ . '/../includes/layout_end.php';
+$crumb = 'Perdas e transferências';
+$activeNav = 'relatorios';
+if (!empty($usuario['eh_superadmin'])) {
+    header('Location: /pages/superadmin.php');
     exit;
 }
-
-$empresaId = (int) $usuario['empresa_ativa_id'];
-$scope = rbac_leads_scope($usuario); // sempre aplicado primeiro — os filtros abaixo só restringem ainda mais, nunca abrem exceção ao escopo da função.
-
-// --------------------------------------------------------------
-// Filtros (GET) — período fixo + empreendimento/superintendência/
-// equipe (rotulada "Gerente", já que cada equipe tem um gerente só).
-// As opções dos selects listam tudo da empresa, não só o que o cargo
-// atual enxergaria sozinho; isso é seguro porque o filtro escolhido
-// sempre se soma (AND) ao escopo obrigatório do cargo — nunca o
-// substitui — então escolher algo fora do próprio escopo simplesmente
-// não traz nenhuma linha, nunca vaza dado de outra equipe.
-// --------------------------------------------------------------
-$periodosValidos = [7 => 'Últimos 7 dias', 30 => 'Últimos 30 dias', 90 => 'Últimos 90 dias'];
-$periodo = (int) ($_GET['periodo'] ?? 30);
-if (!isset($periodosValidos[$periodo])) {
-    $periodo = 30;
-}
-$dataInicio = date('Y-m-d', strtotime("-{$periodo} days"));
-
-$filtroEmpreendimento = isset($_GET['empreendimento']) && $_GET['empreendimento'] !== '' ? (int) $_GET['empreendimento'] : null;
-$filtroSuperintendencia = isset($_GET['superintendencia']) && $_GET['superintendencia'] !== '' ? (int) $_GET['superintendencia'] : null;
-$filtroEquipe = isset($_GET['equipe']) && $_GET['equipe'] !== '' ? (int) $_GET['equipe'] : null;
-
-$extraSql = '';
-$extraParams = [];
-if ($filtroEmpreendimento) {
-    $extraSql .= ' AND leads.empreendimento_id = :f_emp';
-    $extraParams['f_emp'] = $filtroEmpreendimento;
-}
-if ($filtroEquipe) {
-    $extraSql .= ' AND leads.equipe_id = :f_equipe';
-    $extraParams['f_equipe'] = $filtroEquipe;
-} elseif ($filtroSuperintendencia) {
-    $extraSql .= ' AND leads.equipe_id IN (SELECT id FROM equipes WHERE superintendencia_id = :f_super)';
-    $extraParams['f_super'] = $filtroSuperintendencia;
+if (!usuario_tem_permissao($usuario, 'visualizar_indicadores')) {
+    pagina_acesso_restrito($crumb, $activeNav, 'Visualizar indicadores/dashboard');
 }
 
-$baseSql = $scope['sql'] . $extraSql;
-$baseParams = array_merge($scope['params'], $extraParams);
+$f = dash_filtros($usuario, $_GET);
+$dimsPerdas = array_intersect_key(dash_dimensoes(), array_flip(['corretor', 'equipe', 'gerente', 'superintendencia', 'empreendimento']));
+$padrao = dash_dimensao_padrao($usuario);
+$por = array_key_exists($_GET['perdas_por'] ?? '', $dimsPerdas) ? $_GET['perdas_por'] : (isset($dimsPerdas[$padrao]) ? $padrao : 'corretor');
+$opcoes = dash_opcoes($usuario);
+$publicos = dash_filtros_publicos($f);
 
-function relContar(string $baseSql, array $baseParams, string $condicao, array $params = []): int
-{
-    $stmt = db()->prepare('SELECT COUNT(*) FROM leads WHERE ' . $baseSql . ' AND ' . $condicao);
-    $stmt->execute(array_merge($baseParams, $params));
-    return (int) $stmt->fetchColumn();
+$linhas = dash_perdas($usuario, $f, $por);
+$porEmp = $por === 'empreendimento' ? $linhas : dash_perdas($usuario, $f, 'empreendimento');
+$serie = dash_perdas_serie($usuario, $f);
+$motivos = dash_perdas_por_motivo($usuario, $f);
+$somar = fn (array $ls, string $c) => array_sum(array_column($ls, $c));
+$tot = ['nome' => 'Total'];
+foreach (['inatividade', 'redistribuidos', 'administrativas', 'mudanca_equipe', 'total'] as $c) {
+    $tot[$c] = $somar($linhas, $c);
 }
+$fAnt = ['ini' => $f['ant_ini'], 'fim' => $f['ant_fim']] + $f;
+$ant = dash_perdas($usuario, $fAnt, 'superintendencia');
+$antIna = $somar($ant, 'inatividade');
+$antAdm = $somar($ant, 'administrativas');
+[$varIna, $clsIna] = dash_variacao($tot['inatividade'], $antIna, 'qtd', true);
+[$varAdm, $clsAdm] = dash_variacao($tot['administrativas'], $antAdm, 'qtd', true);
+$podeExportar = usuario_tem_permissao($usuario, 'exportar_relatorios');
+$urlPor = fn (string $d) => '?' . http_build_query($publicos + ['perdas_por' => $d]) . '#perdas-inatividade';
 
-// --------------------------------------------------------------
-// KPIs
-// --------------------------------------------------------------
-$leadsRecebidos = relContar($baseSql, $baseParams, 'leads.criado_em >= :data_inicio', ['data_inicio' => $dataInicio]);
-$stmt = db()->prepare("SELECT COUNT(DISTINCT lead_eventos.lead_id) FROM lead_eventos INNER JOIN leads ON leads.id = lead_eventos.lead_id WHERE {$baseSql} AND lead_eventos.tipo = 'contato' AND lead_eventos.criado_em >= :data_inicio");
-$stmt->execute(array_merge($baseParams, ['data_inicio' => $dataInicio]));
-$atendimentos = (int) $stmt->fetchColumn();
-$visitasAgendadas = relContar($baseSql, $baseParams, "leads.etapa IN ('visita_agendada','visita_realizada','contrato_assinado') AND leads.criado_em >= :data_inicio", ['data_inicio' => $dataInicio]);
-$vendasRealizadas = relContar($baseSql, $baseParams, "leads.etapa = 'contrato_assinado' AND leads.atualizado_em >= :data_inicio", ['data_inicio' => $dataInicio]);
-$perdasInatividade = relContar($baseSql, $baseParams, "leads.etapa = 'perdido' AND leads.atualizado_em >= :data_inicio", ['data_inicio' => $dataInicio]);
-
-// --------------------------------------------------------------
-// Leads recebidos por dia (gráfico de barras, período inteiro, com
-// dias sem lead aparecendo como zero — não somem do eixo).
-// --------------------------------------------------------------
-$stmt = db()->prepare("SELECT DATE(leads.criado_em) AS dia, COUNT(*) AS total FROM leads WHERE {$baseSql} AND leads.criado_em >= :data_inicio GROUP BY dia");
-$stmt->execute(array_merge($baseParams, ['data_inicio' => $dataInicio]));
-$porDiaRaw = [];
-foreach ($stmt->fetchAll() as $row) {
-    $porDiaRaw[$row['dia']] = (int) $row['total'];
-}
-$serieDiaria = [];
-for ($d = strtotime($dataInicio); $d <= strtotime('today'); $d += 86400) {
-    $chave = date('Y-m-d', $d);
-    $serieDiaria[] = ['dia' => $chave, 'total' => $porDiaRaw[$chave] ?? 0];
-}
-$maxDiario = max(1, max(array_column($serieDiaria, 'total')));
-
-// --------------------------------------------------------------
-// Funil de conversão — cada etapa conta os leads criados no período
-// que estão nela OU já passaram dela (aproximação: não guardamos a
-// data em que cada etapa foi alcançada, só a etapa atual; um lead
-// hoje em "Visita agendada" soma em todas as etapas anteriores do
-// funil, não só na sua atual — assim como no relatório de referência).
-// --------------------------------------------------------------
-$funilEtapas = lead_etapas_funil();
-$funil = [];
-foreach ($funilEtapas as $i => $etapa) {
-    $restantes = array_slice($funilEtapas, $i);
-    $placeholders = [];
-    $params = ['data_inicio' => $dataInicio];
-    foreach ($restantes as $j => $e) {
-        $ph = "et{$j}";
-        $placeholders[] = ":{$ph}";
-        $params[$ph] = $e;
-    }
-    $stmt = db()->prepare("SELECT COUNT(*) FROM leads WHERE {$baseSql} AND leads.criado_em >= :data_inicio AND leads.etapa IN (" . implode(',', $placeholders) . ')');
-    $stmt->execute(array_merge($baseParams, $params));
-    $funil[] = ['etapa' => $etapa, 'rotulo' => lead_etapa_rotulo($etapa), 'total' => (int) $stmt->fetchColumn()];
-}
-$maxFunil = max(1, $funil[0]['total']);
-$conversaoGeral = $funil[0]['total'] > 0 ? round(end($funil)['total'] / $funil[0]['total'] * 100, 1) : 0.0;
-
-// --------------------------------------------------------------
-// Resultado por empreendimento
-// --------------------------------------------------------------
-$stmt = db()->prepare("
-    SELECT empreendimentos.id, empreendimentos.nome,
-        COUNT(leads.id) AS total_leads,
-        SUM(leads.etapa = 'contrato_assinado') AS total_vendas
-    FROM empreendimentos
-    LEFT JOIN leads ON leads.empreendimento_id = empreendimentos.id AND {$baseSql} AND leads.criado_em >= :data_inicio
-    WHERE empreendimentos.empresa_id = :empresa_id
-    GROUP BY empreendimentos.id, empreendimentos.nome
-    ORDER BY total_leads DESC
-");
-$stmt->execute(array_merge($baseParams, ['data_inicio' => $dataInicio, 'empresa_id' => $empresaId]));
-$porEmpreendimento = $stmt->fetchAll();
-
-// --------------------------------------------------------------
-// Oportunidades perdidas (por motivo)
-// --------------------------------------------------------------
-$stmt = db()->prepare("SELECT COALESCE(motivo_perda, 'Outros motivos') AS motivo, COUNT(*) AS total FROM leads WHERE {$baseSql} AND leads.etapa = 'perdido' AND leads.atualizado_em >= :data_inicio GROUP BY motivo ORDER BY total DESC");
-$stmt->execute(array_merge($baseParams, ['data_inicio' => $dataInicio]));
-$perdasPorMotivo = $stmt->fetchAll();
-$maxPerdas = max(1, $perdasInatividade);
-
-// --------------------------------------------------------------
-// Transferências e perdas — só contagens agregadas, pela estrutura de
-// ORIGEM gravada na transferência (sem nomes nem telefones).
-// --------------------------------------------------------------
-require_once __DIR__ . '/../includes/transferencia.php';
-// Resultados por roleta — só leads dentro do escopo (e filtros) de quem vê.
-$stmt = db()->prepare("SELECT r.id, r.nome, COUNT(d.id) AS distribuidos,
-        SUM(CASE WHEN leads.etapa = 'contrato_assinado' THEN 1 ELSE 0 END) AS vendas,
-        COUNT(DISTINCT d.usuario_id) AS corretores
-    FROM roleta_distribuicoes d
-    INNER JOIN roletas r ON r.id = d.roleta_id
-    INNER JOIN leads ON leads.id = d.lead_id
-    WHERE {$baseSql} AND d.distribuido_em >= :rr_inicio
-    GROUP BY r.id, r.nome ORDER BY distribuidos DESC, r.nome");
-$stmt->execute($baseParams + ['rr_inicio' => $dataInicio]);
-$porRoleta = $stmt->fetchAll();
-$stmt = db()->prepare("SELECT COUNT(*) FROM roleta_fila f INNER JOIN leads ON leads.id = f.lead_id
-    WHERE {$baseSql} AND f.resolvido_em IS NULL AND leads.responsavel_id IS NULL");
-$stmt->execute($baseParams);
-$naFilaAgora = (int) $stmt->fetchColumn();
-
-$tScope = rbac_transferencias_scope($usuario);
-$tSql = $tScope['sql'] . ' AND t.criado_em >= :t_inicio';
-$tParams = $tScope['params'] + ['t_inicio' => $dataInicio];
-if ($filtroEmpreendimento) { $tSql .= ' AND t.empreendimento_id = :t_emp'; $tParams['t_emp'] = $filtroEmpreendimento; }
-if ($filtroEquipe) { $tSql .= ' AND t.de_equipe_id = :t_eq'; $tParams['t_eq'] = $filtroEquipe; }
-elseif ($filtroSuperintendencia) { $tSql .= ' AND t.de_superintendencia_id = :t_su'; $tParams['t_su'] = $filtroSuperintendencia; }
-$stmt = db()->prepare("SELECT t.motivo, COUNT(*) AS total, SUM(t.para_equipe_id IS NULL OR t.de_equipe_id IS NULL OR t.para_equipe_id <> t.de_equipe_id) AS saiu_da_equipe FROM lead_transferencias t WHERE {$tSql} GROUP BY t.motivo");
-$stmt->execute($tParams);
-$transfPorMotivo = [];
-foreach ($stmt->fetchAll() as $row) {
-    $transfPorMotivo[$row['motivo']] = ['total' => (int) $row['total'], 'saiu' => (int) $row['saiu_da_equipe']];
-}
-$transfTotal = array_sum(array_column($transfPorMotivo, 'total'));
-$transfSaiu = array_sum(array_column($transfPorMotivo, 'saiu'));
-$maxTransf = max(1, ...array_column($transfPorMotivo, 'total') ?: [1]);
-
-// Perdas por inatividade (recuperação automática): pela estrutura anterior.
-require_once __DIR__ . '/../includes/recuperacao.php';
-$perdasRecuperacao = $transfPorMotivo['inatividade']['total'] ?? 0;
-$perdasAgrupar = in_array($_GET['perdas_por'] ?? '', ['corretor', 'equipe', 'superintendencia'], true) ? $_GET['perdas_por'] : 'corretor';
-$perdasAgregadas = recuperacao_perdas_agregadas($tSql, $tParams, $perdasAgrupar);
-$maxPerdasAgr = max(1, ...array_map('intval', array_column($perdasAgregadas, 'perdas')) ?: [1]);
-
-// --------------------------------------------------------------
-// Opções dos filtros
-// --------------------------------------------------------------
-$empreendimentosOpt = db()->prepare('SELECT id, nome FROM empreendimentos WHERE empresa_id = :empresa_id ORDER BY nome');
-$empreendimentosOpt->execute(['empresa_id' => $empresaId]);
-$empreendimentosOpt = $empreendimentosOpt->fetchAll();
-
-$superintendenciasOpt = db()->prepare('SELECT id, nome FROM superintendencias WHERE empresa_id = :empresa_id ORDER BY nome');
-$superintendenciasOpt->execute(['empresa_id' => $empresaId]);
-$superintendenciasOpt = $superintendenciasOpt->fetchAll();
-
-$equipesOpt = db()->prepare("SELECT equipes.id, IF(usuarios.nome IS NULL, equipes.nome, CONCAT(usuarios.nome, ' — ', equipes.nome)) AS rotulo FROM equipes LEFT JOIN usuarios ON usuarios.id = equipes.gerente_id WHERE equipes.empresa_id = :empresa_id ORDER BY rotulo");
-$equipesOpt->execute(['empresa_id' => $empresaId]);
-$equipesOpt = $equipesOpt->fetchAll();
-
-$pageTitle = 'Relatórios — ' . APP_NAME;
-$crumb = 'Relatórios';
-$activeNav = 'relatorios';
+$pageTitle = 'Perdas e transferências — ' . APP_NAME;
 require __DIR__ . '/../includes/layout_start.php';
 ?>
 <div class="header">
-    <div><div class="eyebrow">Visão do gestor</div><h1>Desempenho comercial</h1><p>Acompanhe resultados sem precisar abrir os leads individualmente.</p></div>
+    <div>
+        <div class="eyebrow">Relatórios</div>
+        <h1>Perdas e transferências</h1>
+        <p><?= e(dash_periodos()[$f['periodo']]) ?>: <b><?= e($f['rotulo']) ?></b> · contado pela equipe que estava com o lead antes de ele sair.</p>
+    </div>
     <div class="actions">
-        <button type="button" class="btn btn-outline" data-open-modal="modal-excel"><?= icon('chart') ?>Exportar Excel</button>
-    </div>
-</div>
-
-<form class="filters-row" method="get">
-    <select class="select-filter" name="superintendencia" onchange="this.form.submit()">
-        <option value="">Todas as superintendências</option>
-        <?php foreach ($superintendenciasOpt as $s): ?>
-            <option value="<?= $s['id'] ?>" <?= $filtroSuperintendencia === (int) $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['nome']) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <select class="select-filter" name="equipe" onchange="this.form.submit()">
-        <option value="">Todos os gerentes</option>
-        <?php foreach ($equipesOpt as $e): ?>
-            <option value="<?= $e['id'] ?>" <?= $filtroEquipe === (int) $e['id'] ? 'selected' : '' ?>><?= htmlspecialchars($e['rotulo']) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <select class="select-filter" name="empreendimento" onchange="this.form.submit()">
-        <option value="">Todos os empreendimentos</option>
-        <?php foreach ($empreendimentosOpt as $emp): ?>
-            <option value="<?= $emp['id'] ?>" <?= $filtroEmpreendimento === (int) $emp['id'] ? 'selected' : '' ?>><?= htmlspecialchars($emp['nome']) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <select class="select-filter" name="periodo" onchange="this.form.submit()">
-        <?php foreach ($periodosValidos as $dias => $rotulo): ?>
-            <option value="<?= $dias ?>" <?= $periodo === $dias ? 'selected' : '' ?>><?= $rotulo ?></option>
-        <?php endforeach; ?>
-    </select>
-</form>
-
-<div class="kpi-grid kpi-grid-5">
-    <div class="kpi"><div class="kpi-top"><span class="label">Leads recebidos</span><div class="kpi-icon"><?= icon('user') ?></div></div><div class="kpi-value"><?= $leadsRecebidos ?></div><div class="kpi-sub">no período</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="label">Atendimentos</span><div class="kpi-icon"><?= icon('phone') ?></div></div><div class="kpi-value"><?= $atendimentos ?></div><div class="kpi-sub">registrados no período</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="label">Visitas agendadas</span><div class="kpi-icon"><?= icon('calendar') ?></div></div><div class="kpi-value"><?= $visitasAgendadas ?></div><div class="kpi-sub">visitas confirmadas</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="label">Vendas realizadas</span><div class="kpi-icon"><?= icon('check') ?></div></div><div class="kpi-value"><?= $vendasRealizadas ?></div><div class="kpi-sub">contratos assinados</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="label">Perdas por inatividade</span><div class="kpi-icon"><?= icon('clock') ?></div></div><div class="kpi-value"><?= $perdasRecuperacao ?></div><div class="kpi-sub">sem feedback no prazo</div></div>
-</div>
-
-<div class="grid-2">
-    <div class="card">
-        <div class="card-head">
-            <div><h2>Leads recebidos por dia</h2><p>Evolução da demanda nos últimos <?= $periodo ?> dias.</p></div>
-            <span class="pill pill-muted"><?= $leadsRecebidos ?> no período</span>
-        </div>
-        <div class="bar-chart">
-            <?php foreach ($serieDiaria as $ponto): ?>
-                <div class="bar-col" title="<?= date('d/m', strtotime($ponto['dia'])) ?>: <?= $ponto['total'] ?> lead(s)">
-                    <div class="bar" style="height: <?= max(3, round($ponto['total'] / $maxDiario * 100)) ?>%"></div>
-                    <?php if (count($serieDiaria) <= 31): ?><span class="bar-label"><?= date('d/m', strtotime($ponto['dia'])) ?></span><?php endif; ?>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-head"><div><h2>Funil de conversão</h2><p>Onde suas oportunidades avançam.</p></div></div>
-        <div class="funnel">
-            <?php foreach ($funil as $passo): ?>
-                <div class="funnel-row">
-                    <span class="funnel-label"><?= htmlspecialchars($passo['rotulo']) ?></span>
-                    <div class="funnel-track"><div class="funnel-fill" style="width: <?= max(2, round($passo['total'] / $maxFunil * 100)) ?>%"></div></div>
-                    <span class="funnel-value"><?= $passo['total'] ?></span>
-                </div>
-            <?php endforeach; ?>
-        </div>
-        <div class="funnel-total"><span>Conversão geral</span><strong><?= $conversaoGeral ?>%</strong></div>
-    </div>
-</div>
-
-<div class="grid-2" style="margin-top:20px;">
-    <div class="card">
-        <div class="card-head">
-            <div><h2>Resultado por empreendimento</h2></div>
-        </div>
-        <table class="report-table">
-            <thead><tr><th>Empreendimento</th><th>Leads</th><th>Vendas</th><th>Conversão</th></tr></thead>
-            <tbody>
-            <?php foreach ($porEmpreendimento as $row):
-                $conv = $row['total_leads'] > 0 ? round($row['total_vendas'] / $row['total_leads'] * 100, 1) : 0.0;
-            ?>
-                <tr>
-                    <td><strong><?= htmlspecialchars($row['nome']) ?></strong></td>
-                    <td><?= (int) $row['total_leads'] ?></td>
-                    <td><?= (int) $row['total_vendas'] ?></td>
-                    <td><span class="pill pill-green"><?= $conv ?>%</span></td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if (!$porEmpreendimento): ?><tr><td colspan="4" class="empty-note">Nenhum empreendimento cadastrado.</td></tr><?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card">
-        <div class="card-head">
-            <div><h2>Oportunidades perdidas</h2><p>Por falta de atuação dentro do prazo.</p></div>
-            <?php if ($perdasInatividade > 0): ?><span class="pill pill-red">Atenção</span><?php endif; ?>
-        </div>
-        <div class="perdas-headline"><strong><?= $perdasInatividade ?></strong><div><b>Leads perdidos</b><span>No período selecionado.</span></div></div>
-        <?php if ($perdasPorMotivo): ?>
-            <div class="funnel" style="margin-top:14px;">
-                <?php foreach ($perdasPorMotivo as $m): ?>
-                    <div class="funnel-row">
-                        <span class="funnel-label"><?= htmlspecialchars($m['motivo']) ?></span>
-                        <div class="funnel-track funnel-track-red"><div class="funnel-fill funnel-fill-red" style="width: <?= max(2, round($m['total'] / $maxPerdas * 100)) ?>%"></div></div>
-                        <span class="funnel-value"><?= (int) $m['total'] ?></span>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php else: ?>
-            <p class="empty-note">Nenhuma oportunidade perdida no período — ótimo sinal.</p>
+        <a class="btn btn-outline" href="/pages/dashboard.php?<?= e(http_build_query($publicos)) ?>"><?= icon('chart') ?>Dashboard</a>
+        <?php if ($podeExportar): ?>
+            <?php dash_exportar('modal-exportar', [
+                'perdas' => 'Perdas por ' . mb_strtolower($dimsPerdas[$por]) . ' (tabela abaixo)',
+                'perdas_empreendimento' => 'Perdas por empreendimento',
+            ], $publicos + ['perdas_por' => $por]); ?>
         <?php endif; ?>
     </div>
 </div>
 
-<div class="card" style="margin-top:20px;">
-    <div class="card-head">
-        <div><h2>Resultados por roleta</h2><p>Leads entregues pelo rodízio no período e quantos viraram venda.</p></div>
-        <?php if ($naFilaAgora): ?><a class="pill pill-amber" href="/pages/roletas.php#fila"><?= $naFilaAgora ?> na fila de espera agora</a><?php endif; ?>
+<?php dash_form_filtros($f, $opcoes, ['perdas_por' => $por]); ?>
+
+<div class="kpi-grid dash-kpis">
+    <div class="kpi"><div class="kpi-top"><span class="label">Perdidos por inatividade <?= dash_ajuda('Leads retirados do corretor pela recuperação automática, por falta de feedback no prazo.') ?></span><div class="kpi-icon"><?= icon('clock') ?></div></div>
+        <div class="kpi-value"><?= dash_num($tot['inatividade']) ?></div><div class="kpi-sub <?= $clsIna ?>"><?= e($varIna) ?></div></div>
+    <div class="kpi"><div class="kpi-top"><span class="label">Já redistribuídos <?= dash_ajuda('Dos perdidos por inatividade, quantos já foram entregues a outro corretor.') ?></span><div class="kpi-icon"><?= icon('users') ?></div></div>
+        <div class="kpi-value"><?= dash_num($tot['redistribuidos']) ?></div><div class="kpi-sub"><?= $tot['inatividade'] ? dash_pct($tot['redistribuidos'] / $tot['inatividade'] * 100) . ' dos perdidos' : '—' ?></div></div>
+    <div class="kpi"><div class="kpi-top"><span class="label">Transferências administrativas <?= dash_ajuda('Leads que um gestor passou para outro corretor manualmente.') ?></span><div class="kpi-icon"><?= icon('users') ?></div></div>
+        <div class="kpi-value"><?= dash_num($tot['administrativas']) ?></div><div class="kpi-sub <?= $clsAdm ?>"><?= e($varAdm) ?></div></div>
+    <div class="kpi"><div class="kpi-top"><span class="label">Mudança de equipe <?= dash_ajuda('Leads que acompanharam o corretor quando ele trocou de equipe (o corretor continua o mesmo).') ?></span><div class="kpi-icon"><?= icon('kanban') ?></div></div>
+        <div class="kpi-value"><?= dash_num($tot['mudanca_equipe']) ?></div><div class="kpi-sub">no período</div></div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-head"><div><h2>Tendência</h2><p>Saídas por <?= $f['dias'] > 92 ? 'semana' : 'dia' ?>.</p></div>
+            <div class="dash-legenda-inline"><span><span class="dot seg-ina"></span>Inatividade</span><span><span class="dot seg-adm"></span>Administrativas</span></div></div>
+        <?php dash_grafico_barras($serie, 'Perdas por inatividade e transferências administrativas', 'saídas'); ?>
     </div>
-    <div class="table-wrap"><table class="report-table">
-        <thead><tr><th>Roleta</th><th>Leads distribuídos</th><th>Corretores que receberam</th><th>Vendas</th><th>Conversão</th></tr></thead>
-        <tbody>
-        <?php foreach ($porRoleta as $row):
-            $conv = $row['distribuidos'] > 0 ? round($row['vendas'] / $row['distribuidos'] * 100, 1) : 0.0;
-        ?>
-            <tr>
-                <td><strong><?= htmlspecialchars($row['nome']) ?></strong></td>
-                <td><?= (int) $row['distribuidos'] ?></td>
-                <td><?= (int) $row['corretores'] ?></td>
-                <td><?= (int) $row['vendas'] ?></td>
-                <td><span class="pill pill-green"><?= $conv ?>%</span></td>
-            </tr>
+    <div class="card">
+        <div class="card-head"><div><h2>Leads encerrados sem venda <?= dash_ajuda('Leads recebidos no período que hoje estão em "Perdido" ou "Sem interesse", pelo motivo informado pelo corretor.') ?></h2></div></div>
+        <?php dash_barras_horizontais(array_map(fn ($m) => ['rotulo' => $m['motivo'], 'total' => $m['total']], $motivos), 'Motivos de perda', 10); ?>
+    </div>
+</div>
+
+<div class="card dash-section" id="perdas-inatividade">
+    <div class="card-head"><div><h2>Perdas por estrutura anterior <?= dash_ajuda('Quem estava com o lead quando ele saiu. Inatividade e transferências administrativas aparecem separadas.') ?></h2><p>Agrupar por:</p></div></div>
+    <nav class="segmented-inline dash-por" aria-label="Agrupar perdas por">
+        <?php foreach ($dimsPerdas as $d => $rot): ?>
+            <a class="seg-link<?= $por === $d ? ' is-active' : '' ?>" href="<?= e($urlPor($d)) ?>"<?= $por === $d ? ' aria-current="true"' : '' ?>><?= e($rot) ?></a>
         <?php endforeach; ?>
-        <?php if (!$porRoleta): ?><tr><td colspan="5" class="empty-note">Nenhum lead distribuído pela roleta no período.</td></tr><?php endif; ?>
-        </tbody>
-    </table></div>
+    </nav>
+    <?php dash_tabela('tabela-perdas', dash_colunas_perdas($por), $linhas, $tot, 'inatividade', 'Nenhuma perda ou transferência no período.'); ?>
 </div>
 
-<div class="card transf-card">
-    <div class="card-head">
-        <div><h2>Transferências e perdas</h2><p>Leads que saíram da sua estrutura no período, por motivo. Números agregados — sem dados dos clientes.</p></div>
-        <span class="pill <?= $transfTotal ? 'pill-amber' : 'pill-muted' ?>"><?= $transfTotal ?> no período</span>
-    </div>
-    <div class="transf-grid">
-        <div class="perdas-headline"><strong><?= $transfSaiu ?></strong><div><b>Saíram da equipe</b><span>Foram para outra equipe ou estrutura.</span></div></div>
-        <div class="perdas-headline"><strong><?= $perdasRecuperacao ?></strong><div><b>Perdidos por inatividade</b><span>Sem feedback válido no prazo; voltaram para a roleta.</span></div></div>
-    </div>
-    <?php if ($transfPorMotivo): ?>
-        <div class="funnel" style="margin-top:14px;">
-            <?php foreach (transferencia_motivos() as $motivo => $rotulo): if (empty($transfPorMotivo[$motivo])) continue; $m = $transfPorMotivo[$motivo]; ?>
-                <div class="funnel-row">
-                    <span class="funnel-label"><?= e($rotulo) ?></span>
-                    <div class="funnel-track"><div class="funnel-fill" style="width: <?= max(2, round($m['total'] / $maxTransf * 100)) ?>%"></div></div>
-                    <span class="funnel-value" title="<?= $m['saiu'] ?> saíram da equipe"><?= $m['total'] ?></span>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php else: ?>
-        <p class="empty-note">Nenhuma transferência saindo da sua estrutura no período.</p>
-    <?php endif; ?>
+<?php if ($por !== 'empreendimento'): ?>
+<div class="card dash-section" id="perdas-empreendimento">
+    <div class="card-head"><div><h2>Perdas por empreendimento</h2></div></div>
+    <?php
+    $totEmp = ['nome' => 'Total'];
+    foreach (['inatividade', 'redistribuidos', 'administrativas', 'mudanca_equipe', 'total'] as $c) {
+        $totEmp[$c] = $somar($porEmp, $c);
+    }
+    dash_tabela('tabela-perdas-emp', dash_colunas_perdas('empreendimento'), $porEmp, $totEmp, 'inatividade', 'Nenhuma perda ou transferência no período.');
+    ?>
 </div>
-
-<div class="card transf-card" id="perdas-inatividade">
-    <div class="card-head">
-        <div><h2>Perdas por inatividade</h2><p>Leads tirados por falta de feedback válido, pela estrutura que os tinha. Só números — a equipe anterior não vê mais os cadastros.</p></div>
-        <div class="segmented segmented-inline" role="tablist" aria-label="Agrupar perdas por">
-            <?php foreach (['corretor' => 'Corretor', 'equipe' => 'Equipe', 'superintendencia' => 'Superintendência'] as $g => $rot): ?>
-                <a class="seg-link<?= $perdasAgrupar === $g ? ' active' : '' ?>" href="?<?= e(http_build_query(array_merge($_GET, ['perdas_por' => $g]))) ?>#perdas-inatividade"><?= $rot ?></a>
-            <?php endforeach; ?>
-        </div>
-    </div>
-    <?php if ($perdasAgregadas): ?>
-        <div class="table-wrap"><table class="report-table">
-            <thead><tr><th><?= ['corretor' => 'Corretor anterior', 'equipe' => 'Equipe anterior', 'superintendencia' => 'Superintendência anterior'][$perdasAgrupar] ?></th><th>Perdas</th><th>Já com novo corretor</th><th class="col-bar"></th></tr></thead>
-            <tbody>
-            <?php foreach ($perdasAgregadas as $row): ?>
-                <tr>
-                    <td><?= e($row['nome'] ?? 'Sem ' . ($perdasAgrupar === 'corretor' ? 'corretor' : ($perdasAgrupar === 'equipe' ? 'equipe' : 'superintendência'))) ?></td>
-                    <td><b><?= (int) $row['perdas'] ?></b></td>
-                    <td><?= (int) $row['redistribuidos'] ?></td>
-                    <td class="col-bar"><div class="funnel-track funnel-track-red"><div class="funnel-fill funnel-fill-red" style="width: <?= max(2, round($row['perdas'] / $maxPerdasAgr * 100)) ?>%"></div></div></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table></div>
-    <?php else: ?>
-        <p class="empty-note">Nenhuma perda por inatividade na sua estrutura no período.</p>
-    <?php endif; ?>
-</div>
-
-<div class="modal-overlay" id="modal-excel" hidden>
-    <div class="modal-box">
-        <button type="button" class="overlay-close" data-close-modal="modal-excel">&times;</button>
-        <div class="stub-icon" style="margin:0 auto 14px;"><?= icon('chart') ?></div>
-        <h2 style="text-align:center;">Exportação em desenvolvimento</h2>
-        <p style="text-align:center;color:#8893a4;font-size:14px;">A exportação para Excel desta tela chega na próxima etapa do projeto.</p>
-    </div>
-</div>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/layout_end.php'; ?>

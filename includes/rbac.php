@@ -213,6 +213,16 @@ function usuario_tem_permissao(array $usuario, string $permissao): bool
     return in_array($permissao, $usuario['permissoes'] ?? [], true);
 }
 
+/** Página inicial depois do login: superadmin → painel próprio; gestores → Dashboard; demais → Início. */
+function rbac_pagina_inicial(array $usuario): string
+{
+    if (!empty($usuario['eh_superadmin'])) {
+        return '/pages/superadmin.php';
+    }
+    return ($usuario['escopo'] ?? '') !== 'propria_carteira' && usuario_tem_permissao($usuario, 'visualizar_indicadores')
+        ? '/pages/dashboard.php' : '/pages/inicio.php';
+}
+
 /** Rótulo legível do escopo, para a UI (tela "Usuários e acessos"). */
 function rbac_rotulo_escopo(string $escopo): string
 {

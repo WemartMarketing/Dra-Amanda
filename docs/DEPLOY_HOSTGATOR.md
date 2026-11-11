@@ -59,6 +59,13 @@ define('META_GRAPH_VERSION', 'v21.0');
 define('META_GRAPH_BASE_URL', 'https://graph.facebook.com');
 ```
 
+Opcional (Etapa 6): quantas horas com o corretor, sem contato, fazem um
+lead contar como "sem atendimento" no Dashboard (padrão 2):
+
+```php
+define('DASH_HORAS_SEM_ATENDIMENTO', 2);
+```
+
 Sem `APP_KEY` o sistema se recusa a guardar tokens; sem `META_APP_SECRET` e
 `META_VERIFY_TOKEN` o webhook responde 403 e a tela *Integrações* mostra que
 a integração não está configurada.
@@ -82,9 +89,10 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 10 | `sql/seed_005.sql` | **só para demonstração** — regras das roletas, histórico e 2 leads na fila |
 | 11 | `sql/migration_006_integracoes_oferta.sql` | Etapa 5 (Meta Lead Ads, oferta ativa, recuperação automática) |
 | 12 | `sql/seed_006.sql` | **só para demonstração** — regra de recuperação, uma lista de oferta ativa, leads parados (não cria nada do Meta) |
+| 13 | `sql/migration_007_dashboards.sql` | Etapa 6 (colunas dos dashboards, índices dos relatórios, permissão de auditoria) |
 
-- Quem já rodou os passos 1–10 roda apenas o **11** (e o 12, se usa a base
-  de demonstração).
+- Quem já rodou os passos 1–12 roda apenas o **13** (não há seed da
+  Etapa 6). Quem estava no passo 10 roda 11, 12 (se usa demonstração) e 13.
 - Rode os arquivos **na ordem** numa instalação nova. Se precisar repetir
   algum depois (por exemplo, se uma importação parou no meio), pode rodar de
   novo inclusive uma migração antiga depois de uma mais nova: nenhuma delas
@@ -116,6 +124,22 @@ pela linha de comando: aberta no navegador responde 403 (e a pasta `cron/`
 também é bloqueada pelo `.htaccess`). Duas execuções ao mesmo tempo não
 acontecem (trava `GET_LOCK`). **Sem o cron, a recuperação automática e as
 novas tentativas do Meta não acontecem.**
+
+Adicione também o **backup diário** (uma segunda linha, às 3h15):
+
+```
+15 3 * * * /usr/local/bin/php /home/USUARIO/caminho/cron/backup.php >/dev/null 2>&1
+```
+
+Ele grava `storage/backups/wemart-AAAA-MM-DD-HHMMSS.sql.gz` (SQL
+comprimido, gerado só com PHP) e mantém os 7 mais recentes. A pasta é
+bloqueada para o navegador: para baixar, use cPanel → *Gerenciador de
+Arquivos* → `storage/backups/` → *Download*. Para restaurar num banco
+vazio, importe o `.sql.gz` pelo phpMyAdmin ou rode
+`gunzip -c arquivo.sql.gz | mysql -u USUARIO -p BANCO`.
+Esse backup fica **no mesmo servidor**: mantenha também os backups da
+própria HostGator (cPanel → *Backup* / *JetBackup*) e baixe uma cópia para
+fora do servidor de tempos em tempos.
 
 **HTTPS é obrigatório para a roleta**: o celular só libera a localização
 (GPS) em páginas `https://`. Ative o SSL gratuito em cPanel → *SSL/TLS
@@ -156,6 +180,29 @@ de 10 MB).
    o Meta.
 9. **Oferta ativa → Importar planilha** com um CSV de teste; depois
    `https://seudominio.com.br/storage/importacoes/` deve dar **403**.
+10. Como Master: **Dashboard** abre sozinho depois do login; *Exportar*
+    baixa um .xlsx (se o diálogo disser "CSV", o servidor está sem o
+    ZipArchive — dá para ativar em cPanel → *Select PHP Version* →
+    extensão `zip`); **Auditoria** mostra a exportação.
+11. Rode o backup uma vez pelo Terminal (`php cron/backup.php`) e confira
+    que `https://seudominio.com.br/storage/backups/` dá **403**.
+
+## Checklist depois de instalar (produção)
+
+- [ ] `https://` ativo (AutoSSL) e o site abrindo só por HTTPS.
+- [ ] `/uploads/`, `/storage/`, `/storage/lead_arquivos/`,
+      `/storage/backups/`, `/includes/`, `/sql/` e `/cron/rotinas.php`
+      respondem **403**.
+- [ ] `includes/config.php` criado no servidor com banco, `APP_KEY` e (se
+      usar Meta) as credenciais — nunca enviado ao Git.
+- [ ] Senha do superadmin trocada (ou superadmin próprio criado e o de
+      demonstração desativado).
+- [ ] **Sem dados de demonstração em produção**: numa empresa real não
+      importe `seed*.sql`; se importou para testar, recrie o banco antes de
+      usar com clientes reais.
+- [ ] As duas linhas de cron (rotinas a cada 15 min e backup diário)
+      cadastradas, e um backup baixado para fora do servidor.
+- [ ] Roteiro de testes em `docs/CHECKLIST_TESTES.md` executado.
 
 ## Verificações de segurança incluídas
 
@@ -183,10 +230,15 @@ de 10 MB).
 - Telefone duplicado no cadastro nunca revela lead de outra carteira.
 - Exclusão de lead é lógica (some de todas as telas e relatórios) e fica
   na auditoria.
-- Auditoria das ações administrativas na tabela `auditoria`.
+- Auditoria das ações administrativas na tabela `auditoria`, com tela de
+  consulta (Master) que mascara qualquer campo de segredo.
+- Exportações: só por POST com CSRF, mesma permissão e escopo da tela,
+  proteção contra fórmulas no Excel, nada salvo no servidor, auditadas.
+- LGPD: anonimização irreversível e exportação dos dados de um titular,
+  ambas auditadas; orientações em `docs/LGPD.md` (não é parecer jurídico).
 
 ## O que ainda não está pronto
 
-Ver "Limitações conhecidas" em `docs/README.md` (dashboards completos,
-exportação Excel e logo oficial). O Meta Lead Ads está pronto no código, mas
-só recebe leads depois das credenciais reais.
+Ver "Limitações conhecidas" em `docs/README.md` (logo oficial, entre
+outras). O Meta Lead Ads está pronto no código, mas só recebe leads depois
+das credenciais reais.

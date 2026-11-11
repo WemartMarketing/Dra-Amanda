@@ -2,7 +2,7 @@
 /**
  * POST /api/lead_salvar.php — cadastrar (sem id) ou editar (com id) um lead.
  *   { id?, nome, telefone, email, empreendimento_id, origem, interesse,
- *     renda_informada, prioridade, observacao?, responsavel_id? }
+ *     campanha, renda_informada, prioridade, observacao?, responsavel_id? }
  *
  * Cadastro: permissão criar_leads. Responsável = quem cadastra; gestores
  * (quem tem redistribuir_leads) podem escolher outra pessoa do seu recorte.
@@ -83,6 +83,10 @@ $dados = [
     'renda_informada' => $renda,
     'prioridade' => $prioridade,
 ];
+// Campanha só muda quando o formulário a envia (outros formulários não a apagam).
+if (!$atual || array_key_exists('campanha', $_POST)) {
+    $dados['campanha'] = api_texto($_POST['campanha'] ?? null, 120);
+}
 
 if ($atual) {
     $sets = implode(', ', array_map(fn ($c) => "{$c} = :{$c}", array_keys($dados)));
@@ -152,8 +156,8 @@ if ($pedido && $pedido !== $responsavelId) {
 $estrutura = estrutura_do_usuario($responsavelId);
 
 $colunas = array_keys($dados);
-db()->prepare('INSERT INTO leads (empresa_id, equipe_id, responsavel_id, etapa_id, etapa, ultima_atividade_em, ultimo_feedback_em, ' . implode(', ', $colunas) . ')
-               VALUES (:empresa_id, :equipe_id, :responsavel_id, :etapa_id, :etapa, NOW(), NOW(), :' . implode(', :', $colunas) . ')')
+db()->prepare('INSERT INTO leads (empresa_id, equipe_id, responsavel_id, etapa_id, etapa, ultima_atividade_em, ultimo_feedback_em, atribuido_em, ' . implode(', ', $colunas) . ')
+               VALUES (:empresa_id, :equipe_id, :responsavel_id, :etapa_id, :etapa, NOW(), NOW(), NOW(), :' . implode(', :', $colunas) . ')')
     ->execute($dados + [
         'empresa_id' => $empresaId, 'equipe_id' => $estrutura['equipe_id'], 'responsavel_id' => $responsavelId,
         'etapa_id' => $etapa['id'], 'etapa' => $etapa['categoria'],

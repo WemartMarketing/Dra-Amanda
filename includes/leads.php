@@ -56,7 +56,9 @@ function lead_tipos_evento(): array
 
 /**
  * Marca um FEEDBACK VÁLIDO do atendimento (leads.ultimo_feedback_em), o
- * relógio da recuperação automática por inatividade (seção 11).
+ * relógio da recuperação automática por inatividade (seção 11), e — se
+ * for o primeiro desde que o lead chegou ao corretor atual — também o
+ * primeiro contato (leads.primeiro_contato_em, usado nos dashboards).
  *
  * Só estas ações chamam aqui — elas comprovam atendimento real:
  *   - mudança de etapa (lead_mudar_etapa)
@@ -64,17 +66,31 @@ function lead_tipos_evento(): array
  *   - "Registrar contato" com texto (registro rápido do tipo contato)
  *   - compromisso da agenda marcado como realizado ou cliente ausente
  *     (inclui visita realizada)
- * e estas reiniciam o prazo para o novo dono:
- *   - lead atribuído a um corretor (cadastro, roleta, transferência,
- *     distribuição de lista de oferta ativa)
  *
  * NÃO contam (seção 11: "não considerar qualquer anotação"): observações,
  * envio de arquivos, apertar os botões de WhatsApp/Ligar, editar dados do
  * cadastro, apenas criar um compromisso na agenda, eventos de sistema.
+ * Receber o lead também não conta: isso é lead_marcar_atribuicao().
  */
 function lead_registrar_feedback(int $leadId): void
 {
-    db()->prepare('UPDATE leads SET ultimo_feedback_em = NOW() WHERE id = :id')->execute(['id' => $leadId]);
+    db()->prepare('UPDATE leads SET ultimo_feedback_em = NOW(),
+            primeiro_contato_em = CASE WHEN primeiro_contato_em IS NULL AND responsavel_id IS NOT NULL THEN NOW() ELSE primeiro_contato_em END
+        WHERE id = :id')->execute(['id' => $leadId]);
+}
+
+/**
+ * O lead acabou de ser entregue a um (novo) corretor — cadastro com
+ * responsável, roleta, transferência, importação, oferta ativa,
+ * redistribuição da recuperação. Reinicia o prazo da recuperação para o
+ * novo dono (ultimo_feedback_em), grava atribuido_em e zera o primeiro
+ * contato: o novo corretor ainda não falou com o cliente.
+ * NUNCA marca primeiro_contato_em.
+ */
+function lead_marcar_atribuicao(int $leadId): void
+{
+    db()->prepare('UPDATE leads SET ultimo_feedback_em = NOW(), atribuido_em = NOW(), primeiro_contato_em = NULL WHERE id = :id')
+        ->execute(['id' => $leadId]);
 }
 
 /** Grava uma linha no histórico (lead_eventos). Atividades de atendimento também atualizam ultima_atividade_em. */

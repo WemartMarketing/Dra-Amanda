@@ -823,4 +823,72 @@ function wmToast(msg, persistir) {
     document.querySelectorAll('[data-auto-filtro]').forEach(function (sel) {
         sel.addEventListener('change', function () { if (sel.form) sel.form.submit(); });
     });
+
+    // ------------------------------------------- Dashboard: período e tabelas
+    document.querySelectorAll('select[data-periodo]').forEach(function (sel) {
+        var datas = sel.form.querySelector('[data-periodo-datas]');
+        sel.addEventListener('change', function () {
+            if (sel.value === 'personalizado') { if (datas) { datas.hidden = false; var de = datas.querySelector('input'); if (de) de.focus(); } }
+            else sel.form.submit();
+        });
+    });
+
+    // Tabelas ordenáveis: clique no título da coluna (a linha de total fica embaixo).
+    document.querySelectorAll('table[data-ordenavel]').forEach(function (tabela) {
+        var corpo = tabela.tBodies[0];
+        tabela.querySelectorAll('[data-ordenar]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var col = Number(btn.dataset.ordenar);
+                var th = btn.closest('th');
+                var asc = th.getAttribute('aria-sort') !== 'ascending' && btn.dataset.tipo === 'texto'
+                    ? true
+                    : th.getAttribute('aria-sort') === 'descending';
+                tabela.querySelectorAll('thead th').forEach(function (o) { o.setAttribute('aria-sort', 'none'); });
+                th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+                var linhas = Array.prototype.slice.call(corpo.rows);
+                linhas.sort(function (a, b) {
+                    var x = a.cells[col].dataset.sort, y = b.cells[col].dataset.sort;
+                    var r = btn.dataset.tipo === 'texto' ? x.localeCompare(y, 'pt-BR') : Number(x) - Number(y);
+                    return asc ? r : -r;
+                });
+                linhas.forEach(function (l) { corpo.appendChild(l); });
+            });
+        });
+    });
+
+    // Exportação: baixa o arquivo sem sair da tela; erros aparecem no diálogo.
+    document.querySelectorAll('form[data-exportar-form]').forEach(function (form) {
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            var alerta = form.querySelector('[data-form-alerta]');
+            if (alerta) { alerta.hidden = true; alerta.textContent = ''; }
+            var btn = form.querySelector('[type=submit]');
+            var rotulo = btn ? btn.lastChild.textContent : '';
+            if (btn) { btn.disabled = true; btn.lastChild.textContent = 'Gerando arquivo...'; }
+            var fd = new FormData(form);
+            if (!fd.has('csrf_token')) fd.append('csrf_token', csrfToken());
+            try {
+                var r = await fetch(form.getAttribute('action'), { method: 'POST', body: fd, credentials: 'same-origin' });
+                var tipo = r.headers.get('Content-Type') || '';
+                if (!r.ok || tipo.indexOf('application/json') === 0) {
+                    var j = await r.json().catch(function () { return {}; });
+                    throw new Error(j.erro || 'Não foi possível gerar o arquivo (' + r.status + ').');
+                }
+                var nome = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+                var blob = await r.blob();
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url; a.download = nome ? nome[1] : 'relatorio';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+                wmToast('Arquivo baixado: ' + a.download);
+                fecharModal(form);
+            } catch (err) {
+                if (alerta) { alerta.textContent = err.message || 'Sem conexão. Tente de novo.'; alerta.hidden = false; }
+                else wmToast(err.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.lastChild.textContent = rotulo; }
+            }
+        });
+    });
 })();

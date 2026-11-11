@@ -47,6 +47,11 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
     <div class="actions">
         <a href="/pages/kanban.php?<?= e(http_build_query(array_filter($filtros))) ?>" class="btn btn-outline"><?= icon('kanban') ?>Ver no Kanban</a>
+        <?php if (usuario_tem_permissao($usuario, 'exportar_relatorios')):
+            require_once __DIR__ . '/../includes/dashboard_ui.php';
+            dash_exportar('modal-exportar-leads', ['leads' => 'Lista de leads com os filtros atuais (' . number_format($total, 0, ',', '.') . ' lead' . ($total === 1 ? '' : 's') . ')'],
+                array_filter($filtros, fn ($v) => $v !== null && $v !== ''), true);
+        endif; ?>
         <?php if (usuario_tem_permissao($usuario, 'criar_leads')): ?>
             <a href="/pages/lead.php" class="btn btn-primary"><?= icon('plus') ?>Novo lead</a>
         <?php endif; ?>

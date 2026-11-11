@@ -144,7 +144,7 @@ function recuperacao_perder_lead(int $leadId, array $regra): ?string
         $dias = max($regra['dias_sem_feedback'], (int) floor((time() - strtotime($feedback)) / 86400));
         $texto = 'Sem feedback válido há ' . $dias . ' dia' . ($dias === 1 ? '' : 's') . ' — enviado para recuperação';
 
-        $upd = $pdo->prepare('UPDATE leads SET responsavel_id = NULL, equipe_id = NULL WHERE id = :id AND responsavel_id = :ant');
+        $upd = $pdo->prepare('UPDATE leads SET responsavel_id = NULL, equipe_id = NULL, atribuido_em = NULL, primeiro_contato_em = NULL WHERE id = :id AND responsavel_id = :ant');
         $upd->execute(['id' => $leadId, 'ant' => $anterior]);
         if ($upd->rowCount() !== 1) {
             $pdo->rollBack();

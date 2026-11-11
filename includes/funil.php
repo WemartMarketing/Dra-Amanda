@@ -133,11 +133,13 @@ function lead_mudar_etapa(array $lead, int $etapaId, array $usuario, string $com
     $anterior = $lead['etapa_id'] ? funil_etapa($empresaId, (int) $lead['etapa_id']) : null;
 
     db()->prepare('
-        UPDATE leads SET etapa_id = :etapa_id, etapa = :categoria, ultima_atividade_em = NOW()
+        UPDATE leads SET etapa_id = :etapa_id, etapa = :categoria, ultima_atividade_em = NOW(),
+            contrato_assinado_em = CASE WHEN :cat2 = \'contrato_assinado\' THEN COALESCE(contrato_assinado_em, NOW()) ELSE NULL END
         WHERE id = :id AND empresa_id = :empresa_id
     ')->execute([
         'etapa_id' => $nova['id'],
         'categoria' => $nova['categoria'],
+        'cat2' => $nova['categoria'],
         'id' => $lead['id'],
         'empresa_id' => $empresaId,
     ]);

@@ -67,7 +67,8 @@ if ($acao === 'roleta') {
     if (!$escolhidos) {
         api_erro('Escolha pelo menos um corretor da sua estrutura.', 422);
     }
-    $upd = $pdo->prepare('UPDATE leads SET responsavel_id = :u, equipe_id = :eq, ultima_atividade_em = NOW(), ultimo_feedback_em = NOW()
+    $upd = $pdo->prepare('UPDATE leads SET responsavel_id = :u, equipe_id = :eq, ultima_atividade_em = NOW(), ultimo_feedback_em = NOW(),
+            atribuido_em = NOW(), primeiro_contato_em = NULL
         WHERE id = :id AND empresa_id = :e AND responsavel_id IS NULL AND excluido_em IS NULL');
     $saiFila = $pdo->prepare('UPDATE roleta_fila SET resolvido_em = NOW() WHERE lead_id = :l AND resolvido_em IS NULL');
     $i = 0;

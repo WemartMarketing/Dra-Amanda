@@ -63,7 +63,7 @@ function lead_transferir(array $lead, int $destinoUsuarioId, string $motivo, ?ar
         ->execute(['responsavel' => $destinoUsuarioId, 'equipe' => $para['equipe_id'], 'id' => $lead['id'], 'empresa_id' => $empresaId]);
     // Novo dono recebe o prazo inteiro da recuperação (mudança de equipe não troca o dono).
     if ($motivo !== 'mudanca_equipe') {
-        lead_registrar_feedback((int) $lead['id']);
+        lead_marcar_atribuicao((int) $lead['id']);
     }
     // Lead recuperado por inatividade que agora ganhou dono: completa a
     // estrutura de destino na linha da perda.

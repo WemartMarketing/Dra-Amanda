@@ -30,10 +30,12 @@ UPDATE roleta_empreendimentos SET prioridade = 20 WHERE roleta_id = 1 AND empree
 -- Histórico de distribuição (leads que já existem no seed) ----------------
 INSERT IGNORE INTO roleta_distribuicoes (empresa_id, roleta_id, lead_id, usuario_id, origem, executado_por, distribuido_em)
 SELECT leads.empresa_id, 1, leads.id, leads.responsavel_id, 'manual', NULL, leads.criado_em
-  FROM leads WHERE leads.id IN (1, 2, 4, 8, 13, 22, 23) AND leads.responsavel_id IN (1, 2, 3);
+  FROM leads WHERE leads.id IN (1, 2, 4, 8, 13, 22, 23) AND leads.responsavel_id IN (1, 2, 3)
+   AND NOT EXISTS (SELECT 1 FROM roleta_distribuicoes d WHERE d.lead_id = leads.id); -- sem índice único desde a 006: evita duplicar ao rodar de novo
 INSERT IGNORE INTO roleta_distribuicoes (empresa_id, roleta_id, lead_id, usuario_id, origem, executado_por, distribuido_em)
 SELECT leads.empresa_id, 2, leads.id, leads.responsavel_id, 'manual', NULL, leads.criado_em
-  FROM leads WHERE leads.id IN (15, 17, 19, 20) AND leads.responsavel_id IN (9, 10);
+  FROM leads WHERE leads.id IN (15, 17, 19, 20) AND leads.responsavel_id IN (9, 10)
+   AND NOT EXISTS (SELECT 1 FROM roleta_distribuicoes d WHERE d.lead_id = leads.id);
 
 -- Contadores do rodízio refletem o histórico acima (recalculados, não somados).
 UPDATE roleta_corretores
