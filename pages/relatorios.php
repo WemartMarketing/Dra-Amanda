@@ -145,6 +145,22 @@ $maxPerdas = max(1, $perdasInatividade);
 // ORIGEM gravada na transferência (sem nomes nem telefones).
 // --------------------------------------------------------------
 require_once __DIR__ . '/../includes/transferencia.php';
+// Resultados por roleta — só leads dentro do escopo (e filtros) de quem vê.
+$stmt = db()->prepare("SELECT r.id, r.nome, COUNT(d.id) AS distribuidos,
+        SUM(CASE WHEN leads.etapa = 'contrato_assinado' THEN 1 ELSE 0 END) AS vendas,
+        COUNT(DISTINCT d.usuario_id) AS corretores
+    FROM roleta_distribuicoes d
+    INNER JOIN roletas r ON r.id = d.roleta_id
+    INNER JOIN leads ON leads.id = d.lead_id
+    WHERE {$baseSql} AND d.distribuido_em >= :rr_inicio
+    GROUP BY r.id, r.nome ORDER BY distribuidos DESC, r.nome");
+$stmt->execute($baseParams + ['rr_inicio' => $dataInicio]);
+$porRoleta = $stmt->fetchAll();
+$stmt = db()->prepare("SELECT COUNT(*) FROM roleta_fila f INNER JOIN leads ON leads.id = f.lead_id
+    WHERE {$baseSql} AND f.resolvido_em IS NULL AND leads.responsavel_id IS NULL");
+$stmt->execute($baseParams);
+$naFilaAgora = (int) $stmt->fetchColumn();
+
 $tScope = rbac_transferencias_scope($usuario);
 $tSql = $tScope['sql'] . ' AND t.criado_em >= :t_inicio';
 $tParams = $tScope['params'] + ['t_inicio' => $dataInicio];
@@ -296,6 +312,30 @@ require __DIR__ . '/../includes/layout_start.php';
             <p class="empty-note">Nenhuma oportunidade perdida no período — ótimo sinal.</p>
         <?php endif; ?>
     </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div class="card-head">
+        <div><h2>Resultados por roleta</h2><p>Leads entregues pelo rodízio no período e quantos viraram venda.</p></div>
+        <?php if ($naFilaAgora): ?><a class="pill pill-amber" href="/pages/roletas.php#fila"><?= $naFilaAgora ?> na fila de espera agora</a><?php endif; ?>
+    </div>
+    <div class="table-wrap"><table class="report-table">
+        <thead><tr><th>Roleta</th><th>Leads distribuídos</th><th>Corretores que receberam</th><th>Vendas</th><th>Conversão</th></tr></thead>
+        <tbody>
+        <?php foreach ($porRoleta as $row):
+            $conv = $row['distribuidos'] > 0 ? round($row['vendas'] / $row['distribuidos'] * 100, 1) : 0.0;
+        ?>
+            <tr>
+                <td><strong><?= htmlspecialchars($row['nome']) ?></strong></td>
+                <td><?= (int) $row['distribuidos'] ?></td>
+                <td><?= (int) $row['corretores'] ?></td>
+                <td><?= (int) $row['vendas'] ?></td>
+                <td><span class="pill pill-green"><?= $conv ?>%</span></td>
+            </tr>
+        <?php endforeach; ?>
+        <?php if (!$porRoleta): ?><tr><td colspan="5" class="empty-note">Nenhum lead distribuído pela roleta no período.</td></tr><?php endif; ?>
+        </tbody>
+    </table></div>
 </div>
 
 <div class="card transf-card">

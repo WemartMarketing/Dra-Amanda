@@ -73,11 +73,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
     CONSTRAINT fk_usuarios_equipe FOREIGN KEY (equipe_id) REFERENCES equipes(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE equipes
-    ADD CONSTRAINT fk_equipes_gerente FOREIGN KEY (gerente_id) REFERENCES usuarios(id) ON DELETE SET NULL;
+SET @x := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'equipes' AND CONSTRAINT_NAME = 'fk_equipes_gerente');
+SET @sql := IF(@x = 0, 'ALTER TABLE equipes ADD CONSTRAINT fk_equipes_gerente FOREIGN KEY (gerente_id) REFERENCES usuarios(id) ON DELETE SET NULL', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
-ALTER TABLE superintendencias
-    ADD CONSTRAINT fk_superintendencias_superintendente FOREIGN KEY (superintendente_id) REFERENCES usuarios(id) ON DELETE SET NULL;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'superintendencias' AND CONSTRAINT_NAME = 'fk_superintendencias_superintendente');
+SET @sql := IF(@x = 0, 'ALTER TABLE superintendencias ADD CONSTRAINT fk_superintendencias_superintendente FOREIGN KEY (superintendente_id) REFERENCES usuarios(id) ON DELETE SET NULL', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
 
 -- ------------------------------------------------------------------
 -- Empreendimentos (produtos) e vínculo de GP do Produto

@@ -11,16 +11,39 @@ SET NAMES utf8mb4;
 -- ------------------------------------------------------------------
 -- Empreendimentos: campos completos
 -- ------------------------------------------------------------------
-ALTER TABLE empreendimentos
-    ADD COLUMN IF NOT EXISTS construtora       VARCHAR(190) NULL AFTER nome,
-    ADD COLUMN IF NOT EXISTS endereco          VARCHAR(255) NULL AFTER construtora,
-    ADD COLUMN IF NOT EXISTS bairro            VARCHAR(120) NULL AFTER endereco,
-    ADD COLUMN IF NOT EXISTS cidade            VARCHAR(120) NULL AFTER bairro,
-    ADD COLUMN IF NOT EXISTS estado            CHAR(2) NULL AFTER cidade,
-    ADD COLUMN IF NOT EXISTS status_comercial  ENUM('lancamento','em_obras','pronto','esgotado','suspenso') NOT NULL DEFAULT 'lancamento' AFTER estado,
-    ADD COLUMN IF NOT EXISTS descricao         TEXT NULL AFTER status_comercial,
-    -- Caminho relativo dentro de uploads/empreendimentos/ (nome aleatório gerado no upload)
-    ADD COLUMN IF NOT EXISTS imagem            VARCHAR(255) NULL AFTER descricao;
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'construtora');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN construtora VARCHAR(190) NULL AFTER nome', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'endereco');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN endereco VARCHAR(255) NULL AFTER construtora', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'bairro');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN bairro VARCHAR(120) NULL AFTER endereco', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'cidade');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN cidade VARCHAR(120) NULL AFTER bairro', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'estado');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN estado CHAR(2) NULL AFTER cidade', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'status_comercial');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN status_comercial ENUM(''lancamento'',''em_obras'',''pronto'',''esgotado'',''suspenso'') NOT NULL DEFAULT ''lancamento'' AFTER estado', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'descricao');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN descricao TEXT NULL AFTER status_comercial', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- Caminho relativo dentro de uploads/empreendimentos/ (nome aleatório gerado no upload)
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empreendimentos' AND COLUMN_NAME = 'imagem');
+SET @sql := IF(@x = 0, 'ALTER TABLE empreendimentos ADD COLUMN imagem VARCHAR(255) NULL AFTER descricao', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
 
 -- ------------------------------------------------------------------
 -- Plantões de venda (seção 9: cada plantão tem endereço, coordenadas e
@@ -63,14 +86,16 @@ CREATE TABLE IF NOT EXISTS equipe_empreendimentos (
 -- Roleta pertence a um plantão (a localização/raio passam a vir do plantão;
 -- as colunas antigas de lat/long/raio da roleta ficam como legado e não
 -- devem mais ser editadas pela interface).
-ALTER TABLE roletas
-    ADD COLUMN IF NOT EXISTS plantao_id INT UNSIGNED NULL AFTER empresa_id;
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'roletas' AND COLUMN_NAME = 'plantao_id');
+SET @sql := IF(@x = 0, 'ALTER TABLE roletas ADD COLUMN plantao_id INT UNSIGNED NULL AFTER empresa_id', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
 
 SET @fk_exists := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
                    WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_roletas_plantao');
 SET @sql := IF(@fk_exists = 0,
     'ALTER TABLE roletas ADD CONSTRAINT fk_roletas_plantao FOREIGN KEY (plantao_id) REFERENCES plantoes(id) ON DELETE SET NULL',
-    'SELECT 1');
+    'DO 0');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ------------------------------------------------------------------

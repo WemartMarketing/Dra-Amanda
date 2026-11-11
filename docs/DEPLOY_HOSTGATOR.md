@@ -60,19 +60,40 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 6 | `sql/seed_003.sql` | **só para demonstração** — complementa o passo 2 |
 | 7 | `sql/migration_004_crm.sql` | Etapa 3 (CRM: funil configurável, agenda, transferências, arquivos) |
 | 8 | `sql/seed_004.sql` | **só para demonstração** — agenda, uma transferência e prioridades |
+| 9 | `sql/migration_005_roleta.sql` | Etapa 4 (roleta: presença, rodízio, fila de espera) |
+| 10 | `sql/seed_005.sql` | **só para demonstração** — regras das roletas, histórico e 2 leads na fila |
 
-- Quem já rodou os passos 1–6 roda apenas o **7** (e o 8, se usa a base de
+- Quem já rodou os passos 1–8 roda apenas o **9** (e o 10, se usa a base de
   demonstração).
-- `migration_003`, `seed_003`, `migration_004` e `seed_004` podem ser
-  executados mais de uma vez sem duplicar nada. A `migration_002` não: rode
-  uma única vez.
-- O `seed_004` não usa procedures nem triggers (a hospedagem compartilhada
-  costuma não liberar `CREATE ROUTINE`) e importa pelo phpMyAdmin.
+- **Todos** os arquivos acima podem ser executados mais de uma vez sem
+  duplicar nada e funcionam do mesmo jeito em MySQL 5.7+/8.0 e MariaDB
+  10.3+ — não é preciso descobrir qual banco a hospedagem usa.
+- Nenhum usa procedures, funções ou triggers (a hospedagem compartilhada
+  costuma não liberar `CREATE ROUTINE`); todos importam pelo phpMyAdmin.
 - Em uma empresa real, pule os seeds e cadastre empresa e Master pelo
   **Superadmin** (`superadmin@wemart.demo` existe só se o seed foi
   importado — em produção crie o seu e troque a senha).
 
-## 5. Ajuste de upload (MultiPHP INI Editor)
+## 5. Rotina da roleta (Cron Jobs do cPanel)
+
+No cPanel → **Cron Jobs**, adicione (a cada 15 minutos), trocando
+`USUARIO` e o caminho pela pasta onde o sistema está:
+
+```
+*/15 * * * * /usr/local/bin/php /home/USUARIO/caminho/cron/processar_fila.php >/dev/null 2>&1
+```
+
+Ela encerra presenças vencidas e entrega os leads que esperavam na fila.
+Só roda pela linha de comando: aberta no navegador responde 403 (e a pasta
+`cron/` também é bloqueada pelo `.htaccess`). Duas execuções ao mesmo
+tempo não acontecem (trava `GET_LOCK`). Mesmo sem o cron, a fila é
+processada quando um corretor entra na roleta e pelo botão do gestor.
+
+**HTTPS é obrigatório para a roleta**: o celular só libera a localização
+(GPS) em páginas `https://`. Ative o SSL gratuito em cPanel → *SSL/TLS
+Status* (AutoSSL) antes de usar a roleta.
+
+## 6. Ajuste de upload (MultiPHP INI Editor)
 
 As imagens de empreendimentos aceitam até 3 MB e os arquivos de leads até
 10 MB. Se o
@@ -82,7 +103,7 @@ avisa o limite real ao usuário. Para liberar os 3 MB, no cPanel abra
 `post_max_size = 12M` (assim os arquivos de leads também chegam ao limite
 de 10 MB).
 
-## 6. Testar
+## 7. Testar
 
 1. Acesse `https://seudominio.com.br/login.php`.
 2. Com o seed: entre como `fernanda.gestora@hmvendas.demo` / `demo123` e
@@ -98,10 +119,16 @@ de 10 MB).
    Minha agenda; na aba Arquivos, envie um PDF e baixe de volta.
 6. No celular: abra Plantões → *Novo plantão* → "Usar minha localização
    atual" (só funciona com HTTPS ativo).
+7. Abra `https://seudominio.com.br/cron/processar_fila.php`: deve dar
+   **403**. No celular, como corretor, **Início → ENTRAR NA ROLETA** dentro
+   do raio do plantão.
 
 ## Verificações de segurança incluídas
 
-- `.htaccess` bloqueia `/includes/` e `/sql/`; `uploads/.htaccess` só
+- Roleta: a distância é calculada no servidor (nunca um "dentro do raio"
+  vindo do navegador); o check-in usa sempre o usuário logado e só vale
+  para roletas às quais ele está vinculado.
+- `.htaccess` bloqueia `/includes/`, `/sql/` e `/cron/`; `uploads/.htaccess` só
   entrega imagens com nome gerado pelo sistema e não executa scripts
   (testado em Apache com mod_php: `.php`, `.phtml` e `.php.png` → 403).
 - Senhas com `password_hash()`; bloqueio após 5 tentativas de login.
@@ -119,6 +146,5 @@ de 10 MB).
 
 ## O que ainda não está pronto
 
-Ver "Limitações conhecidas" em `docs/README.md` (presença por
-geolocalização, distribuição automática e redistribuição por inatividade,
-Meta Ads, oferta ativa, exportação Excel e logo oficial).
+Ver "Limitações conhecidas" em `docs/README.md` (Meta Ads, oferta ativa,
+recuperação de leads parados, exportação Excel e logo oficial).

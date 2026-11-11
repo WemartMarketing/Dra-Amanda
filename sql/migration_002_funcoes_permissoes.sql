@@ -25,12 +25,18 @@ CREATE TABLE IF NOT EXISTS planos (
     ativo           TINYINT(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO planos (nome, descricao) VALUES
-    ('Padrão', 'Plano inicial — todas as funcionalidades construídas até esta etapa.');
+INSERT INTO planos (nome, descricao)
+SELECT 'Padrão', 'Plano inicial — todas as funcionalidades construídas até esta etapa.'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM planos WHERE nome = 'Padrão');
 
-ALTER TABLE empresas
-    ADD COLUMN IF NOT EXISTS plano_id INT UNSIGNED NULL AFTER ativa,
-    ADD CONSTRAINT fk_empresas_plano FOREIGN KEY (plano_id) REFERENCES planos(id) ON DELETE SET NULL;
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresas' AND COLUMN_NAME = 'plano_id');
+SET @sql := IF(@x = 0, 'ALTER TABLE empresas ADD COLUMN plano_id INT UNSIGNED NULL AFTER ativa', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'empresas' AND CONSTRAINT_NAME = 'fk_empresas_plano');
+SET @sql := IF(@x = 0, 'ALTER TABLE empresas ADD CONSTRAINT fk_empresas_plano FOREIGN KEY (plano_id) REFERENCES planos(id) ON DELETE SET NULL', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
 
 UPDATE empresas SET plano_id = (SELECT id FROM planos WHERE nome = 'Padrão' LIMIT 1) WHERE plano_id IS NULL;
 
@@ -85,10 +91,18 @@ CREATE TABLE IF NOT EXISTS funcao_permissoes (
 -- Usuários: adiciona funcao_id (substitui cargo em código) e o flag
 -- de Superadmin WeMart (cross-empresa, fora do sistema de funções).
 -- ------------------------------------------------------------------
-ALTER TABLE usuarios
-    ADD COLUMN IF NOT EXISTS funcao_id INT UNSIGNED NULL AFTER cargo,
-    ADD COLUMN IF NOT EXISTS eh_superadmin TINYINT(1) NOT NULL DEFAULT 0 AFTER funcao_id,
-    ADD CONSTRAINT fk_usuarios_funcao FOREIGN KEY (funcao_id) REFERENCES funcoes(id) ON DELETE RESTRICT;
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'funcao_id');
+SET @sql := IF(@x = 0, 'ALTER TABLE usuarios ADD COLUMN funcao_id INT UNSIGNED NULL AFTER cargo', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'eh_superadmin');
+SET @sql := IF(@x = 0, 'ALTER TABLE usuarios ADD COLUMN eh_superadmin TINYINT(1) NOT NULL DEFAULT 0 AFTER funcao_id', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND CONSTRAINT_NAME = 'fk_usuarios_funcao');
+SET @sql := IF(@x = 0, 'ALTER TABLE usuarios ADD CONSTRAINT fk_usuarios_funcao FOREIGN KEY (funcao_id) REFERENCES funcoes(id) ON DELETE RESTRICT', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
 
 -- ------------------------------------------------------------------
 -- Throttling de tentativas de login (seção 15)

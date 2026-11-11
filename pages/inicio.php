@@ -44,9 +44,19 @@ if ($ehCorretor) {
     $stmt->execute(['e' => $empresaId, 'u' => $uid]);
     $visitas = (int) $stmt->fetchColumn();
 
-    $stmt = db()->prepare('SELECT roletas.id, roletas.nome FROM roletas INNER JOIN roleta_corretores rc ON rc.roleta_id = roletas.id WHERE rc.usuario_id = :uid AND roletas.empresa_id = :e LIMIT 1');
+    // Estado real da roleta: sessão aberta e ainda válida?
+    require_once __DIR__ . '/../includes/roleta.php';
+    roleta_fechar_expiradas($empresaId);
+    $stmt = db()->prepare('SELECT roletas.id, roletas.nome, roletas.ativa, s.entrou_em
+        FROM roletas INNER JOIN roleta_corretores rc ON rc.roleta_id = roletas.id
+        LEFT JOIN roleta_sessoes s ON s.roleta_id = roletas.id AND s.usuario_id = rc.usuario_id AND s.saiu_em IS NULL
+        WHERE rc.usuario_id = :uid AND roletas.empresa_id = :e
+        ORDER BY (s.id IS NULL), roletas.ativa DESC, roletas.nome LIMIT 1');
     $stmt->execute(['uid' => $uid, 'e' => $empresaId]);
     $roleta = $stmt->fetch();
+    $roletaTexto = !$roleta ? 'Você ainda não está vinculado a uma roleta'
+        : ($roleta['entrou_em'] ? 'Você está na roleta ' . $roleta['nome'] . ' desde ' . date('H:i', strtotime($roleta['entrou_em']))
+            : ($roleta['ativa'] ? $roleta['nome'] . ' · toque para verificar sua presença' : $roleta['nome'] . ' · roleta pausada'));
 
     require __DIR__ . '/../includes/layout_start.php';
     ?>
@@ -62,7 +72,7 @@ if ($ehCorretor) {
         <a href="/pages/leads.php" class="big-action"><?= icon('users') ?><span>MEUS LEADS</span></a>
         <a href="/pages/kanban.php" class="big-action"><?= icon('kanban') ?><span>MEU KANBAN</span></a>
         <a href="/pages/agenda.php" class="big-action"><?= icon('calendar') ?><span>MINHA AGENDA</span></a>
-        <a href="/pages/roletas.php" class="big-action big-action-primary"><?= icon('pin') ?><span>ENTRAR NA ROLETA</span><small><?= $roleta ? e($roleta['nome']) . ' · check-in chega na próxima etapa' : 'Check-in na roleta chega na próxima etapa' ?></small></a>
+        <a href="/pages/minha_roleta.php" class="big-action big-action-primary <?= $roleta && $roleta['entrou_em'] ? 'is-in' : '' ?>"><?= icon('pin') ?><span><?= $roleta && $roleta['entrou_em'] ? 'VOCÊ ESTÁ NA ROLETA' : 'ENTRAR NA ROLETA' ?></span><small><?= e($roletaTexto) ?></small></a>
     </div>
 
     <div class="kpi-grid kpi-grid-5">

@@ -76,6 +76,10 @@ function lead_transferir(array $lead, int $destinoUsuarioId, string $motivo, ?ar
         'motivo' => $motivo, 'observacao' => $observacao, 'executado_por' => $executorId,
     ]);
 
+    // Lead que esperava na fila da roleta e foi atribuído à mão sai da fila.
+    db()->prepare('UPDATE roleta_fila SET resolvido_em = NOW() WHERE lead_id = :lead AND resolvido_em IS NULL')
+        ->execute(['lead' => $lead['id']]);
+
     // Compromissos ainda pendentes seguem o novo responsável.
     db()->prepare("UPDATE agenda_compromissos SET usuario_id = :novo WHERE lead_id = :lead AND status = 'agendado'")
         ->execute(['novo' => $destinoUsuarioId, 'lead' => $lead['id']]);

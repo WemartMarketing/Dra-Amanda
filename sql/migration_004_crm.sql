@@ -25,12 +25,26 @@ SET NAMES utf8mb4;
 ALTER TABLE leads
     MODIFY etapa ENUM('novo_lead','primeiro_contato','em_atendimento','visita_agendada','visita_realizada','sem_interesse','contrato_assinado','perdido') NOT NULL DEFAULT 'novo_lead';
 
-ALTER TABLE leads
-    ADD COLUMN IF NOT EXISTS etapa_id          INT UNSIGNED NULL AFTER etapa,
-    ADD COLUMN IF NOT EXISTS prioridade        ENUM('baixa','normal','alta') NOT NULL DEFAULT 'normal' AFTER etapa_id,
-    ADD COLUMN IF NOT EXISTS ultima_atividade_em DATETIME NULL AFTER ultimo_contato_em,
-    ADD COLUMN IF NOT EXISTS excluido_em       DATETIME NULL AFTER atualizado_em,
-    ADD COLUMN IF NOT EXISTS excluido_por      INT UNSIGNED NULL AFTER excluido_em;
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'etapa_id');
+SET @sql := IF(@x = 0, 'ALTER TABLE leads ADD COLUMN etapa_id INT UNSIGNED NULL AFTER etapa', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'prioridade');
+SET @sql := IF(@x = 0, 'ALTER TABLE leads ADD COLUMN prioridade ENUM(''baixa'',''normal'',''alta'') NOT NULL DEFAULT ''normal'' AFTER etapa_id', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'ultima_atividade_em');
+SET @sql := IF(@x = 0, 'ALTER TABLE leads ADD COLUMN ultima_atividade_em DATETIME NULL AFTER ultimo_contato_em', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'excluido_em');
+SET @sql := IF(@x = 0, 'ALTER TABLE leads ADD COLUMN excluido_em DATETIME NULL AFTER atualizado_em', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @x := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'excluido_por');
+SET @sql := IF(@x = 0, 'ALTER TABLE leads ADD COLUMN excluido_por INT UNSIGNED NULL AFTER excluido_em', 'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
 
 -- ------------------------------------------------------------------
 -- Etapas do funil por empresa
@@ -80,7 +94,7 @@ SET @fk := (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
             WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_leads_etapa');
 SET @sql := IF(@fk = 0,
     'ALTER TABLE leads ADD CONSTRAINT fk_leads_etapa FOREIGN KEY (etapa_id) REFERENCES funil_etapas(id) ON DELETE RESTRICT',
-    'SELECT 1');
+    'DO 0');
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- ------------------------------------------------------------------

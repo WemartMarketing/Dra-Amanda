@@ -96,7 +96,9 @@ function csrfToken() {
             if (r.ok && data.ok) {
                 location.href = '/pages/roletas.php' + (data.id ? '?id=' + data.id : '');
             } else {
-                alert(data.erro || 'Não foi possível salvar a roleta.');
+                var alerta = form.querySelector('[data-form-alerta]');
+                if (alerta) { alerta.textContent = data.erro || 'Não foi possível salvar a roleta.'; alerta.hidden = false; }
+                else alert(data.erro || 'Não foi possível salvar a roleta.');
             }
         });
     });
@@ -107,6 +109,32 @@ function csrfToken() {
             const usuarioId = form.usuario_id.value;
             if (!usuarioId) return;
             await roletaCorretorAcao(currentRoletaId(), usuarioId, 'add');
+        });
+    });
+    document.querySelectorAll('[data-corretor-acao]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (btn.dataset.confirmar && !confirm(btn.dataset.confirmar)) return;
+            roletaCorretorAcao(currentRoletaId(), btn.dataset.usuario, btn.dataset.corretorAcao);
+        });
+    });
+    document.querySelectorAll('[data-prioridade-empreendimento]').forEach(function (form) {
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const body = new URLSearchParams({ roleta_id: currentRoletaId(), empreendimento_id: form.dataset.prioridadeEmpreendimento, acao: 'prioridade', prioridade: form.prioridade.value, csrf_token: csrfToken() });
+            const r = await fetch('/api/roleta_empreendimento.php', { method: 'POST', body: body });
+            const data = await r.json().catch(function () { return {}; });
+            if (r.ok && data.ok) { location.reload(); } else { alert(data.erro || 'Não foi possível salvar a prioridade.'); }
+        });
+    });
+    document.querySelectorAll('[data-fila-processar]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            const body = new URLSearchParams({ acao: 'processar', roleta_id: btn.dataset.filaProcessar, csrf_token: csrfToken() });
+            const r = await fetch('/api/roleta_fila.php', { method: 'POST', body: body });
+            const data = await r.json().catch(function () { return {}; });
+            btn.disabled = false;
+            alert(data.mensagem || data.erro || 'Não foi possível processar a fila.');
+            if (r.ok && data.ok) location.reload();
         });
     });
     document.querySelectorAll('[data-remover-corretor]').forEach(function (btn) {
@@ -411,7 +439,8 @@ function csrfToken() {
     });
 
     function currentRoletaId() {
-        return new URLSearchParams(location.search).get('id') || '';
+        var el = document.querySelector('[data-roleta-id]');
+        return el ? el.dataset.roletaId : (new URLSearchParams(location.search).get('id') || '');
     }
     async function roletaCorretorAcao(roletaId, usuarioId, acao) {
         const body = new URLSearchParams({ roleta_id: roletaId, usuario_id: usuarioId, acao: acao, csrf_token: csrfToken() });
@@ -480,6 +509,29 @@ function wmToast(msg, persistir) {
             var res = await postar(form.getAttribute('action'), new FormData(form));
             if (btn) btn.disabled = false;
             var j = res.json;
+            if (j.ok && j.roleta) {
+                // Lead enviado para a roleta: mostra quem recebeu (ou a fila) aqui mesmo.
+                var caixa = form.querySelector('[data-form-resultado]');
+                if (caixa) {
+                    caixa.innerHTML = '';
+                    caixa.className = 'roleta-resultado ' + (j.roleta === 'distribuido' ? 'is-ok' : 'is-fila');
+                    var p = document.createElement('p');
+                    p.textContent = j.mensagem;
+                    caixa.appendChild(p);
+                    if (j.redirecionar) {
+                        var link = document.createElement('a');
+                        link.href = j.redirecionar; link.className = 'btn btn-secondary';
+                        link.textContent = 'Abrir a ficha do lead';
+                        caixa.appendChild(link);
+                    }
+                    caixa.hidden = false;
+                    caixa.scrollIntoView({ block: 'center' });
+                }
+                if (!caixa) wmToast(j.mensagem);
+                form.reset();
+                form.dispatchEvent(new Event('change'));
+                return;
+            }
             if (j.ok) {
                 var destino = form.dataset.redirecionar;
                 if (destino) {
@@ -506,6 +558,31 @@ function wmToast(msg, persistir) {
             }
         });
     });
+
+
+    // ---------------------------------- Novo lead: "Distribuir pela roleta"
+    (function () {
+        var opcao = document.querySelector('[data-opcao-roleta]');
+        if (!opcao) return;
+        var form = opcao.closest('form');
+        var emp = form.querySelector('[name=empreendimento_id]');
+        var caixa = opcao.querySelector('[data-distribuir-roleta]');
+        var resp = form.querySelector('[data-campo-responsavel]');
+        var ultimoEmp = null;
+        function atualizar() {
+            var op = emp.options[emp.selectedIndex];
+            var tem = !!(op && op.dataset.temRoleta);
+            opcao.hidden = !tem;
+            // Padrão para gestores: ligado quando o empreendimento tem roleta ativa.
+            if (emp.value !== ultimoEmp) { caixa.checked = tem; ultimoEmp = emp.value; }
+            if (!tem) caixa.checked = false;
+            if (resp) resp.hidden = caixa.checked;
+        }
+        emp.addEventListener('change', atualizar);
+        caixa.addEventListener('change', function () { if (resp) resp.hidden = caixa.checked; });
+        form.addEventListener('change', function (e) { if (e.target === form) { ultimoEmp = null; atualizar(); } });
+        atualizar();
+    })();
 
     // ------------------------------------- [data-api-acao] (botões simples)
     var reservados = ['apiAcao', 'confirmar', 'irPara'];
@@ -584,6 +661,11 @@ function wmToast(msg, persistir) {
             abrirTransferencia([btn.dataset.transferirLead]);
         });
     });
+    // Vindo da fila de espera ("Atribuir manualmente"): abre a transferência.
+    if (new URLSearchParams(location.search).get('transferir') === '1') {
+        var btnT = document.querySelector('[data-transferir-lead]');
+        if (btnT) abrirTransferencia([btnT.dataset.transferirLead]);
+    }
     var bulk = document.querySelector('[data-bulk-bar]');
     function selecionados() { return Array.prototype.map.call(document.querySelectorAll('[data-selecionar-lead]:checked'), function (c) { return c.value; }); }
     function atualizarBulk() {

@@ -97,6 +97,46 @@ if ($atual) {
 }
 
 // ---------------------------------------------------------------- Cadastro
+$etapa = funil_primeira_etapa($empresaId);
+if (!$etapa) {
+    api_erro('O funil da empresa não tem etapas ativas. Fale com o administrador.', 409);
+}
+
+// "Distribuir pela roleta": o lead nasce sem responsável e o rodízio
+// escolhe quem recebe (ou ele vai para a fila de espera).
+if (!empty($_POST['distribuir_roleta'])) {
+    require_once __DIR__ . '/../includes/roleta.php';
+    if (!usuario_tem_permissao($usuario, 'gerenciar_roletas') && !usuario_tem_permissao($usuario, 'redistribuir_leads')) {
+        api_erro('Sua função não pode enviar leads para a roleta.', 403);
+    }
+    if (!$empreendimentoId) {
+        api_erro('Para distribuir pela roleta, escolha o empreendimento de interesse.', 422);
+    }
+    $colunas = array_keys($dados);
+    db()->prepare('INSERT INTO leads (empresa_id, equipe_id, responsavel_id, etapa_id, etapa, ultima_atividade_em, ' . implode(', ', $colunas) . ')
+                   VALUES (:empresa_id, NULL, NULL, :etapa_id, :etapa, NOW(), :' . implode(', :', $colunas) . ')')
+        ->execute($dados + ['empresa_id' => $empresaId, 'etapa_id' => $etapa['id'], 'etapa' => $etapa['categoria']]);
+    $novoId = (int) db()->lastInsertId();
+    lead_registrar_evento($novoId, (int) $usuario['id'], 'sistema', 'Lead cadastrado por ' . $usuario['nome'] . ' e enviado para a roleta');
+    $observacao = api_texto($_POST['observacao'] ?? null, 500);
+    if ($observacao) {
+        lead_registrar_evento($novoId, (int) $usuario['id'], 'nota', $observacao);
+    }
+    auditoria_registrar($empresaId, (int) $usuario['id'], 'lead.criado', 'lead', $novoId, ['distribuir_roleta' => true, 'origem' => $origem]);
+
+    $res = roleta_distribuir_lead($novoId, 'manual', $usuario);
+    $visivel = rbac_pode_ver_lead($usuario, $novoId);
+    if ($res['status'] === 'distribuido') {
+        $msg = $visivel
+            ? 'Lead cadastrado e entregue a ' . $res['usuario_nome'] . ' pela roleta ' . $res['roleta_nome'] . '.'
+            : 'Lead cadastrado e entregue pela roleta ' . $res['roleta_nome'] . ' a um corretor de plantão.';
+    } else {
+        $msg = 'Lead cadastrado e colocado na fila de espera: ' . mb_strtolower($res['motivo']) . '. Ele será entregue assim que um corretor entrar na roleta.';
+    }
+    api_responder(['ok' => true, 'id' => $novoId, 'roleta' => $res['status'], 'mensagem' => $msg,
+        'redirecionar' => $visivel ? '/pages/lead.php?id=' . $novoId . '&novo=1' : null, 'permanecer' => !$visivel]);
+}
+
 $responsavelId = (int) $usuario['id'];
 $pedido = (int) ($_POST['responsavel_id'] ?? 0);
 if ($pedido && $pedido !== $responsavelId) {
@@ -108,10 +148,6 @@ if ($pedido && $pedido !== $responsavelId) {
         api_erro('Responsável fora da sua equipe.', 404);
     }
     $responsavelId = $pedido;
-}
-$etapa = funil_primeira_etapa($empresaId);
-if (!$etapa) {
-    api_erro('O funil da empresa não tem etapas ativas. Fale com o administrador.', 409);
 }
 $estrutura = estrutura_do_usuario($responsavelId);
 

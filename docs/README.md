@@ -83,9 +83,8 @@ HostGator. O desenvolvimento segue as etapas do prompt mestre.
   para "Visita realizada".
 - **Início do corretor**: contagens, atividades pendentes, próximos
   compromissos, alertas de leads parados e os botões MEUS LEADS, MEU
-  KANBAN, MINHA AGENDA e ENTRAR NA ROLETA (o check-in com localização chega
-  na Etapa 4 — o botão leva à tela da roleta e diz isso). Gestores mantêm a
-  visão da equipe.
+  KANBAN, MINHA AGENDA e ENTRAR NA ROLETA (leva a **Minha roleta**, ver
+  Etapa 4). Gestores mantêm a visão da equipe.
 - **Transferência de leads** (permissão *Redistribuir leads*): da ficha ou
   em lote, só para corretores do próprio escopo. Grava em
   `lead_transferencias` a estrutura de origem e destino (corretor, equipe,
@@ -103,12 +102,58 @@ HostGator. O desenvolvimento segue as etapas do prompt mestre.
   roleta e Meu perfil; no celular, barra inferior Início | Leads | Kanban |
   Agenda | Mais.
 
+### Etapa 4 — Roleta
+Todas as regras ficam em `includes/roleta.php` (páginas, APIs, cron e, na
+Etapa 5, o webhook do Meta Ads chamam as mesmas funções).
+- **Minha roleta** (corretor, permissão *Participar de roletas*): status
+  grande — verde "DENTRO DO PLANTÃO — PODE ENTRAR NA ROLETA" ou vermelho
+  "FORA DO PLANTÃO — ENTRADA BLOQUEADA" com o motivo (distância, GPS
+  impreciso, fora do horário/dia, roleta ou corretor pausado). Botões
+  Verificar localização / Entrar / Sair; enquanto está dentro, a página
+  reconfirma a posição a cada *intervalo de verificação* e mostra "na
+  roleta desde HH:MM · próxima verificação em N min", a posição no rodízio
+  e os leads recebidos hoje. Sem renovação, a presença vence sozinha depois
+  da *validade* (a página precisa ficar aberta — o aviso aparece na tela).
+- **Quem decide é o servidor**: o navegador só manda latitude, longitude e
+  precisão; o servidor confere vínculo, pausa, roleta ativa, dia (ISO 1–7),
+  horário (America/Sao_Paulo, inclusive virando a meia-noite), precisão ≤
+  máximo e distância (haversine) ≤ raio do plantão. Toda tentativa — aceita
+  ou recusada — fica em `roleta_presencas`; a presença em `roleta_sessoes`
+  (no máximo uma aberta por corretor e roleta). O usuário vem sempre da
+  sessão: ninguém faz check-in por outro nem numa roleta à qual não está
+  vinculado.
+- **Rodízio** (`roleta_distribuir_lead`): recebe, entre os corretores com
+  presença válida, não pausados e abaixo do limite diário, quem está há mais
+  tempo sem receber. Transação com trava na linha do lead e da roleta: dois
+  leads simultâneos nunca vão para o mesmo corretor fora da vez, e o mesmo
+  lead nunca é entregue duas vezes. Empreendimento em mais de uma roleta:
+  tenta primeiro a de menor *prioridade*.
+- **Fila de espera**: sem ninguém disponível, o lead fica sem responsável em
+  `roleta_fila`. É entregue quando um corretor entra na roleta, pelo botão
+  *Distribuir fila agora* / *Distribuir agora*, pelo cron
+  `cron/processar_fila.php` ou à mão (*Atribuir manualmente* abre a
+  transferência). Leads na fila aparecem para quem vê toda a empresa,
+  todos os produtos ou o produto vinculado; gerentes e superintendentes os
+  veem depois de distribuídos para a equipe deles.
+- **Roletas** (gestão): regras (dias, horário, exigir presença, precisão,
+  validade, intervalo, limite diário), prioridade dos empreendimentos,
+  corretores com status ao vivo ("Na roleta desde 10:12 · última verificação
+  há 2 min · a 85 m", "Fora — presença expirou às 11:40", "Pausado pelo
+  gestor"), ordem do rodízio, Pausar/Retomar/Tirar agora/Remover, fila de
+  espera e histórico de distribuição (o nome do lead só aparece para quem
+  pode vê-lo; os outros veem "Lead #id").
+- **Novo lead → Distribuir pela roleta**: padrão para gestores quando o
+  empreendimento tem roleta ativa; a tela diz quem recebeu ou que o lead foi
+  para a fila.
+- **Relatórios → Resultados por roleta**: leads distribuídos, corretores que
+  receberam, vendas e conversão (dentro do escopo de quem vê).
+
 ### Limitações conhecidas (ficam para as próximas etapas)
-- **Etapa 4**: presença por geolocalização (check-in na roleta) e
-  distribuição automática da roleta, incluindo redistribuição automática
-  de leads parados (o motivo *inatividade* já existe em
-  `lead_transferencias`). Os plantões já guardam coordenadas e raio para isso.
-- **Etapa 5**: Meta Lead Ads, oferta ativa e recuperação automática.
+- **Etapa 5**: webhook do Meta Lead Ads chamando `roleta_distribuir_lead`,
+  importação/oferta ativa e recuperação automática de leads parados (4 dias;
+  o motivo *inatividade* já existe em `lead_transferencias`).
+- A presença depende da página aberta no celular: navegadores não permitem
+  GPS em segundo plano numa página web.
 - **Etapa 6**: dashboards completos e exportação Excel (o botão existe e
   avisa que está em desenvolvimento).
 - Logo oficial da WeMart ainda não foi enviada — o sistema usa o texto
@@ -137,7 +182,13 @@ mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_003_estrutura_comer
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_003.sql
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_004_crm.sql
 mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_004.sql
+mysql -u wemart -pwemart_dev_pw wemart_sales < sql/migration_005_roleta.sql
+mysql -u wemart -pwemart_dev_pw wemart_sales < sql/seed_005.sql
 ```
+
+Todas as migrações e seeds rodam mais de uma vez sem duplicar nada e
+funcionam igual em MySQL 5.7+/8.0 e MariaDB 10.3+ (sem procedures,
+funções ou triggers). Para a fila da roleta: `php cron/processar_fila.php`.
 
 Observação: o `php -S` ignora `.htaccess` (inclusive o bloqueio de
 `storage/`). Para testar as proteções de `uploads/`, `storage/`,
@@ -196,6 +247,22 @@ Senha de todas as contas: **demo123**
    para `.pdf`) é recusado.
 6. **Meu perfil**: trocar a senha exige a senha atual.
 
+### Como testar a Etapa 4
+O seed deixa todos os corretores **fora** da roleta e 2 leads na fila da
+Casa HM — Zona Oeste (plantão em -23.52621, -46.67669, raio 300 m, seg a
+sáb 09:00–18:00).
+1. Como `carlos@hmvendas.demo`, no celular (HTTPS) ou com a localização
+   simulada no DevTools: **Início → ENTRAR NA ROLETA**. Dentro do raio a
+   tela fica verde; *Entrar na roleta* abre a presença e os 2 leads da fila
+   chegam para ele.
+2. Simule 2 km de distância: vermelho com a distância. Precisão de 500 m:
+   "GPS impreciso". Fora do horário: "Fora do horário do plantão".
+3. Como `fernanda.gestora@hmvendas.demo` → **Roletas**: veja o status ao
+   vivo, pause o Carlos (ele sai na hora) e retome; *Editar regras* muda
+   dias, horário, precisão, validade e limite diário.
+4. **Novo lead** com empreendimento Smart Marquês: "Distribuir pela roleta"
+   já vem marcado; a tela diz quem recebeu (ou que foi para a fila).
+
 Todos os nomes, leads e telefones do seed são **fictícios**.
 
 ## Estrutura
@@ -211,11 +278,13 @@ includes/
   leads.php, leads_lista.php       helpers de lead, telefone, filtros e consultas da lista/Kanban
   lead_componentes.php             card do lead e modais (mover, transferir, agendar)
   agenda.php, transferencia.php    agenda comercial e transferência de leads
+  roleta.php                       presença, rodízio, fila e distribuição (única fonte das regras)
   arquivos.php                     upload/validação de arquivos de lead
   auditoria.php, db.php, layout_*  auditoria, PDO e layout
 pages/                             telas (inicio, leads, kanban, lead, agenda, funil, perfil,
                                    relatorios, equipes, empreendimentos, empreendimento,
-                                   plantoes, roletas, usuarios, superadmin)
+                                   plantoes, roletas, minha_roleta, usuarios, superadmin)
+cron/processar_fila.php            rotina da roleta (só linha de comando; HTTP → 403)
 api/                               endpoints POST chamados por fetch()
 uploads/                           imagens de empreendimentos (protegido por .htaccess)
 storage/                           arquivos privados de leads — nunca servidos direto (.htaccess nega tudo)

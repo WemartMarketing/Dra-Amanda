@@ -1,66 +1,44 @@
 <?php
 /**
- * POST /api/roleta_empreendimento.php  { roleta_id, empreendimento_id, acao: 'add'|'remover' }
- * Vincula/desvincula um empreendimento da roleta, com as mesmas
- * checagens de empresa e permissão de api/roleta_corretor.php.
+ * POST /api/roleta_empreendimento.php
+ *   { roleta_id, empreendimento_id, acao: 'add'|'remover'|'prioridade', prioridade? }
+ * Vincula/desvincula um empreendimento da roleta ou define a prioridade
+ * dele nesta roleta (menor = tentada primeiro quando o empreendimento
+ * está em mais de uma roleta — seção 13). Roleta e empreendimento
+ * precisam ser da empresa do gestor.
  */
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/rbac.php';
+require_once __DIR__ . '/../includes/api.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!auth_check()) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'erro' => 'Sessão expirada.']);
-    exit;
-}
-
-$usuario = current_user();
-if (!usuario_tem_permissao($usuario, 'gerenciar_roletas')) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Sua função não pode gerenciar roletas.']);
-    exit;
-}
-
-if (!csrf_validar_requisicao()) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
-    exit;
-}
-
+$usuario = api_iniciar('gerenciar_roletas');
 $empresaId = (int) $usuario['empresa_ativa_id'];
 $roletaId = (int) ($_POST['roleta_id'] ?? 0);
 $empreendimentoId = (int) ($_POST['empreendimento_id'] ?? 0);
-$acao = $_POST['acao'] ?? '';
+$acao = (string) ($_POST['acao'] ?? '');
 
-if (!$roletaId || !$empreendimentoId || !in_array($acao, ['add', 'remover'], true)) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'erro' => 'Dados inválidos.']);
-    exit;
+if (!$roletaId || !$empreendimentoId || !in_array($acao, ['add', 'remover', 'prioridade'], true)) {
+    api_erro('Dados inválidos.', 422);
+}
+if (!api_registro_da_empresa('roletas', $roletaId, $empresaId)) {
+    api_erro('Roleta não encontrada.', 404);
+}
+if (!api_registro_da_empresa('empreendimentos', $empreendimentoId, $empresaId)) {
+    api_erro('Empreendimento não encontrado nesta empresa.', 404);
 }
 
-$stmt = db()->prepare('SELECT id FROM roletas WHERE id = :id AND empresa_id = :empresa_id');
-$stmt->execute(['id' => $roletaId, 'empresa_id' => $empresaId]);
-if (!$stmt->fetch()) {
-    http_response_code(404);
-    echo json_encode(['ok' => false, 'erro' => 'Roleta não encontrada.']);
-    exit;
-}
-
-$stmt = db()->prepare('SELECT id FROM empreendimentos WHERE id = :id AND empresa_id = :empresa_id');
-$stmt->execute(['id' => $empreendimentoId, 'empresa_id' => $empresaId]);
-if (!$stmt->fetch()) {
-    http_response_code(404);
-    echo json_encode(['ok' => false, 'erro' => 'Empreendimento não encontrado nesta empresa.']);
-    exit;
+$prioridade = (int) ($_POST['prioridade'] ?? 100);
+if ($prioridade < 1 || $prioridade > 999) {
+    api_erro('A prioridade deve ser um número de 1 a 999 (menor = recebe primeiro).', 422);
 }
 
 if ($acao === 'add') {
-    db()->prepare('INSERT IGNORE INTO roleta_empreendimentos (roleta_id, empreendimento_id) VALUES (:roleta_id, :empreendimento_id)')
-        ->execute(['roleta_id' => $roletaId, 'empreendimento_id' => $empreendimentoId]);
+    db()->prepare('INSERT IGNORE INTO roleta_empreendimentos (roleta_id, empreendimento_id, prioridade) VALUES (:r, :e, :p)')
+        ->execute(['r' => $roletaId, 'e' => $empreendimentoId, 'p' => $prioridade]);
+} elseif ($acao === 'prioridade') {
+    db()->prepare('UPDATE roleta_empreendimentos SET prioridade = :p WHERE roleta_id = :r AND empreendimento_id = :e')
+        ->execute(['p' => $prioridade, 'r' => $roletaId, 'e' => $empreendimentoId]);
 } else {
-    db()->prepare('DELETE FROM roleta_empreendimentos WHERE roleta_id = :roleta_id AND empreendimento_id = :empreendimento_id')
-        ->execute(['roleta_id' => $roletaId, 'empreendimento_id' => $empreendimentoId]);
+    db()->prepare('DELETE FROM roleta_empreendimentos WHERE roleta_id = :r AND empreendimento_id = :e')
+        ->execute(['r' => $roletaId, 'e' => $empreendimentoId]);
 }
-
-echo json_encode(['ok' => true]);
+auditoria_registrar($empresaId, (int) $usuario['id'], 'roleta.empreendimento_' . $acao, 'roleta', $roletaId, ['empreendimento_id' => $empreendimentoId, 'prioridade' => $prioridade]);
+api_responder(['ok' => true]);

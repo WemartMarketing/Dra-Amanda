@@ -23,6 +23,15 @@ if (!$leadId) {
     }
     $podeEscolherResponsavel = usuario_tem_permissao($usuario, 'redistribuir_leads') && !$ehCorretor;
     $responsaveis = $podeEscolherResponsavel ? rbac_usuarios_atribuiveis($usuario) : [];
+    // Empreendimentos com roleta ativa: para eles o gestor pode deixar o rodízio escolher o corretor.
+    $podeRoleta = !$ehCorretor && (usuario_tem_permissao($usuario, 'gerenciar_roletas') || usuario_tem_permissao($usuario, 'redistribuir_leads'));
+    $empComRoleta = [];
+    if ($podeRoleta) {
+        $stmt = db()->prepare('SELECT DISTINCT re.empreendimento_id FROM roleta_empreendimentos re
+            INNER JOIN roletas r ON r.id = re.roleta_id AND r.ativa = 1 WHERE r.empresa_id = :empresa_id');
+        $stmt->execute(['empresa_id' => $empresaId]);
+        $empComRoleta = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
     $pageTitle = 'Novo lead — ' . APP_NAME;
     require __DIR__ . '/../includes/layout_start.php';
     ?>
@@ -39,7 +48,7 @@ if (!$leadId) {
                 <div class="field"><label for="n-emp">Empreendimento de interesse</label>
                     <select id="n-emp" name="empreendimento_id">
                         <option value="">Não informado</option>
-                        <?php foreach ($empreendimentos as $emp): ?><option value="<?= (int) $emp['id'] ?>"><?= e($emp['nome']) ?></option><?php endforeach; ?>
+                        <?php foreach ($empreendimentos as $emp): ?><option value="<?= (int) $emp['id'] ?>" <?= in_array((int) $emp['id'], $empComRoleta, true) ? 'data-tem-roleta="1"' : '' ?>><?= e($emp['nome']) ?><?= in_array((int) $emp['id'], $empComRoleta, true) ? ' · roleta ativa' : '' ?></option><?php endforeach; ?>
                     </select>
                 </div>
                 <div class="field"><label for="n-origem">Origem</label>
@@ -55,7 +64,7 @@ if (!$leadId) {
                 <div class="field"><label for="n-int">Interesse</label><input type="text" id="n-int" name="interesse" placeholder="Ex.: 2 dormitórios" maxlength="190"></div>
                 <div class="field"><label for="n-renda">Renda familiar informada</label><input type="text" id="n-renda" name="renda_informada" placeholder="Ex.: 5.600" inputmode="decimal"></div>
                 <?php if ($responsaveis): ?>
-                    <div class="field"><label for="n-resp">Responsável</label>
+                    <div class="field" data-campo-responsavel><label for="n-resp">Responsável</label>
                         <select id="n-resp" name="responsavel_id">
                             <option value="">Eu mesmo (<?= e($usuario['nome']) ?>)</option>
                             <?php foreach ($responsaveis as $r): if ((int) $r['id'] === (int) $usuario['id']) continue; ?><option value="<?= (int) $r['id'] ?>"><?= e($r['nome']) ?><?= $r['equipe_nome'] ? ' — ' . e($r['equipe_nome']) : '' ?></option><?php endforeach; ?>
@@ -64,7 +73,14 @@ if (!$leadId) {
                 <?php endif; ?>
             </div>
             <div class="field"><label for="n-obs">Observação</label><textarea id="n-obs" name="observacao" maxlength="500" placeholder="Ex.: Cliente prefere contato à tarde."></textarea></div>
+            <?php if ($podeRoleta && $empComRoleta): ?>
+                <label class="check-roleta" data-opcao-roleta hidden>
+                    <input type="checkbox" name="distribuir_roleta" value="1" data-distribuir-roleta>
+                    <span><strong>Distribuir pela roleta</strong><small>O rodízio escolhe o próximo corretor que está no plantão. Se ninguém estiver disponível, o lead fica na fila de espera e é entregue assim que alguém entrar.</small></span>
+                </label>
+            <?php endif; ?>
             <div class="form-alert" data-form-alerta hidden></div>
+            <div data-form-resultado hidden></div>
             <div class="modal-actions"><button type="submit" class="btn btn-primary"><?= icon('plus') ?>Cadastrar lead</button><a href="/pages/leads.php" class="btn btn-outline">Cancelar</a></div>
         </form>
     </div>

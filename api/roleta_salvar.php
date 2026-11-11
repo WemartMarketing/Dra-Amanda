@@ -1,77 +1,102 @@
 <?php
 /**
- * POST /api/roleta_salvar.php  { id?, nome, plantao_id?, horario_inicio, horario_fim, ativa }
- * Endereço, coordenadas e raio de presença vêm do plantão (Etapa 2); as
- * colunas antigas de raio/coordenadas da própria roleta não são mais
- * alteradas por aqui.
- * Cria uma roleta nova (sem id) ou atualiza uma existente da própria
- * empresa. Exige a permissão gerenciar_roletas, checada aqui de novo
- * mesmo que a tela já esconda o formulário de quem não a tem.
+ * POST /api/roleta_salvar.php — cria (sem id) ou edita uma roleta da empresa.
+ *   { id?, nome, plantao_id?, horario_inicio, horario_fim, dias_semana[],
+ *     exigir_presenca, precisao_maxima_metros, validade_presenca_min,
+ *     intervalo_verificacao_min, max_leads_dia_corretor?, ativa }
+ * Endereço, coordenadas e raio de presença vêm do plantão (Etapa 2).
+ * Pausar uma roleta encerra as presenças abertas nela.
  */
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/rbac.php';
+require_once __DIR__ . '/../includes/api.php';
+require_once __DIR__ . '/../includes/roleta.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!auth_check()) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'erro' => 'Sessão expirada.']);
-    exit;
-}
-
-$usuario = current_user();
-if (!usuario_tem_permissao($usuario, 'gerenciar_roletas')) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Sua função não pode gerenciar roletas.']);
-    exit;
-}
-
-if (!csrf_validar_requisicao()) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
-    exit;
-}
-
+$usuario = api_iniciar('gerenciar_roletas');
 $empresaId = (int) $usuario['empresa_ativa_id'];
 $id = (int) ($_POST['id'] ?? 0);
-$nome = trim($_POST['nome'] ?? '');
+
+$nome = api_texto($_POST['nome'] ?? null);
+if (!$nome) {
+    api_erro('Informe um nome para a roleta.', 422);
+}
 $plantaoId = (int) ($_POST['plantao_id'] ?? 0) ?: null;
-$horarioInicio = trim($_POST['horario_inicio'] ?? '') ?: null;
-$horarioFim = trim($_POST['horario_fim'] ?? '') ?: null;
-$ativa = !empty($_POST['ativa']) ? 1 : 0;
-
-if ($nome === '') {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'erro' => 'Informe um nome para a roleta.']);
-    exit;
+if ($plantaoId && !api_registro_da_empresa('plantoes', $plantaoId, $empresaId)) {
+    api_erro('Plantão inválido.', 422);
 }
 
-if ($plantaoId) {
-    $stmt = db()->prepare('SELECT 1 FROM plantoes WHERE id = :id AND empresa_id = :empresa_id');
-    $stmt->execute(['id' => $plantaoId, 'empresa_id' => $empresaId]);
-    if (!$stmt->fetchColumn()) {
-        http_response_code(422);
-        echo json_encode(['ok' => false, 'erro' => 'Plantão inválido.']);
-        exit;
+$hora = function ($valor) {
+    $valor = trim((string) $valor);
+    if ($valor === '') {
+        return null;
     }
+    if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/', $valor)) {
+        api_erro('Horário inválido. Use HH:MM.', 422);
+    }
+    return substr($valor, 0, 5) . ':00';
+};
+$horarioInicio = $hora($_POST['horario_inicio'] ?? '');
+$horarioFim = $hora($_POST['horario_fim'] ?? '');
+if (($horarioInicio === null) !== ($horarioFim === null)) {
+    api_erro('Informe o início e o fim do horário (ou deixe os dois vazios para qualquer horário).', 422);
 }
+if ($horarioInicio !== null && $horarioInicio === $horarioFim) {
+    api_erro('O início e o fim do horário não podem ser iguais.', 422);
+}
+
+$dias = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['dias_semana'] ?? [])), fn ($d) => $d >= 1 && $d <= 7)));
+sort($dias);
+if (!$dias) {
+    api_erro('Escolha pelo menos um dia da semana.', 422);
+}
+
+$inteiro = function (string $campo, int $min, int $max, ?int $padrao, string $rotulo) {
+    $valor = trim((string) ($_POST[$campo] ?? ''));
+    if ($valor === '') {
+        return $padrao;
+    }
+    if (!ctype_digit($valor) || (int) $valor < $min || (int) $valor > $max) {
+        api_erro("{$rotulo} deve ser um número de {$min} a {$max}.", 422);
+    }
+    return (int) $valor;
+};
+$precisao = $inteiro('precisao_maxima_metros', 10, 2000, 150, 'Precisão máxima do GPS');
+$validade = $inteiro('validade_presenca_min', 5, 240, 20, 'Validade da presença');
+$intervalo = $inteiro('intervalo_verificacao_min', 1, 60, 5, 'Intervalo de verificação');
+if ($intervalo >= $validade) {
+    api_erro('O intervalo de verificação precisa ser menor que a validade da presença, senão a presença vence antes de ser renovada.', 422);
+}
+$limiteDia = $inteiro('max_leads_dia_corretor', 1, 500, null, 'Limite diário por corretor');
+
+$dados = [
+    'nome' => $nome,
+    'plantao_id' => $plantaoId,
+    'horario_inicio' => $horarioInicio,
+    'horario_fim' => $horarioFim,
+    'dias_semana' => implode(',', $dias),
+    'exigir_presenca' => !empty($_POST['exigir_presenca']) ? 1 : 0,
+    'precisao_maxima_metros' => $precisao,
+    'validade_presenca_min' => $validade,
+    'intervalo_verificacao_min' => $intervalo,
+    'max_leads_dia_corretor' => $limiteDia,
+    'ativa' => !empty($_POST['ativa']) ? 1 : 0,
+];
 
 if ($id) {
-    $stmt = db()->prepare('SELECT id FROM roletas WHERE id = :id AND empresa_id = :empresa_id');
-    $stmt->execute(['id' => $id, 'empresa_id' => $empresaId]);
-    if (!$stmt->fetch()) {
-        http_response_code(404);
-        echo json_encode(['ok' => false, 'erro' => 'Roleta não encontrada.']);
-        exit;
+    $atual = roleta_carregar($empresaId, $id);
+    if (!$atual) {
+        api_erro('Roleta não encontrada.', 404);
     }
-    db()->prepare('UPDATE roletas SET nome = :nome, plantao_id = :plantao_id, horario_inicio = :hi, horario_fim = :hf, ativa = :ativa WHERE id = :id AND empresa_id = :empresa_id')
-        ->execute(['nome' => $nome, 'plantao_id' => $plantaoId, 'hi' => $horarioInicio, 'hf' => $horarioFim, 'ativa' => $ativa, 'id' => $id, 'empresa_id' => $empresaId]);
-    auditoria_registrar($empresaId, (int) $usuario['id'], 'roleta.editada', 'roleta', $id, ['nome' => $nome, 'plantao_id' => $plantaoId, 'ativa' => $ativa]);
-    echo json_encode(['ok' => true, 'id' => $id]);
-} else {
-    db()->prepare('INSERT INTO roletas (empresa_id, plantao_id, nome, ativa, horario_inicio, horario_fim) VALUES (:empresa_id, :plantao_id, :nome, :ativa, :hi, :hf)')
-        ->execute(['empresa_id' => $empresaId, 'plantao_id' => $plantaoId, 'nome' => $nome, 'ativa' => $ativa, 'hi' => $horarioInicio, 'hf' => $horarioFim]);
-    $novoId = (int) db()->lastInsertId();
-    auditoria_registrar($empresaId, (int) $usuario['id'], 'roleta.criada', 'roleta', $novoId, ['nome' => $nome, 'plantao_id' => $plantaoId]);
-    echo json_encode(['ok' => true, 'id' => $novoId]);
+    $sets = implode(', ', array_map(fn ($c) => "{$c} = :{$c}", array_keys($dados)));
+    db()->prepare("UPDATE roletas SET {$sets} WHERE id = :id AND empresa_id = :empresa_id")
+        ->execute($dados + ['id' => $id, 'empresa_id' => $empresaId]);
+    // Pausar, mudar horário/dias ou desligar a exigência fecha quem não se encaixa mais.
+    roleta_fechar_expiradas($empresaId, $id);
+    auditoria_registrar($empresaId, (int) $usuario['id'], $atual['ativa'] && !$dados['ativa'] ? 'roleta.pausada' : 'roleta.editada', 'roleta', $id, $dados);
+    api_responder(['ok' => true, 'id' => $id, 'mensagem' => 'Regras da roleta salvas.']);
 }
+
+$colunas = array_keys($dados);
+db()->prepare('INSERT INTO roletas (empresa_id, ' . implode(', ', $colunas) . ') VALUES (:empresa_id, :' . implode(', :', $colunas) . ')')
+    ->execute($dados + ['empresa_id' => $empresaId]);
+$novoId = (int) db()->lastInsertId();
+auditoria_registrar($empresaId, (int) $usuario['id'], 'roleta.criada', 'roleta', $novoId, $dados);
+api_responder(['ok' => true, 'id' => $novoId, 'mensagem' => 'Roleta criada.']);

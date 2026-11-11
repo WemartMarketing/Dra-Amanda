@@ -1,70 +1,71 @@
 <?php
 /**
- * POST /api/roleta_corretor.php  { roleta_id, usuario_id, acao: 'add'|'remover' }
- * Habilita/remove um corretor da roleta. Confere que a roleta e o
- * usuário pertencem à mesma empresa do gestor logado (nunca vincula
- * usuário de outra empresa), e que quem chama pode gerenciar.
+ * POST /api/roleta_corretor.php
+ *   { roleta_id, usuario_id, acao: 'add'|'remover'|'pausar'|'retomar'|'retirar' }
+ * Gestão dos corretores de uma roleta (permissão gerenciar_roletas).
+ *   add      — habilita (vai para o fim da ordem de cadastro)
+ *   remover  — desvincula e encerra a presença aberta
+ *   pausar   — fica vinculado, mas não recebe e não consegue entrar
+ *   retomar  — volta a poder entrar/receber
+ *   retirar  — encerra a presença atual (ele pode entrar de novo)
+ * Roleta e corretor precisam ser da empresa do gestor.
  */
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/rbac.php';
+require_once __DIR__ . '/../includes/api.php';
+require_once __DIR__ . '/../includes/roleta.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!auth_check()) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'erro' => 'Sessão expirada.']);
-    exit;
-}
-
-$usuario = current_user();
-if (!usuario_tem_permissao($usuario, 'gerenciar_roletas')) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Sua função não pode gerenciar roletas.']);
-    exit;
-}
-
-if (!csrf_validar_requisicao()) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'erro' => 'Token de segurança inválido.']);
-    exit;
-}
-
+$usuario = api_iniciar('gerenciar_roletas');
 $empresaId = (int) $usuario['empresa_ativa_id'];
 $roletaId = (int) ($_POST['roleta_id'] ?? 0);
 $usuarioId = (int) ($_POST['usuario_id'] ?? 0);
-$acao = $_POST['acao'] ?? '';
+$acao = (string) ($_POST['acao'] ?? '');
 
-if (!$roletaId || !$usuarioId || !in_array($acao, ['add', 'remover'], true)) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'erro' => 'Dados inválidos.']);
-    exit;
+if (!$roletaId || !$usuarioId || !in_array($acao, ['add', 'remover', 'pausar', 'retomar', 'retirar'], true)) {
+    api_erro('Dados inválidos.', 422);
 }
-
-$stmt = db()->prepare('SELECT id FROM roletas WHERE id = :id AND empresa_id = :empresa_id');
-$stmt->execute(['id' => $roletaId, 'empresa_id' => $empresaId]);
-if (!$stmt->fetch()) {
-    http_response_code(404);
-    echo json_encode(['ok' => false, 'erro' => 'Roleta não encontrada.']);
-    exit;
+if (!api_registro_da_empresa('roletas', $roletaId, $empresaId)) {
+    api_erro('Roleta não encontrada.', 404);
 }
-
-$stmt = db()->prepare("SELECT usuarios.id FROM usuarios INNER JOIN funcoes ON funcoes.id = usuarios.funcao_id WHERE usuarios.id = :id AND usuarios.empresa_id = :empresa_id AND funcoes.escopo = 'propria_carteira'");
+$stmt = db()->prepare('
+    SELECT usuarios.id FROM usuarios
+    INNER JOIN funcoes ON funcoes.id = usuarios.funcao_id
+    INNER JOIN funcao_permissoes fp ON fp.funcao_id = funcoes.id AND fp.permissao_chave = \'participar_roleta\'
+    WHERE usuarios.id = :id AND usuarios.empresa_id = :empresa_id' . ($acao === 'add' ? ' AND usuarios.ativo = 1' : ''));
 $stmt->execute(['id' => $usuarioId, 'empresa_id' => $empresaId]);
-if (!$stmt->fetch()) {
-    http_response_code(404);
-    echo json_encode(['ok' => false, 'erro' => 'Corretor não encontrado nesta empresa.']);
-    exit;
+if (!$stmt->fetch() && $acao === 'add') {
+    api_erro('Corretor não encontrado nesta empresa ou sem permissão para participar de roletas.', 404);
+}
+if ($acao !== 'add' && !roleta_vinculo($roletaId, $usuarioId)) {
+    api_erro('Este corretor não está nesta roleta.', 404);
 }
 
-if ($acao === 'add') {
-    $stmt = db()->prepare('SELECT COALESCE(MAX(ordem), 0) + 1 FROM roleta_corretores WHERE roleta_id = :roleta_id');
-    $stmt->execute(['roleta_id' => $roletaId]);
-    $proximaOrdem = (int) $stmt->fetchColumn();
-    db()->prepare('INSERT IGNORE INTO roleta_corretores (roleta_id, usuario_id, ordem) VALUES (:roleta_id, :usuario_id, :ordem)')
-        ->execute(['roleta_id' => $roletaId, 'usuario_id' => $usuarioId, 'ordem' => $proximaOrdem]);
-} else {
-    db()->prepare('DELETE FROM roleta_corretores WHERE roleta_id = :roleta_id AND usuario_id = :usuario_id')
-        ->execute(['roleta_id' => $roletaId, 'usuario_id' => $usuarioId]);
+$sessao = roleta_sessao_aberta($roletaId, $usuarioId);
+switch ($acao) {
+    case 'add':
+        $stmt = db()->prepare('SELECT COALESCE(MAX(ordem), 0) + 1 FROM roleta_corretores WHERE roleta_id = :r');
+        $stmt->execute(['r' => $roletaId]);
+        db()->prepare('INSERT IGNORE INTO roleta_corretores (roleta_id, usuario_id, ordem) VALUES (:r, :u, :o)')
+            ->execute(['r' => $roletaId, 'u' => $usuarioId, 'o' => (int) $stmt->fetchColumn()]);
+        break;
+    case 'remover':
+        if ($sessao) {
+            roleta_fechar_sessao((int) $sessao['id'], 'removido');
+        }
+        db()->prepare('DELETE FROM roleta_corretores WHERE roleta_id = :r AND usuario_id = :u')->execute(['r' => $roletaId, 'u' => $usuarioId]);
+        break;
+    case 'pausar':
+        db()->prepare('UPDATE roleta_corretores SET pausado = 1 WHERE roleta_id = :r AND usuario_id = :u')->execute(['r' => $roletaId, 'u' => $usuarioId]);
+        if ($sessao) {
+            roleta_fechar_sessao((int) $sessao['id'], 'gestor');
+        }
+        break;
+    case 'retomar':
+        db()->prepare('UPDATE roleta_corretores SET pausado = 0 WHERE roleta_id = :r AND usuario_id = :u')->execute(['r' => $roletaId, 'u' => $usuarioId]);
+        break;
+    case 'retirar':
+        if ($sessao) {
+            roleta_fechar_sessao((int) $sessao['id'], 'gestor');
+        }
+        break;
 }
-
-echo json_encode(['ok' => true]);
+auditoria_registrar($empresaId, (int) $usuario['id'], 'roleta.corretor_' . $acao, 'roleta', $roletaId, ['usuario_id' => $usuarioId]);
+api_responder(['ok' => true]);

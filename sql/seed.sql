@@ -8,20 +8,20 @@ SET NAMES utf8mb4;
 -- para calcular "há quantos minutos/dias".
 SET time_zone = '-03:00';
 
-INSERT INTO empresas (id, nome, slug) VALUES (1, 'HM Vendas', 'hm-vendas');
+INSERT IGNORE INTO empresas (id, nome, slug) VALUES (1, 'HM Vendas', 'hm-vendas');
 
-INSERT INTO empreendimentos (id, empresa_id, nome) VALUES
+INSERT IGNORE INTO empreendimentos (id, empresa_id, nome) VALUES
     (1, 1, 'Smart Marquês'),
     (2, 1, 'Vila das Belezas'),
     (3, 1, 'Freguesia do Ó'),
     (4, 1, 'Flow Itaim');
 
-INSERT INTO superintendencias (id, empresa_id, nome) VALUES
+INSERT IGNORE INTO superintendencias (id, empresa_id, nome) VALUES
     (1, 1, 'Zona Oeste'),
     (2, 1, 'Zona Sul');
 
 -- Usuários (senha para todos: demo123)
-INSERT INTO usuarios (id, empresa_id, nome, email, senha_hash, cargo) VALUES
+INSERT IGNORE INTO usuarios (id, empresa_id, nome, email, senha_hash, cargo) VALUES
     (1,  1, 'Carlos Silva',     'carlos@hmvendas.demo',          '$2y$10$ad/19PZCUWIfyXBk5Pg0lujtdxbNjKEQR6DsgMrQnaTrt0s0MPQw.', 'corretor'),
     (2,  1, 'Fernanda Costa',   'fernanda.costa@hmvendas.demo',  '$2y$10$ad/19PZCUWIfyXBk5Pg0lujtdxbNjKEQR6DsgMrQnaTrt0s0MPQw.', 'corretor'),
     (3,  1, 'Rafael Nunes',     'rafael.nunes@hmvendas.demo',    '$2y$10$ad/19PZCUWIfyXBk5Pg0lujtdxbNjKEQR6DsgMrQnaTrt0s0MPQw.', 'corretor'),
@@ -36,7 +36,7 @@ INSERT INTO usuarios (id, empresa_id, nome, email, senha_hash, cargo) VALUES
     (12, 1, 'Eduardo Nogueira','eduardo.lider@hmvendas.demo',    '$2y$10$ad/19PZCUWIfyXBk5Pg0lujtdxbNjKEQR6DsgMrQnaTrt0s0MPQw.', 'gp_lider'),
     (13, 1, 'Beatriz Sales',   'beatriz.geral@hmvendas.demo',    '$2y$10$ad/19PZCUWIfyXBk5Pg0lujtdxbNjKEQR6DsgMrQnaTrt0s0MPQw.', 'gerente_geral');
 
-INSERT INTO equipes (id, empresa_id, superintendencia_id, nome, gerente_id) VALUES
+INSERT IGNORE INTO equipes (id, empresa_id, superintendencia_id, nome, gerente_id) VALUES
     (1, 1, 1, 'Equipe Zona Oeste', 4),
     (2, 1, 2, 'Equipe Zona Sul', 8);
 
@@ -46,38 +46,38 @@ UPDATE superintendencias SET superintendente_id = 6 WHERE id = 1;
 UPDATE superintendencias SET superintendente_id = 7 WHERE id = 2;
 
 -- GP do Produto: Patrícia enxerga só os leads de Smart Marquês e Flow Itaim.
-INSERT INTO usuario_empreendimentos (usuario_id, empreendimento_id) VALUES (11, 1), (11, 4);
+INSERT IGNORE INTO usuario_empreendimentos (usuario_id, empreendimento_id) VALUES (11, 1), (11, 4);
 
 -- Roletas de distribuição (ver tela 05) — uma ativa por superintendência e
 -- uma pausada, para a lista não ficar trivial.
-INSERT INTO roletas (id, empresa_id, nome, ativa, raio_presenca_metros, horario_inicio, horario_fim) VALUES
+INSERT IGNORE INTO roletas (id, empresa_id, nome, ativa, raio_presenca_metros, horario_inicio, horario_fim) VALUES
     (1, 1, 'Casa HM — Zona Oeste', 1, 300, '09:00:00', '18:00:00'),
     (2, 1, 'Casa HM — Zona Sul', 1, 300, '09:00:00', '18:00:00'),
     (3, 1, 'Interior — Campinas', 0, 500, '09:00:00', '17:00:00');
 
-INSERT INTO roleta_empreendimentos (roleta_id, empreendimento_id) VALUES
+INSERT IGNORE INTO roleta_empreendimentos (roleta_id, empreendimento_id) VALUES
     (1, 1), (1, 2), (1, 3),
     (2, 2), (2, 4),
     (3, 4);
-INSERT INTO roleta_corretores (roleta_id, usuario_id, ordem) VALUES
+INSERT IGNORE INTO roleta_corretores (roleta_id, usuario_id, ordem) VALUES
     (1, 1, 1), (1, 2, 2), (1, 3, 3),
     (2, 9, 1), (2, 10, 2);
 
 -- Presença: Carlos e Juliana confirmaram recentemente e estão dentro do
 -- raio (Disponível); Fernanda Costa está fora do raio agora (Bloqueado);
 -- Rafael não confirma presença há dias (também some da lista "disponível").
-INSERT INTO roleta_presencas (roleta_id, usuario_id, dentro_do_raio, confirmado_em) VALUES
-    (1, 1, 1, DATE_SUB(NOW(), INTERVAL 20 MINUTE)),
-    (1, 2, 0, DATE_SUB(NOW(), INTERVAL 10 MINUTE)),
-    (1, 3, 1, DATE_SUB(NOW(), INTERVAL 3 DAY)),
-    (2, 9, 1, DATE_SUB(NOW(), INTERVAL 35 MINUTE)),
-    (2, 10, 1, DATE_SUB(NOW(), INTERVAL 1 HOUR));
+INSERT IGNORE INTO roleta_presencas (id, roleta_id, usuario_id, dentro_do_raio, confirmado_em) VALUES
+    (1, 1, 1, 1, DATE_SUB(NOW(), INTERVAL 20 MINUTE)),
+    (2, 1, 2, 0, DATE_SUB(NOW(), INTERVAL 10 MINUTE)),
+    (3, 1, 3, 1, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+    (4, 2, 9, 1, DATE_SUB(NOW(), INTERVAL 35 MINUTE)),
+    (5, 2, 10, 1, DATE_SUB(NOW(), INTERVAL 1 HOUR));
 
 -- ------------------------------------------------------------------
 -- Leads (carteira de Carlos Silva, equipe Zona Oeste) — 12 ativos +
 -- 2 já convertidos neste mês, para a KPI "Vendas do mês".
 -- ------------------------------------------------------------------
-INSERT INTO leads (id, empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, renda_informada, origem, etapa, proximo_passo, data_retorno, ultimo_contato_em, criado_em) VALUES
+INSERT IGNORE INTO leads (id, empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, renda_informada, origem, etapa, proximo_passo, data_retorno, ultimo_contato_em, criado_em) VALUES
     (1,  1, 1, 1, 1, 'Ana Souza',      '11988776655', 'ana.souza@exemplo.com',      '2 dormitórios', 5600.00, 'meta_ads', 'novo_lead',        'Ligar novamente', CURDATE(),           NOW(),                         DATE_SUB(NOW(), INTERVAL 28 MINUTE)),
     (2,  1, 2, 1, 1, 'Rafael Lima',    '11987001122', NULL,                          '3 dormitórios', NULL,    'manual',   'novo_lead',        NULL,               NULL,                NULL,                          DATE_SUB(NOW(), INTERVAL 41 MINUTE)),
     (3,  1, 3, 1, 1, 'João Pedro',     '11986002233', NULL,                          '2 dormitórios', NULL,    'meta_ads', 'novo_lead',        NULL,               NULL,                NULL,                          DATE_SUB(NOW(), INTERVAL 1 HOUR)),
@@ -98,7 +98,7 @@ INSERT INTO leads (id, empresa_id, empreendimento_id, equipe_id, responsavel_id,
 -- relatórios com mais de uma equipe/empreendimento e inclui leads
 -- perdidos (ver tela 04, "Oportunidades perdidas").
 -- ------------------------------------------------------------------
-INSERT INTO leads (id, empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, renda_informada, origem, etapa, motivo_perda, proximo_passo, data_retorno, ultimo_contato_em, criado_em, atualizado_em) VALUES
+INSERT IGNORE INTO leads (id, empresa_id, empreendimento_id, equipe_id, responsavel_id, nome, telefone, email, interesse, renda_informada, origem, etapa, motivo_perda, proximo_passo, data_retorno, ultimo_contato_em, criado_em, atualizado_em) VALUES
     (15, 1, 2, 2, 9,  'Henrique Tavares', '11994001100', NULL, '2 dormitórios', NULL, 'meta_ads',   'novo_lead',        NULL, 'Ligar novamente',  CURDATE(), NOW(),                          DATE_SUB(NOW(), INTERVAL 2 HOUR),  DATE_SUB(NOW(), INTERVAL 2 HOUR)),
     (16, 1, 4, 2, 9,  'Camila Ferreira',  '11993002211', NULL, '1 dormitório',  NULL, 'manual',     'primeiro_contato', NULL, 'Confirmar visita', CURDATE(), DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY),   DATE_SUB(NOW(), INTERVAL 1 DAY)),
     (17, 1, 2, 2, 10, 'Vinícius Rocha',   '11992003322', NULL, '3 dormitórios', NULL, 'meta_ads',   'em_atendimento',   NULL, 'Enviar proposta',  CURDATE(), DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY),   DATE_SUB(NOW(), INTERVAL 2 DAY)),
@@ -112,33 +112,33 @@ INSERT INTO leads (id, empresa_id, empreendimento_id, equipe_id, responsavel_id,
     (25, 1, 2, 2, 9,  'Alexandre Melo',   '11984001188', NULL, '3 dormitórios', NULL, 'meta_ads',   'perdido', 'Fechou com concorrente',   NULL, NULL, DATE_SUB(NOW(), INTERVAL 11 DAY), DATE_SUB(NOW(), INTERVAL 11 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
     (26, 1, 1, 1, 1,  'Larissa Gomes',    '11983002299', NULL, '2 dormitórios', NULL, 'manual',     'perdido', 'Fora do perfil de crédito', NULL, NULL, DATE_SUB(NOW(), INTERVAL 13 DAY), DATE_SUB(NOW(), INTERVAL 13 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY));
 
-INSERT INTO lead_eventos (lead_id, usuario_id, tipo, descricao, criado_em) VALUES
-    (15, 9,  'atribuicao', 'Lead atribuído a Juliana Prado — origem: roleta Casa HM — Zona Sul', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
-    (17, 10, 'contato',    'Cliente pediu condições de pagamento.', DATE_SUB(NOW(), INTERVAL 2 DAY)),
-    (20, 10, 'mudanca_etapa', 'Etapa alterada de "Visita realizada" para "Contrato assinado"', NOW()),
-    (21, 9,  'mudanca_etapa', 'Etapa alterada de "Em atendimento" para "Perdido"', DATE_SUB(NOW(), INTERVAL 3 DAY)),
-    (22, 2,  'mudanca_etapa', 'Etapa alterada de "1º contato" para "Perdido"', DATE_SUB(NOW(), INTERVAL 4 DAY)),
-    (23, 3,  'mudanca_etapa', 'Etapa alterada de "Novo lead" para "Perdido"', DATE_SUB(NOW(), INTERVAL 2 DAY)),
-    (24, 10, 'mudanca_etapa', 'Etapa alterada de "Visita agendada" para "Perdido"', DATE_SUB(NOW(), INTERVAL 1 DAY)),
-    (25, 9,  'mudanca_etapa', 'Etapa alterada de "Em atendimento" para "Perdido"', DATE_SUB(NOW(), INTERVAL 5 DAY)),
-    (26, 1,  'mudanca_etapa', 'Etapa alterada de "1º contato" para "Perdido"', DATE_SUB(NOW(), INTERVAL 6 DAY));
+INSERT IGNORE INTO lead_eventos (id, lead_id, usuario_id, tipo, descricao, criado_em) VALUES
+    (1, 15, 9,  'atribuicao', 'Lead atribuído a Juliana Prado — origem: roleta Casa HM — Zona Sul', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+    (2, 17, 10, 'contato',    'Cliente pediu condições de pagamento.', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+    (3, 20, 10, 'mudanca_etapa', 'Etapa alterada de "Visita realizada" para "Contrato assinado"', NOW()),
+    (4, 21, 9,  'mudanca_etapa', 'Etapa alterada de "Em atendimento" para "Perdido"', DATE_SUB(NOW(), INTERVAL 3 DAY)),
+    (5, 22, 2,  'mudanca_etapa', 'Etapa alterada de "1º contato" para "Perdido"', DATE_SUB(NOW(), INTERVAL 4 DAY)),
+    (6, 23, 3,  'mudanca_etapa', 'Etapa alterada de "Novo lead" para "Perdido"', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+    (7, 24, 10, 'mudanca_etapa', 'Etapa alterada de "Visita agendada" para "Perdido"', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+    (8, 25, 9,  'mudanca_etapa', 'Etapa alterada de "Em atendimento" para "Perdido"', DATE_SUB(NOW(), INTERVAL 5 DAY)),
+    (9, 26, 1,  'mudanca_etapa', 'Etapa alterada de "1º contato" para "Perdido"', DATE_SUB(NOW(), INTERVAL 6 DAY));
 
 -- Histórico (ver tela 03 — exemplo fiel para o lead Ana Souza)
-INSERT INTO lead_eventos (lead_id, usuario_id, tipo, descricao, criado_em) VALUES
-    (1, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 28 MINUTE)),
-    (1, 1, 'contato',      'Cliente demonstrou interesse no imóvel.', DATE_SUB(NOW(), INTERVAL 15 MINUTE)),
-    (2, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 41 MINUTE)),
-    (3, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 1 HOUR)),
-    (4, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 1 DAY)),
-    (4, 1, 'mudanca_etapa','Etapa alterada de "Novo lead" para "1º contato"', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
-    (7, 1, 'contato',      'Cliente confirmou interesse e pediu condições de pagamento.', DATE_SUB(NOW(), INTERVAL 5 HOUR)),
-    (9, 1, 'mudanca_etapa','Etapa alterada de "Em atendimento" para "Visita agendada"', DATE_SUB(NOW(), INTERVAL 1 DAY)),
-    (13,1, 'mudanca_etapa','Etapa alterada de "Visita realizada" para "Contrato assinado"', NOW()),
-    (14,1, 'mudanca_etapa','Etapa alterada de "Visita realizada" para "Contrato assinado"', NOW());
+INSERT IGNORE INTO lead_eventos (id, lead_id, usuario_id, tipo, descricao, criado_em) VALUES
+    (10, 1, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 28 MINUTE)),
+    (11, 1, 1, 'contato',      'Cliente demonstrou interesse no imóvel.', DATE_SUB(NOW(), INTERVAL 15 MINUTE)),
+    (12, 2, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 41 MINUTE)),
+    (13, 3, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 1 HOUR)),
+    (14, 4, 1, 'atribuicao',   'Lead atribuído a Carlos Silva — origem: roleta Casa HM — Zona Oeste', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+    (15, 4, 1, 'mudanca_etapa','Etapa alterada de "Novo lead" para "1º contato"', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+    (16, 7, 1, 'contato',      'Cliente confirmou interesse e pediu condições de pagamento.', DATE_SUB(NOW(), INTERVAL 5 HOUR)),
+    (17, 9, 1, 'mudanca_etapa','Etapa alterada de "Em atendimento" para "Visita agendada"', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+    (18, 13,1, 'mudanca_etapa','Etapa alterada de "Visita realizada" para "Contrato assinado"', NOW()),
+    (19, 14,1, 'mudanca_etapa','Etapa alterada de "Visita realizada" para "Contrato assinado"', NOW());
 
 -- Próximas ações (ver tela 03 — exemplo fiel para o lead Ana Souza)
-INSERT INTO lead_tarefas (lead_id, titulo, descricao, data_vencimento, concluida) VALUES
-    (1, 'Retornar contato', 'Confirmar disponibilidade', DATE_ADD(CURDATE(), INTERVAL 1 DAY), 0),
-    (1, 'Enviar condições', 'Informar entrada e mensais', NULL, 0),
-    (7, 'Enviar proposta formal', NULL, CURDATE(), 0),
-    (9, 'Confirmar presença na visita', NULL, CURDATE(), 0);
+INSERT IGNORE INTO lead_tarefas (id, lead_id, titulo, descricao, data_vencimento, concluida) VALUES
+    (1, 1, 'Retornar contato', 'Confirmar disponibilidade', DATE_ADD(CURDATE(), INTERVAL 1 DAY), 0),
+    (2, 1, 'Enviar condições', 'Informar entrada e mensais', NULL, 0),
+    (3, 7, 'Enviar proposta formal', NULL, CURDATE(), 0),
+    (4, 9, 'Confirmar presença na visita', NULL, CURDATE(), 0);
