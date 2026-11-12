@@ -1265,3 +1265,93 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
     /* Rodapé legal discreto */
     .site-legal { font-size: 12.5px; padding: 6px 24px 100px; line-height: 1.5; }
 }
+
+/* ================================================ Celular — versão mais leve
+   Pedido do cliente: menos poluição visual. Botões e cartões menores,
+   textos secundários um pouco menores e mais espaço entre os blocos.
+   Prevalece sobre as regras de celular anteriores (fica por último). */
+@media (max-width: 880px) {
+    html, body { font-size: 15px; }
+    .container { padding: 22px 18px 112px; }
+    .card { padding: 18px; margin-bottom: 18px; }
+    .grid-2 { gap: 18px; }
+
+    /* Topo: foguete + "Sales" */
+    .mobile-brand { display: flex; align-items: center; gap: 8px; }
+    .mobile-brand .brand-icone { width: 30px; height: 30px; border-radius: 8px; display: block; }
+    .mobile-brand .brand-sales { height: 19px; width: auto; display: block; }
+    .mobile-crumb { font-size: 14px; }
+
+    /* Cabeçalho mais enxuto */
+    .header { margin-bottom: 20px; }
+    .header h1 { font-size: 23px; }
+    .header p { font-size: 14.5px; line-height: 1.45; }
+    .pg-leads .header p, .pg-kanban .header p, .pg-agenda .header p { display: none; }
+    .header .actions { gap: 8px; margin-top: 4px; }
+
+    /* Botões e textos: um degrau menores */
+    .btn { height: 42px; font-size: 15px; border-radius: 11px; padding: 0 14px; gap: 7px; }
+    .btn svg { width: 17px; height: 17px; }
+    .btn-sm, .link-btn, .chip-btn, .seg-link { font-size: 14.5px; }
+    .btn-sm { height: 38px; border-radius: 10px; padding: 0 12px; }
+    .btn-primary { box-shadow: 0 3px 10px rgba(99, 91, 250, .22); }
+    .icon-btn { width: 38px; height: 38px; border-radius: 10px; }
+    .icon-btn svg { width: 18px; height: 18px; }
+    .select-filter { height: 42px; font-size: 15px; }
+    .header p, .back-link, .card-head p, .empty-note, .field label, .lead-sub, .lead-header-sub .muted,
+    .agenda-info span, .agenda-info small, .agenda-when span, .who-info span,
+    .timeline-item span, .more-menu-list > a, .more-menu-list > button, .file-row .who-info span,
+    .tip-box, .rule-box span, .alert-strip, .data-grid dd, .week-item, .big-action small { font-size: 14.5px; }
+    .filters-note, .kpi .label, .kpi-sub, .subhead, small.muted { font-size: 13.5px; }
+    .task-row .who-info strong a, .agenda-info strong, .lead-link { font-size: 15.5px; }
+    .card-head h2 { font-size: 17px; }
+
+    /* Busca + Filtros na mesma linha */
+    .filters-row { gap: 8px; margin-bottom: 18px; }
+    .filters-row .filter-search { flex: 1 1 0; min-width: 0; }
+    .filters-row .filters-toggle { height: 42px; }
+    .pg-kanban .filters-row .filters-note { display: none; }
+
+    /* Kanban: abas menores e cartões leves, sem a "caixa" da coluna */
+    .kanban-tabs { gap: 6px; margin-bottom: 16px; }
+    .kanban-tab { padding: 7px 12px; font-size: 14px; }
+    .kanban-tab b { font-size: 12px; padding: 0 6px; }
+    .kcol { background: none; border-top: 0; padding: 0; }
+    .kcol-head { display: none; }
+    .kcard { padding: 14px 14px 12px; border-radius: 16px; margin-bottom: 12px; border-color: transparent; }
+    .kcard-top { margin-bottom: 2px; }
+    .kcard-name { font-size: 15.5px; }
+    .kcard-meta { flex-direction: row; flex-wrap: wrap; gap: 0; font-size: 13.5px; margin-bottom: 10px; }
+    .kcard-meta > span + span::before { content: "·"; margin: 0 6px; color: #b5bccb; }
+    .kcard-next { font-size: 13.5px; padding: 6px 9px; margin-bottom: 6px; }
+    .kcard-next svg, .kcard-foot svg { width: 14px; height: 14px; }
+    .kcard-foot { font-size: 12.5px; }
+    .kcard-actions { gap: 6px; margin-top: 12px; }
+    .kcard-actions .icon-btn { width: 36px; height: 36px; }
+    .kcard-move-btn { height: 36px; font-size: 14px; }
+    .kcard-recup { font-size: 13.5px; }
+
+    /* Lista de leads */
+    .lead-table tr { padding-top: 18px; padding-bottom: 18px; }
+    .lead-table td { font-size: 14.5px; }
+
+    /* Início: atalhos e indicadores mais baixos */
+    .big-actions { gap: 10px; margin-bottom: 18px; }
+    .big-action { min-height: 82px; padding: 12px 6px; gap: 8px; }
+    .big-action svg { width: 20px; height: 20px; padding: 8px; }
+    .big-action span { font-size: 12px !important; }
+    .big-action-primary { padding: 14px 16px; }
+    .big-action-primary span { font-size: 15px !important; }
+    .big-action-primary small { font-size: 13.5px !important; }
+    .kpi-grid, .kpi-grid-5 { gap: 10px; margin-bottom: 20px; }
+    .kpi-value { font-size: 25px; }
+    .task-row { padding: 12px; }
+
+    /* Ficha */
+    .lead-header h1 { font-size: 21px; }
+    .lead-actions > .btn-outline:not(.btn-wide), .lead-actions > .more-menu > summary { min-height: 74px; font-size: 14px; }
+    .tab { font-size: 14.5px; padding: 11px 12px; }
+
+    .bottom-nav a, .bottom-nav button { font-size: 11px; }
+    .bottom-nav a svg, .bottom-nav button svg { width: 20px; height: 20px; }
+}

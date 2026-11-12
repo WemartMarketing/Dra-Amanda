@@ -18,6 +18,16 @@ function logo_html(string $fundo = 'escuro'): string
  * foguete da logo em branco sobre um quadrado azul-marinho. Chame dentro
  * do <head> de toda página.
  */
+/**
+ * Marca compacta para a barra do topo no celular: o ícone do foguete
+ * (o mesmo do favicon) + "Sales", sem repetir "wemart" em toda tela.
+ */
+function logo_compacta_html(): string
+{
+    return '<img src="/assets/img/favicon/icon-192.png?v=1" alt="" class="brand-icone" width="192" height="192">'
+         . '<img src="/assets/img/sales-escuro.png?v=1" alt="WeMart Sales" class="brand-sales" width="394" height="121">';
+}
+
 function favicon_tags(): string
 {
     return '<link rel="icon" href="/favicon.ico?v=1" sizes="any">' . "\n"

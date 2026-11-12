@@ -65,7 +65,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
 <link rel="stylesheet" href="/assets/css/app.css">
 <?= favicon_tags() ?>
 </head>
-<body>
+<body class="pg-<?= htmlspecialchars($navAtivo ?? '') ?>">
 <div class="shell">
     <aside class="side">
         <a href="<?= $inicioHref ?>" class="brand" aria-label="WeMart Sales — página inicial"><?= logo_html() ?></a>
@@ -117,7 +117,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
         </header>
 
         <div class="mobile-topbar">
-            <a href="<?= $inicioHref ?>" class="mobile-brand" aria-label="WeMart Sales — página inicial"><?= logo_html('claro') ?></a>
+            <a href="<?= $inicioHref ?>" class="mobile-brand" aria-label="WeMart Sales — página inicial"><?= logo_compacta_html() ?></a>
             <div class="crumb mobile-crumb"><strong><?= htmlspecialchars($crumb ?? '') ?></strong></div>
             <a href="/pages/perfil.php" class="avatar" aria-label="Meu perfil"><?= htmlspecialchars($avatarIniciais) ?></a>
         </div>
