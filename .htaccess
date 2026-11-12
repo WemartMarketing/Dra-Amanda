@@ -15,3 +15,8 @@ DirectoryIndex index.php
 </IfModule>
 
 Options -Indexes
+
+# Fontes do sistema (assets/fonts)
+<IfModule mod_mime.c>
+    AddType font/woff2 .woff2
+</IfModule>

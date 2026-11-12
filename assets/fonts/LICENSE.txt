@@ -1,0 +1,3 @@
+DM Sans e Manrope — SIL Open Font License 1.1 (https://openfontlicense.org).
+Arquivos do subconjunto "latin" (cobre português), servidos localmente
+para não depender do Google Fonts em produção.

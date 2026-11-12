@@ -1,5 +1,9 @@
 /* WeMart Sales — estilos (paleta e tokens do protótipo de referência) */
 
+/* Fontes da marca, servidas pelo próprio sistema (assets/fonts, licença OFL). */
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 400 800; font-display: swap; src: url(/assets/fonts/dm-sans-latin.woff2) format('woff2'); }
+@font-face { font-family: 'Manrope'; font-style: normal; font-weight: 500 800; font-display: swap; src: url(/assets/fonts/manrope-latin.woff2) format('woff2'); }
+
 :root {
     --bg: #f6f7fb;
     --surface: #fff;
@@ -27,6 +31,8 @@ html, body {
     background: var(--bg); color: var(--ink);
     font-family: 'DM Sans', Arial, Helvetica, sans-serif;
     font-size: 15px;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 h1, h2, h3, .brand, .header h1 { font-family: Manrope, Arial, sans-serif; }
 button, input, select, textarea { font: inherit; }
@@ -1124,3 +1130,138 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .login-legal a { color: #fff; text-decoration: underline; }
 .legal-doc { max-width: 820px; margin: 0 auto; padding: 32px 18px 60px; font-size: 16px; line-height: 1.6; }
 .legal-doc h1 { font-size: 26px; } .legal-doc h2 { font-size: 20px; margin-top: 28px; }
+
+
+/* ================================================ Celular — acabamento visual
+   Camada final só para telas ≤ 880px: mantém os tamanhos de texto
+   operacionais (≥ 16px) e reorganiza cartões, botões e navegação para
+   ficarem mais leves e alinhados. Fica no fim do arquivo para prevalecer. */
+@media (max-width: 880px) {
+    body { background: #f3f4f9; }
+    .container { padding: 18px 16px 112px; }
+    .card { padding: 18px; border-radius: 20px; box-shadow: 0 1px 2px rgba(24, 32, 57, .04), 0 6px 20px rgba(24, 32, 57, .05); }
+    .card-head { margin-bottom: 14px; }
+    .card-head h2 { font-size: 18px; letter-spacing: -.3px; }
+    .card-head > .link-btn, .card-head > .pill { white-space: nowrap; flex: 0 0 auto; }
+
+    /* Barra do topo: translúcida, acompanha a rolagem */
+    .mobile-topbar {
+        height: calc(58px + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px);
+        background: rgba(255, 255, 255, .86); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px);
+        border-bottom: 1px solid rgba(24, 32, 57, .06);
+    }
+    .mobile-brand .brand-logo { width: 138px; max-width: 138px; }
+    .mobile-crumb { font-size: 14px; color: #6b7690; }
+    .mobile-crumb strong { color: var(--ink); font-weight: 700; }
+    .mobile-topbar .avatar { width: 34px; height: 34px; font-size: 12px; background: linear-gradient(135deg, #ece9ff, #dcd8ff); }
+
+    /* Cabeçalho das páginas */
+    .header { margin-bottom: 18px; gap: 12px; }
+    .header h1 { font-size: 25px; letter-spacing: -.8px; margin-bottom: 4px; }
+    .eyebrow { font-size: 12px; letter-spacing: 1.2px; margin-bottom: 4px; }
+    .header .actions { width: 100%; }
+    .header .actions .btn { flex: 1; justify-content: center; }
+
+    /* Botões: mais altos para o dedo e com cantos suaves */
+    .btn { height: 46px; border-radius: 12px; }
+    .btn-sm { height: 42px; border-radius: 11px; padding: 0 14px; }
+    .btn-primary { box-shadow: 0 4px 14px rgba(99, 91, 250, .28); }
+    .icon-btn { border-radius: 12px; }
+
+    /* Início: atalhos */
+    .big-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .big-action {
+        min-height: 92px; padding: 14px 8px; border-radius: 18px; border: 0;
+        align-items: center; justify-content: center; text-align: center; gap: 10px;
+        box-shadow: 0 1px 2px rgba(24, 32, 57, .04), 0 6px 18px rgba(24, 32, 57, .05);
+    }
+    .big-action svg { width: 22px; height: 22px; padding: 9px; box-sizing: content-box; border-radius: 12px; background: #efedff; }
+    .big-action span { font-size: 12.5px !important; letter-spacing: .4px; line-height: 1.25; }
+    .big-action-primary {
+        order: -1; grid-column: 1 / -1; min-height: 0; padding: 16px 18px;
+        display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 2px;
+        text-align: left; align-items: center; justify-items: start;
+        background: linear-gradient(135deg, #7b6cff, #5249e8); box-shadow: 0 10px 24px rgba(82, 73, 232, .32);
+    }
+    .big-action-primary.is-in { background: linear-gradient(135deg, #22b585, #13895f); box-shadow: 0 10px 24px rgba(19, 137, 95, .28); }
+    .big-action-primary svg { grid-row: 1 / span 2; background: rgba(255, 255, 255, .18); color: #fff; }
+    .big-action-primary span { font-size: 16px !important; letter-spacing: .3px; }
+    .big-action-primary small { font-size: 14px !important; opacity: .9; line-height: 1.35; }
+
+    /* Início e relatórios: indicadores compactos */
+    .kpi-grid, .kpi-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .kpi-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .kpi { padding: 14px; border-radius: 18px; box-shadow: 0 1px 2px rgba(24, 32, 57, .04), 0 6px 18px rgba(24, 32, 57, .05); }
+    .kpi-top { margin-bottom: 8px; gap: 8px; }
+    .kpi .label { font-size: 14px; line-height: 1.25; }
+    .kpi-icon { width: 30px; height: 30px; border-radius: 9px; }
+    .kpi-icon svg { width: 16px; height: 16px; }
+    .kpi-value { font-size: 28px; line-height: 1.1; }
+    .kpi-sub { font-size: 14px; }
+
+    /* Listas de tarefas: nome em cima, ações embaixo, sem espremer o texto */
+    .task-row { flex-wrap: wrap; gap: 10px 12px; padding: 14px; border-radius: 16px; }
+    .task-row .who-info { flex: 1 1 calc(100% - 56px); }
+    .task-row .who-info span { line-height: 1.4; }
+    .task-row > .btn { flex: 1 1 auto; justify-content: center; }
+    .task-row > .icon-btn { flex: 0 0 auto; }
+    .recup-card .task-row { background: #fff; }
+    .alert-strip { border-radius: 16px; padding: 14px; gap: 10px; }
+    .alert-strip span { min-width: 0; flex: 1 1 calc(100% - 30px); }
+    .alert-strip .link-btn { margin-left: 28px; padding: 0; }
+
+    /* Compromissos */
+    .agenda-item { padding: 14px; border-radius: 16px; gap: 10px 12px; }
+    .agenda-when { min-width: 46px; text-align: left; }
+    .agenda-info { flex: 1 1 0; min-width: 0; }
+    .agenda-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .agenda-actions .btn { width: 100%; justify-content: center; padding: 0 8px; }
+    .agenda-actions .btn-success { grid-column: 1 / -1; }
+    .agenda-actions [data-reagendar]:nth-of-type(2) { grid-column: 1 / -1; }
+    .agenda-actions .pill { grid-column: 1 / -1; justify-self: start; }
+    .agenda-actions .link-btn { grid-column: 1 / -1; justify-self: center; padding: 6px; }
+    .tip-box { border-radius: 14px; line-height: 1.45; }
+
+    /* Lista de leads */
+    .lead-list-card { padding: 4px 14px 10px; }
+    .lead-table tr { padding-top: 16px; padding-bottom: 16px; }
+    .lead-table tr:last-child { border-bottom: 0; }
+    .col-acoes { display: flex !important; gap: 8px; }
+    .col-acoes .icon-btn { margin: 0; }
+
+    /* Ficha do lead */
+    .lead-header { border-radius: 20px; gap: 16px; }
+    .lead-header-main { align-items: flex-start; gap: 14px; }
+    .lead-avatar { width: 52px !important; height: 52px !important; font-size: 17px !important; }
+    .lead-header h1 { font-size: 23px; letter-spacing: -.5px; line-height: 1.2; }
+    .lead-header-sub { gap: 6px; line-height: 1.4; }
+    /* Ações: Ligar/WhatsApp lado a lado, Registrar contato inteiro e os
+       demais como três atalhos (ícone em cima, texto embaixo). */
+    .lead-actions { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+    .lead-actions > .btn-primary, .lead-actions > .btn-success { grid-column: span 3; padding: 0 8px; }
+    .lead-actions > .btn-wide { grid-column: 1 / -1; }
+    .lead-actions > .btn-outline:not(.btn-wide), .lead-actions > .more-menu { grid-column: span 2; min-width: 0; }
+    .lead-actions > .btn-outline:not(.btn-wide), .lead-actions > .more-menu > summary {
+        flex-direction: column; height: auto; min-height: 86px; padding: 10px 4px; gap: 6px;
+        white-space: normal; text-align: center; line-height: 1.2; width: 100%;
+    }
+    .lead-actions > .more-menu { display: flex; margin: 0; }
+    .lead-actions > .more-menu > summary { flex: 1; margin: 0; }
+    .lead-actions > .btn-outline:not(.btn-wide) svg, .lead-actions > .more-menu > summary svg { width: 20px; height: 20px; color: var(--accent); }
+    .tabs { gap: 2px; }
+    .tab { padding: 12px 12px; }
+
+    /* Navegação de baixo: translúcida, com destaque em pílula */
+    .bottom-nav {
+        height: calc(66px + env(safe-area-inset-bottom, 0px)); padding: 6px 6px env(safe-area-inset-bottom, 0px);
+        background: rgba(255, 255, 255, .9); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px);
+        border-top: 1px solid rgba(24, 32, 57, .06); box-shadow: 0 -6px 24px rgba(24, 32, 57, .06);
+    }
+    .bottom-nav a, .bottom-nav button { gap: 4px; font-size: 11.5px; color: #8b95a8; justify-content: flex-start; padding-top: 2px; }
+    .bottom-nav a svg, .bottom-nav button svg { width: 22px; height: 22px; padding: 4px 16px; box-sizing: content-box; border-radius: 999px; transition: background .2s ease; }
+    .bottom-nav a.active, .bottom-nav button.active { color: var(--accent); }
+    .bottom-nav a.active svg, .bottom-nav button.active svg { background: #ecebff; }
+
+    /* Rodapé legal discreto */
+    .site-legal { font-size: 12.5px; padding: 6px 24px 100px; line-height: 1.5; }
+}
