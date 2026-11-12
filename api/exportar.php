@@ -108,6 +108,26 @@ switch ($relatorio) {
         $filtrosAud = array_filter($lf, fn ($v) => $v !== null && $v !== '');
         break;
 
+    case 'automacao_indicadores':
+    case 'automacao_empreendimento':
+    case 'automacao_equipe':
+    case 'automacao_jornada':
+    case 'automacao_campanha':
+        require_once __DIR__ . '/../includes/relatorio_automacao.php';
+        $ra = relatorio_automacao($usuario, $f);
+        $tab = substr($relatorio, 10);
+        if ($tab === 'indicadores') {
+            $colunas = ['indicador' => ['Indicador', 'texto'], 'valor' => ['Valor', 'texto']];
+            $linhas = array_map(fn ($l) => ['indicador' => $l[0], 'valor' => $l[1]], relaut_indicadores_linhas($ra['indicadores']));
+        } else {
+            $colunas = relaut_colunas($tab);
+            $linhas = $ra['por_' . $tab];
+        }
+        $titulo = 'Automações — ' . ['indicadores' => 'indicadores', 'empreendimento' => 'por empreendimento', 'equipe' => 'por equipe',
+                                     'jornada' => 'por jornada', 'campanha' => 'por campanha'][$tab];
+        $filtrosAud = dash_filtros_publicos($f);
+        break;
+
     default:
         api_erro('Relatório desconhecido.', 422);
 }

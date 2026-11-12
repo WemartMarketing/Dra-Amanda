@@ -9,7 +9,8 @@
  *   4. aplica a recuperação automática por inatividade;
  *   5. apaga arquivos temporários de importação com mais de 1 hora;
  *   6. reprocessa avisos do WhatsApp que falharam (espera crescente);
- *   7. executa a fila de automação (envios de WhatsApp, Jornadas) — tarefas vencidas.
+ *   7. agenda o próximo lote das campanhas de WhatsApp em andamento;
+ *   8. executa a fila de automação (envios de WhatsApp, Jornadas) — tarefas vencidas.
  *
  * Só roda pela linha de comando (403 via navegador). GET_LOCK impede duas
  * execuções ao mesmo tempo; cada etapa falha sozinha sem parar as outras.
@@ -22,6 +23,7 @@ require_once __DIR__ . '/../includes/meta.php';
 require_once __DIR__ . '/../includes/recuperacao.php';
 require_once __DIR__ . '/../includes/importacao.php';
 require_once __DIR__ . '/../includes/automacao.php';
+require_once __DIR__ . '/../includes/campanhas.php';
 
 $pdo = db();
 // Mesma trava de cron/processar_fila.php: as duas nunca rodam juntas.
@@ -56,6 +58,10 @@ try {
     $etapa('whatsapp', function () {
         $r = wa_processar_pendentes(300);
         return $r['tentados'] . ' aviso(s), ' . $r['processados'] . ' ok, ' . $r['erros'] . ' erro(s)';
+    });
+    $etapa('campanhas', function () {
+        $r = campanhas_processar();
+        return $r['campanhas'] . ' campanha(s), ' . $r['agendadas'] . ' envio(s) agendado(s), ' . $r['ignoradas'] . ' não enviado(s), ' . $r['concluidas'] . ' concluída(s)';
     });
     $etapa('automação', function () {
         $r = automacao_executar(200);

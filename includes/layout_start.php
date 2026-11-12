@@ -32,7 +32,8 @@ $inicioHref = $ehGestor ? '/pages/dashboard.php' : '/pages/inicio.php';
 // WhatsApp: quem atende vai para as conversas (com o número de não lidas); quem só configura, para a configuração.
 require_once __DIR__ . '/whatsapp_conversas.php';
 $waAtende = empty($usuario['eh_superadmin']) && wa_pode_atender($usuario) && wa_central_ativa((int) $usuario['empresa_ativa_id']);
-$waHref = $waAtende ? '/pages/conversas.php' : (usuario_tem_permissao($usuario, 'whatsapp_configurar') ? '/pages/whatsapp.php' : null);
+$waHref = $waAtende ? '/pages/conversas.php' : (usuario_tem_permissao($usuario, 'whatsapp_configurar') ? '/pages/whatsapp.php'
+    : (usuario_tem_permissao($usuario, 'gerenciar_campanhas_wa') ? '/pages/campanhas.php' : null));
 $waNaoLidas = $waAtende ? wa_conversas_nao_lidas($usuario) : 0;
 require_once __DIR__ . '/pendencias.php';
 $pendCount = pendencias_contar($usuario);

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/lead_componentes.php';
 require_once __DIR__ . '/../includes/whatsapp_conversas.php';
-require_once __DIR__ . '/../includes/jornadas.php';
+require_once __DIR__ . '/../includes/jornadas_editor.php';
 
 $usuario = auth_require();
 $crumb = 'WhatsApp';
@@ -35,8 +35,12 @@ $finalidades = ['boas_vindas' => 'Boas-vindas a novo lead', 'follow_up' => 'Lemb
 
 if ($aba === 'jornadas') {
     $idsJornadas = [jornada_garantir_boas_vindas($empresaId), jornada_garantir_follow_up($empresaId)];
+    // Todas as jornadas da empresa: as padrão primeiro, desativadas por último.
+    $stmt = db()->prepare("SELECT id FROM jornadas WHERE empresa_id = :e AND id NOT IN (:a, :b) ORDER BY status = 'desativada', id");
+    $stmt->execute(['e' => $empresaId, 'a' => $idsJornadas[0], 'b' => $idsJornadas[1]]);
+    $todasJornadas = array_merge($idsJornadas, array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     $jornadasTela = [];
-    foreach ($idsJornadas as $jid) {
+    foreach ($todasJornadas as $jid) {
         $j = jornada_carregar($empresaId, $jid);
         $stmt = db()->prepare('SELECT * FROM jornada_passos WHERE jornada_id = :j ORDER BY ordem, id');
         $stmt->execute(['j' => $jid]);
@@ -223,10 +227,16 @@ require __DIR__ . '/../includes/layout_start.php';
     $statusX = ['ativa' => ['Em andamento', 'pill-blue'], 'aguardando' => ['Aguardando', 'pill-blue'], 'pausada' => ['Pausada', 'pill-amber'],
                 'concluida' => ['Concluída', 'pill-green'], 'cancelada' => ['Encerrada', 'pill-muted'], 'erro' => ['Erro', 'pill-red']];
     $rotTipo = ['esperar' => 'Espera', 'condicao' => 'Condição', 'enviar_template' => 'Mensagem', 'enviar_documento' => 'Book', 'confirmar_atendimento' => 'Corretor',
-                'criar_tarefa' => 'Tarefa', 'notificar_corretor' => 'Aviso', 'encerrar' => 'Fim'];
+                'criar_tarefa' => 'Tarefa', 'notificar_corretor' => 'Aviso', 'atualizar_etapa' => 'Etapa', 'encaminhar_fila' => 'Roleta', 'encerrar' => 'Fim'];
     $rotRegra = ['cliente_respondeu' => 'o cliente respondeu', 'corretor_confirmou' => 'o corretor confirmou resposta', 'humano_respondeu' => 'alguém respondeu pelo WhatsApp',
                  'houve_tentativa' => 'houve tentativa de contato', 'tem_responsavel' => 'tem corretor'];
 ?>
+    <?php if ($podeJornada): ?>
+        <div class="jornadas-topo">
+            <p class="muted">Cada jornada roda <b>uma vez por lead</b>, respeita autorização, horário de envio e limites — e nunca insiste além do configurado.</p>
+            <a class="btn btn-primary" href="/pages/jornada_editor.php"><?= icon('plus') ?>Nova jornada</a>
+        </div>
+    <?php endif; ?>
     <?php foreach ($jornadasTela as $j): $jid = (int) $j['id']; $origensSel = (array) ($j['gatilho_config']['origens'] ?? []); [$stRot, $stPill] = $statusJ[$j['status']]; $passosPorChave = array_column($j['passos'], null, 'chave'); ?>
     <div class="card jornada-card">
         <div class="card-head">
@@ -234,7 +244,15 @@ require __DIR__ . '/../includes/layout_start.php';
             <span class="pill <?= $stPill ?>"><?= $stRot ?></span>
         </div>
         <ol class="jornada-fluxo" aria-label="Passos da jornada <?= e($j['nome']) ?>">
-            <li><span class="jf-tipo">Gatilho</span><b>Lead novo chega</b><small>Origens: <?= e(implode(', ', array_map(fn ($o) => $rotOrigens[$o] ?? $o, $origensSel)) ?: '—') ?><?= !empty($j['gatilho_config']['parar_quando_responder']) ? ' · para quando o cliente responde' : '' ?></small></li>
+            <li><span class="jf-tipo">Gatilho</span><b><?= e(jornada_gatilhos()[$j['gatilho']] ?? $j['gatilho']) ?></b><small><?php
+                if ($j['gatilho'] === 'novo_lead') {
+                    echo 'Origens: ' . e(implode(', ', array_map(fn ($o) => $rotOrigens[$o] ?? $o, $origensSel)) ?: '—');
+                } elseif ($j['gatilho'] === 'mudanca_etapa') {
+                    echo 'Etapa: ' . e(funil_etapa($empresaId, (int) ($j['gatilho_config']['etapa_id'] ?? 0))['nome'] ?? '—');
+                } else {
+                    echo 'Uma vez por lead';
+                }
+                ?><?= !empty($j['gatilho_config']['parar_quando_responder']) ? ' · para quando o cliente responde' : '' ?></small></li>
             <?php foreach ($j['passos'] as $ps): $c = $ps['config']; ?>
                 <li class="jf-<?= e($ps['tipo']) ?>"><span class="jf-tipo"><?= e($rotTipo[$ps['tipo']] ?? $ps['tipo']) ?></span><b><?= e($ps['titulo'] ?: $ps['tipo']) ?></b><small><?php
                     if ($ps['tipo'] === 'esperar') {
@@ -248,6 +266,14 @@ require __DIR__ . '/../includes/layout_start.php';
                         echo !empty($c['ignorar_horario']) ? ' · a qualquer hora' : ' · só no horário de envio';
                     } elseif ($ps['tipo'] === 'confirmar_atendimento') {
                         echo 'Pergunta ao corretor “o cliente respondeu?”' . (!empty($c['so_se_tentativa']) ? ', só se ele registrou tentativa' : '');
+                    } elseif ($ps['tipo'] === 'criar_tarefa' || $ps['tipo'] === 'notificar_corretor') {
+                        echo e($c['titulo'] ?? '');
+                    } elseif ($ps['tipo'] === 'atualizar_etapa') {
+                        echo 'Para: ' . e(funil_etapa($empresaId, (int) ($c['etapa_id'] ?? 0))['nome'] ?? '—');
+                    } elseif ($ps['tipo'] === 'encaminhar_fila') {
+                        echo 'Lead sem corretor vai para a roleta';
+                    } elseif ($ps['tipo'] === 'enviar_documento') {
+                        echo 'Book (PDF) do empreendimento';
                     } elseif ($ps['tipo'] === 'encerrar') {
                         echo 'Encerra a jornada';
                     }
@@ -267,8 +293,8 @@ require __DIR__ . '/../includes/layout_start.php';
             <span class="pill <?= ($j['estat']['bloqueadas'] ?? 0) ? 'pill-amber' : 'pill-muted' ?>">Não enviadas (regras): <?= (int) ($j['estat']['bloqueadas'] ?? 0) ?></span>
             <?php if (!empty($j['estat']['books'])): ?><span class="pill pill-blue">Books: <?= (int) $j['estat']['books'] ?></span><?php endif; ?>
         </div>
-        <?php if ($podeJornada): ?>
-            <details class="jornada-config"<?= $j['status'] === 'rascunho' ? ' open' : '' ?>><summary>Ajustar esta jornada</summary>
+        <?php if ($podeJornada && $j['gatilho'] === 'novo_lead' && $j['status'] !== 'desativada'): ?>
+            <details class="jornada-config"<?= $j['status'] === 'rascunho' && in_array($jid, $idsJornadas, true) ? ' open' : '' ?>><summary>Ajuste rápido</summary>
             <form data-api-form action="/api/whatsapp.php">
                 <input type="hidden" name="acao" value="jornada_config"><input type="hidden" name="id" value="<?= $jid ?>">
                 <div class="field"><span class="label-like">Quais leads entram</span><div>
@@ -295,11 +321,18 @@ require __DIR__ . '/../includes/layout_start.php';
                 </div>
             </form>
             </details>
-            <div class="actions" style="margin-top:12px;">
+        <?php endif; ?>
+        <?php if ($podeJornada): ?>
+            <div class="actions jornada-acoes" style="margin-top:12px;">
                 <?php if ($j['status'] === 'ativa'): ?>
-                    <button type="button" class="btn btn-outline" data-api-acao="/api/whatsapp.php" data-acao="jornada_status" data-id="<?= $jid ?>" data-status="pausada" data-confirmar="Pausar esta jornada? Os leads que estão nela ficam parados até ela voltar.">Pausar jornada</button>
+                    <button type="button" class="btn btn-outline" data-api-acao="/api/jornadas.php" data-acao="status" data-id="<?= $jid ?>" data-status="pausada" data-confirmar="Pausar esta jornada? Os leads que estão nela ficam parados até ela voltar.">Pausar jornada</button>
                 <?php else: ?>
-                    <button type="button" class="btn btn-primary" data-api-acao="/api/whatsapp.php" data-acao="jornada_status" data-id="<?= $jid ?>" data-status="ativa"><?= icon('zap') ?>Ligar esta jornada</button>
+                    <button type="button" class="btn btn-primary" data-api-acao="/api/jornadas.php" data-acao="status" data-id="<?= $jid ?>" data-status="ativa"><?= icon('zap') ?><?= $j['status'] === 'desativada' ? 'Reativar' : 'Ligar esta jornada' ?></button>
+                <?php endif; ?>
+                <a class="btn btn-outline" href="/pages/jornada_editor.php?id=<?= $jid ?>"><?= icon('pin') ?>Abrir no editor</a>
+                <button type="button" class="btn btn-outline" data-api-acao="/api/jornadas.php" data-acao="duplicar" data-id="<?= $jid ?>">Duplicar</button>
+                <?php if ($j['status'] !== 'desativada'): ?>
+                    <button type="button" class="remove-link" data-api-acao="/api/jornadas.php" data-acao="status" data-id="<?= $jid ?>" data-status="desativada" data-confirmar="Desativar esta jornada? Os leads que estão nela saem e nada mais é enviado.">Desativar</button>
                 <?php endif; ?>
             </div>
         <?php endif; ?>

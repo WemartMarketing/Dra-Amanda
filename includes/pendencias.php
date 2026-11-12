@@ -22,16 +22,20 @@ function pendencia_tipos(): array
 }
 
 /**
- * Cria uma pendência (não duplica: mesma chave_unica, ou já existe uma
- * aberta do mesmo tipo para o mesmo lead). Devolve o id ou null.
+ * Cria uma pendência (não duplica: mesma chave_unica, ou — para pergunta e
+ * "responder no WhatsApp" — já existe uma aberta do mesmo tipo para o lead).
+ * Devolve o id ou null.
  */
 function pendencia_criar(int $empresaId, int $usuarioId, int $leadId, string $tipo, string $titulo, ?string $chaveUnica = null, ?int $execucaoId = null): ?int
 {
     $pdo = db();
-    $stmt = $pdo->prepare("SELECT id FROM corretor_pendencias WHERE empresa_id = :e AND lead_id = :l AND tipo = :t AND status IN ('aberta','adiada') LIMIT 1");
-    $stmt->execute(['e' => $empresaId, 'l' => $leadId, 't' => $tipo]);
-    if ($stmt->fetchColumn()) {
-        return null;
+    // Pergunta e "responder" valem uma por lead; tarefas de jornadas diferentes convivem (chave_unica evita repetição).
+    if ($tipo !== 'tarefa_jornada') {
+        $stmt = $pdo->prepare("SELECT id FROM corretor_pendencias WHERE empresa_id = :e AND lead_id = :l AND tipo = :t AND status IN ('aberta','adiada') LIMIT 1");
+        $stmt->execute(['e' => $empresaId, 'l' => $leadId, 't' => $tipo]);
+        if ($stmt->fetchColumn()) {
+            return null;
+        }
     }
     $ins = $pdo->prepare('INSERT IGNORE INTO corretor_pendencias (empresa_id, usuario_id, lead_id, tipo, titulo, execucao_id, chave_unica)
                           VALUES (:e, :u, :l, :t, :ti, :x, :c)');

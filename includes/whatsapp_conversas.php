@@ -321,6 +321,12 @@ function wa_render_abas(array $usuario, string $ativa): void
         $abas['conexao'] = ['/pages/whatsapp.php?aba=conexao', 'Conexão'];
         $abas['atividade'] = ['/pages/whatsapp.php?aba=atividade', 'Atividade'];
     }
+    if (usuario_tem_permissao($usuario, 'gerenciar_campanhas_wa')) {
+        $abas['campanhas'] = ['/pages/campanhas.php', 'Campanhas'];
+    }
+    if (usuario_tem_permissao($usuario, 'visualizar_indicadores') && (usuario_tem_permissao($usuario, 'whatsapp_configurar') || usuario_tem_permissao($usuario, 'gerenciar_campanhas_wa'))) {
+        $abas['relatorios'] = ['/pages/relatorio_automacao.php', 'Resultados'];
+    }
     if (count($abas) < 2) {
         return;
     }

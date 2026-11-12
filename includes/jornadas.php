@@ -287,7 +287,10 @@ function jornada_disparar(string $gatilho, int $empresaId, int $leadId, array $c
     foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $jid) {
         $j = jornada_carregar($empresaId, (int) $jid);
         $origens = (array) ($j['gatilho_config']['origens'] ?? []);
-        if ($origens && !in_array($origem, $origens, true)) {
+        if ($gatilho === 'novo_lead' && $origens && !in_array($origem, $origens, true)) {
+            continue;
+        }
+        if ($gatilho === 'mudanca_etapa' && (int) ($j['gatilho_config']['etapa_id'] ?? 0) !== (int) ($contexto['etapa_id'] ?? -1)) {
             continue;
         }
         $primeiro = jornada_primeiro_passo((int) $jid);
@@ -303,6 +306,22 @@ function jornada_disparar(string $gatilho, int $empresaId, int $leadId, array $c
         jornada_log($empresaId, $execId, null, 'iniciou', 'Gatilho: ' . $gatilho . ' (origem ' . $origem . ')');
         jornada_agendar_passo($empresaId, $execId, $primeiro);
         $novas[] = $execId;
+    }
+    return $novas;
+}
+
+/**
+ * Gatilhos "lead muda de etapa" e "lead transferido" (Fase 7). Dispara as
+ * jornadas ligadas e já executa o primeiro passo (o resto segue pela fila).
+ * Cada jornada roda uma vez por lead.
+ */
+function jornada_evento_gatilho(string $gatilho, int $empresaId, int $leadId, array $contexto = []): array
+{
+    $novas = jornada_disparar($gatilho, $empresaId, $leadId, $contexto);
+    foreach ($novas as $execId) {
+        $stmt = db()->prepare('SELECT passo_chave FROM jornada_execucoes WHERE id = :id');
+        $stmt->execute(['id' => $execId]);
+        fila_executar_chave('jornada:' . $execId . ':' . $stmt->fetchColumn(), ['jornada_passo' => 'jornada_tarefa_passo'] + automacao_tratadores_jornada());
     }
     return $novas;
 }
@@ -467,6 +486,30 @@ function jornada_tarefa_passo(array $tarefa): array
             } else {
                 jornada_log($empresaId, $execId, $chave, 'pulado', 'Lead sem corretor.');
             }
+            break;
+
+        case 'atualizar_etapa':
+            // Movimento feito pela automação: NÃO conta como atendimento do corretor
+            // (não mexe no prazo da recuperação) e nunca encerra o lead.
+            $et = funil_etapa($empresaId, (int) ($cfg['etapa_id'] ?? 0));
+            if (!$et || !(int) $et['ativa'] || in_array($et['categoria'], funil_categorias_encerradas(), true)) {
+                jornada_log($empresaId, $execId, $chave, 'pulado', 'Etapa inexistente, inativa ou de encerramento.');
+            } else {
+                $upd = $pdo->prepare('UPDATE leads SET etapa_id = :et, etapa = :cat WHERE id = :l AND empresa_id = :e AND (etapa_id IS NULL OR etapa_id <> :et2)');
+                $upd->execute(['et' => $et['id'], 'cat' => $et['categoria'], 'l' => $x['lead_id'], 'e' => $empresaId, 'et2' => $et['id']]);
+                if ($upd->rowCount()) {
+                    jornada_evento_lead((int) $x['lead_id'], 'Jornada "' . $jornada['nome'] . '": lead movido para "' . $et['nome'] . '"');
+                }
+                jornada_log($empresaId, $execId, $chave, 'etapa', $et['nome']);
+            }
+            break;
+
+        case 'encaminhar_fila':
+            require_once __DIR__ . '/roleta.php';
+            $res = roleta_distribuir_lead((int) $x['lead_id'], 'reprocessamento', null);
+            $txt = ['distribuido' => 'Distribuído para ' . ($res['usuario_nome'] ?? 'um corretor'), 'fila' => 'Na fila de espera: ' . ($res['motivo'] ?? ''),
+                    'ja_atribuido' => 'O lead já tinha corretor'][$res['status']] ?? $res['status'];
+            jornada_log($empresaId, $execId, $chave, 'roleta', $txt);
             break;
 
         case 'encerrar':

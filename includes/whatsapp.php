@@ -479,6 +479,19 @@ function wa_tarefa_enviar(array $tarefa): array
     if ($msg['status'] !== 'na_fila') {
         return ['status' => 'ok', 'mensagem' => 'Já processada (' . $msg['status'] . ').'];   // idempotente
     }
+    // Mensagem de campanha: pausada espera; cancelada não sai.
+    if ($msg['campanha_id']) {
+        $st = $pdo->prepare('SELECT status FROM whatsapp_campanhas WHERE id = :c AND empresa_id = :e');
+        $st->execute(['c' => $msg['campanha_id'], 'e' => $empresaId]);
+        $stCamp = (string) $st->fetchColumn();
+        if ($stCamp === 'pausada') {
+            return ['status' => 'adiar', 'quando' => new DateTimeImmutable('+30 minutes'), 'mensagem' => 'Campanha pausada.'];
+        }
+        if ($stCamp === 'cancelada') {
+            $pdo->prepare("UPDATE whatsapp_mensagens SET status = 'cancelada', erro_texto = 'Campanha cancelada' WHERE id = :id")->execute(['id' => $msg['id']]);
+            return ['status' => 'ok', 'mensagem' => 'Campanha cancelada.'];
+        }
+    }
     $conta = wa_conta($empresaId, (int) $msg['conta_id']);
     $contato = wa_contato($empresaId, (int) $msg['contato_id']);
     $envio = (array) ($p['envio'] ?? []);

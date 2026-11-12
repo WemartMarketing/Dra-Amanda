@@ -36,7 +36,7 @@ Nenhum módulo anterior foi removido ou duplicado.
 | 4 | Jornada "novo lead": boas-vindas por empreendimento, oferta e envio do book (PDF), fila quando a roleta está fechada | **concluída** |
 | 5 | Follow-ups (esperar/condição), central de pendências do corretor ("o cliente respondeu?") | **concluída** |
 | 6 | Integração com recuperação/redistribuição, tela de horário por dia, pausas e feriados das roletas | **concluída** |
-| 7 | Editor visual de jornadas com simulação, campanhas/disparador, relatórios e exportação Excel | a fazer |
+| 7 | Editor visual de jornadas com simulação, campanhas/disparador, relatórios e exportação Excel | **concluída** |
 
 ## Fase 1 — o que foi entregue
 
@@ -506,6 +506,70 @@ mensagens), atuação real × simulada pelo WhatsApp (envio real só para o
 simulador local), recuperação com redistribuição, corretor desativado, visita
 agendada, isolamento entre empresas. 5 mutações detectadas. Fluxo pela tela
 conferido no computador e no celular.
+
+## Fase 7 — Editor visual, campanhas e resultados
+
+### Editor visual de jornadas (`pages/jornada_editor.php`)
+- WhatsApp → Jornadas → **Nova jornada** ou **Abrir no editor**. Blocos
+  conectados, de cima para baixo: Gatilho → Mensagem → Espera → Condição →
+  Ação → Fim. Botões grandes para subir/descer/remover e "+ Adicionar bloco
+  aqui" entre os blocos.
+- Gatilhos: **lead novo chega** (por origem), **lead muda de etapa** (uma etapa
+  do Kanban) e **lead é transferido** para outro corretor.
+- Blocos: Mensagem (template aprovado ou a do empreendimento), Book,
+  Espera (horas corridas ou úteis), Condição (sim/não), Pergunta ao corretor,
+  Tarefa, Aviso ao corretor, **Mudar etapa** e **Encaminhar para a roleta**, Fim.
+- Regras: cada bloco acontece no máximo **uma vez por lead** (o fluxo não pode
+  voltar para trás), limite de 1 a 5 mensagens por lead, só templates aprovados
+  da própria empresa, a automação nunca encerra um lead (perdido/contrato/sem
+  interesse), "Mudar etapa" feito pela automação **não conta como atendimento**
+  do corretor (não mexe no prazo da recuperação).
+- Cadastrar, editar, **duplicar**, ligar, pausar e **desativar**. Jornada
+  ligada não tem blocos alterados (pause antes); lead parado num bloco removido
+  sai da jornada. As jornadas padrão mantêm o nome.
+- **Testar com dados fictícios**: escolha o cenário (autorização, cliente
+  responde ou não, corretor tentou/confirmou, empreendimento com mensagem/book)
+  e veja a linha do tempo. Nada é gravado nem enviado.
+
+### Campanhas de remarketing (`pages/campanhas.php`)
+- Só para quem **autorizou ofertas** (consentimento de marketing registrado,
+  sem descadastro) e só com **template de MARKETING aprovado**.
+- Filtros: empreendimento, etapa, origem, data de cadastro, sem atendimento há
+  N dias, sem resposta há N dias, corretor, equipe, gerente, superintendência,
+  não repetir quem recebeu campanha nos últimos N dias, e **planilha** (CSV/XLSX)
+  de telefones — estar na planilha não é autorização: só recebe quem já é lead
+  com autorização registrada. Repetidos e inválidos são identificados.
+- **Prévia** antes de criar: quantos recebem, quantos ficam de fora e por quê
+  (sem autorização, descadastrado, duplicado, lead encerrado, campanha recente),
+  custo estimado e os limites que valem. O público respeita a carteira de quem cria.
+- **Confirmação consciente**: é preciso digitar o número de contatos. Pode
+  agendar o início.
+- Envio em **lotes de 40 por rodada** do cron, sempre pelas regras de envio
+  (horário, limite de marketing por contato, descadastro na hora).
+  **Pausar** segura até o que já estava na fila; **cancelar** cancela o que não saiu.
+- Resultados: enviadas, simuladas (teste), entregues, lidas, responderam (até
+  7 dias), não enviadas pelas regras, falhas, pediram para sair, custo e custo
+  por resposta.
+
+### Resultados das automações (`pages/relatorio_automacao.php`)
+Aba **Resultados**: leads que receberam a 1ª mensagem automática, taxa de
+entrega (só mensagens reais), taxa de resposta, tempo até a 1ª resposta
+(mediana), books, encaminhados ao corretor, recuperados, redistribuídos,
+visitas e contratos **depois** da automação (mostra influência — não atribui a
+venda à última mensagem), custos (jornadas e campanhas), custo por resposta e
+descadastros. Quebras por empreendimento, equipe, jornada e campanha. Filtros
+de período, empreendimento e equipe; **Exportar Excel** (.xlsx, registrado na
+auditoria). Números agregados, sempre dentro da carteira de quem consulta.
+
+### Testes da Fase 7
+`php tests/whatsapp_fase7_test.php` — 86 verificações (validação do editor,
+laços, salvar/duplicar/ligar/pausar/desativar, simulação sem gravar nada,
+novos blocos e gatilhos, público de campanha e motivos de exclusão, planilha,
+confirmação, lotes, pausa, retomada, cancelamento, descadastro durante a
+campanha, resultados, relatórios, carteira, isolamento entre empresas e
+exportação .xlsx) + 6 mutações detectadas. Dois defeitos encontrados pelos
+testes e corrigidos: filtro de campanha com id inválido ampliava o público
+(agora fica vazio) e tarefas de jornadas diferentes se bloqueavam.
 
 ## Dependências externas (Meta)
 

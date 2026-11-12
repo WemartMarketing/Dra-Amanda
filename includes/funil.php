@@ -156,5 +156,8 @@ function lead_mudar_etapa(array $lead, int $etapaId, array $usuario, string $com
         'de_etapa_id' => $anterior['id'] ?? null, 'para_etapa_id' => (int) $nova['id'],
         'de' => $anterior['categoria'] ?? ($lead['etapa'] ?? null), 'para' => $nova['categoria'],
     ]);
+    // Jornadas com gatilho "lead muda de etapa" (a mudança feita POR uma jornada não passa aqui).
+    require_once __DIR__ . '/jornadas.php';
+    jornada_evento_gatilho('mudanca_etapa', $empresaId, (int) $lead['id'], ['etapa_id' => (int) $nova['id']]);
     return true;
 }
