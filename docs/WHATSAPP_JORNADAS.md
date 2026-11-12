@@ -34,7 +34,7 @@ Nenhum módulo anterior foi removido ou duplicado.
 | 2 | Webhook `webhook/whatsapp.php` (mensagens + status), cliente da Cloud API com **modo de teste**, sincronização de templates, tela de conexão | **concluída** (validação real pendente) |
 | 3 | Central de conversas (3 colunas no computador, tela simples no celular), botão **Conversar no WhatsApp** na ficha e nos cards | **concluída** |
 | 4 | Jornada "novo lead": boas-vindas por empreendimento, oferta e envio do book (PDF), fila quando a roleta está fechada | **concluída** |
-| 5 | Follow-ups (esperar/condição), central de pendências do corretor ("o cliente respondeu?") | a fazer |
+| 5 | Follow-ups (esperar/condição), central de pendências do corretor ("o cliente respondeu?") | **concluída** |
 | 6 | Integração com recuperação/redistribuição, tela de horário por dia, pausas e feriados das roletas | a fazer |
 | 7 | Editor visual de jornadas com simulação, campanhas/disparador, relatórios e exportação Excel | a fazer |
 
@@ -408,6 +408,49 @@ mídia), `api/conversas.php`, `api/whatsapp_midia.php`,
   - o cliente pedindo o book e perguntando o valor, recebendo a resposta
     automática sem preço;
   - conferido também no celular.
+
+## Fase 5 — Follow-ups e central de pendências
+
+### Jornada "Follow-up de lead sem resposta"
+Criada **desligada** em toda conta (ligar em WhatsApp → Jornadas). Vale
+para leads do Meta Ads nas etapas "Novo lead" e "Primeiro contato" (dá para
+mudar em "Ajustar esta jornada"):
+
+1. espera **2 horas úteis** (dentro do horário de envio da conta);
+2. se o cliente respondeu, o corretor respondeu no WhatsApp ou confirmou o
+   atendimento → **encerra**; senão envia o **lembrete** (template escolhido
+   na tela; sem template, o passo é pulado e nada sai);
+3. ~24 h depois do lead: se o corretor registrou tentativa de contato,
+   aparece para ele a pergunta **"O cliente respondeu à sua tentativa de
+   contato?"**;
+4. ~48 h: nova checagem e mensagem de **reengajamento** (máximo de 2
+   mensagens automáticas por lead nesta jornada).
+
+A jornada **para sozinha** quando: o cliente responde, o corretor confirma o
+atendimento, o lead avança no funil, é perdido ou pede descadastro. A
+etapa de 4 dias (recuperação) continua sendo a regra de **Recuperação** que já
+existe; a integração completa fica na Fase 6.
+
+### Central de pendências (sem pop-ups)
+- Sino no topo (computador e celular) com o número de pendências, card no
+  Início e página **Pendências**.
+- Tipos: **Responder no WhatsApp** (cliente escreveu) e **Confirmar resposta
+  do cliente**. Botões grandes: "Sim, respondeu" (pede uma frase e,
+  opcionalmente, a nova etapa do Kanban), "Não respondeu", "Registrar
+  tentativa", "Lembrar mais tarde".
+- **"Não respondeu" nunca dispara mensagem** — só registra; a jornada segue
+  as próprias regras.
+- A pendência pertence a quem é o responsável pelo lead **agora**: se o lead
+  for transferido, ela some da lista do corretor anterior.
+- Quando alguém responde o cliente pelo WhatsApp, a pendência "Responder no
+  WhatsApp" é resolvida automaticamente.
+
+### Testes da Fase 5
+`php tests/whatsapp_fase5_test.php` — 44 verificações (horas úteis, condições,
+parada por resposta/etapa, pendências: criar sem duplicar, transferência,
+"não respondeu" não envia, "sim" encerra a jornada, isolamento entre contas)
++ 3 mutações detectadas. Fluxo pela tela conferido com dados de demonstração,
+no computador e no celular.
 
 ## Dependências externas (Meta)
 

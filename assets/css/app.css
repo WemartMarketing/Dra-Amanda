@@ -1527,3 +1527,39 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .int-consent { margin-top: 6px; font-size: 13px; max-width: 420px; }
 .int-consent summary { cursor: pointer; color: var(--accent); font-weight: 700; }
 .int-consent form { margin-top: 8px; }
+
+/* ------------------------------------------------ Pendências (Fase 5) */
+.sino { position: relative; }
+.sino-badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--red); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.pend-card { margin-bottom: 18px; border: 1px solid #f6dfb2; }
+.pend-card .card-head h2 { display: flex; align-items: center; gap: 8px; }
+.pend-card .card-head h2 svg { color: #a9700f; }
+.pend-lista { display: flex; flex-direction: column; gap: 12px; }
+.pend-card .pend-lista { margin-bottom: 12px; }
+.pend { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: #fff; }
+.pend-topo { display: flex; gap: 12px; align-items: flex-start; }
+.pend-icone { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto; background: #eeecff; color: var(--accent); }
+.pend-icone.pend-responder_whatsapp { background: #e8f7f1; color: #16a34a; }
+.pend-icone.pend-confirmar_resposta { background: #fbf2de; color: #a9700f; }
+.pend-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pend-texto strong { font-size: 15.5px; line-height: 1.35; }
+.pend-texto span { font-size: 13.5px; color: var(--muted); }
+.pend-texto a { color: var(--accent); font-weight: 700; }
+.pend-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.pend-form { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+@media (max-width: 880px) {
+    .pend-acoes .btn { flex: 1 1 calc(50% - 8px); justify-content: center; }
+    .pend-acoes .link-btn { flex: 1 1 100%; text-align: center; padding: 8px; }
+    .pend-texto strong { font-size: 16px; }
+}
+.jornada-card { margin-bottom: 20px; }
+.jornada-fluxo { grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); }
+.jornada-fluxo li.jf-condicao { background: #fff8eb; border-color: #f6dfb2; }
+.jornada-fluxo li.jf-enviar_template { background: #effcf4; border-color: #c7eed7; }
+.jornada-fluxo li.jf-confirmar_atendimento { background: #f2f0ff; border-color: #dcd7ff; }
+.jornada-config { margin-top: 4px; }
+.jornada-config summary { cursor: pointer; font-weight: 700; color: var(--accent); padding: 6px 0; }
+.jornada-config form { margin-top: 10px; }
+@media (max-width: 1100px) { .jornada-fluxo { grid-template-columns: 1fr; } }
+.mobile-sino { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #fff6e6; color: #a9700f; flex: 0 0 auto; }
+.mobile-sino svg { width: 20px; height: 20px; }

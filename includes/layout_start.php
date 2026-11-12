@@ -34,6 +34,8 @@ require_once __DIR__ . '/whatsapp_conversas.php';
 $waAtende = empty($usuario['eh_superadmin']) && wa_pode_atender($usuario) && wa_central_ativa((int) $usuario['empresa_ativa_id']);
 $waHref = $waAtende ? '/pages/conversas.php' : (usuario_tem_permissao($usuario, 'whatsapp_configurar') ? '/pages/whatsapp.php' : null);
 $waNaoLidas = $waAtende ? wa_conversas_nao_lidas($usuario) : 0;
+require_once __DIR__ . '/pendencias.php';
+$pendCount = pendencias_contar($usuario);
 
 $navItems = [
     ['key' => 'dashboard',  'href' => '/pages/dashboard.php',  'label' => 'Dashboard',                                  'icon' => 'chart',    'mostrar' => $ehGestor],
@@ -112,7 +114,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
                     <label class="sr-only" for="busca-global">Buscar lead por nome ou telefone</label>
                     <input id="busca-global" type="search" name="q" placeholder="Buscar lead por nome ou telefone..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>">
                 </form>
-                <button class="circle-btn" type="button" aria-label="Notificações"><?= icon('bell') ?></button>
+                <a class="circle-btn sino" href="/pages/pendencias.php" aria-label="Pendências<?= $pendCount ? ': ' . $pendCount . ' aberta(s)' : '' ?>" title="Pendências"><?= icon('bell') ?><?php if ($pendCount): ?><b class="sino-badge"><?= $pendCount > 99 ? '99+' : $pendCount ?></b><?php endif; ?></a>
                 <div class="who">
                     <div class="avatar"><?= htmlspecialchars($avatarIniciais) ?></div>
                     <div>
@@ -126,6 +128,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
         <div class="mobile-topbar">
             <a href="<?= $inicioHref ?>" class="mobile-brand" aria-label="WeMart Sales — página inicial"><?= logo_compacta_html() ?></a>
             <div class="crumb mobile-crumb"><strong><?= htmlspecialchars($crumb ?? '') ?></strong></div>
+            <?php if ($pendCount): ?><a class="sino mobile-sino" href="/pages/pendencias.php" aria-label="Pendências: <?= $pendCount ?> aberta(s)"><?= icon('bell') ?><b class="sino-badge"><?= $pendCount > 99 ? '99+' : $pendCount ?></b></a><?php endif; ?>
             <a href="/pages/perfil.php" class="avatar" aria-label="Meu perfil"><?= htmlspecialchars($avatarIniciais) ?></a>
         </div>
 

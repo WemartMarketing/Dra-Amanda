@@ -109,6 +109,25 @@ if ($ehCorretor) {
 ?>
 
 <?php
+// Central de pendências: o que a automação pediu para o corretor ver (sem pop-up).
+require_once __DIR__ . '/../includes/pendencias_ui.php';
+require_once __DIR__ . '/../includes/whatsapp_conversas.php';
+$pendInicio = pendencias_do_usuario($usuario, 3);
+if ($pendInicio):
+    $totalPend = pendencias_contar($usuario); ?>
+    <div class="card pend-card">
+        <div class="card-head">
+            <div><h2><?= icon('bell') ?>Pendências</h2><p>Clientes que escreveram e confirmações de contato dos seus leads.</p></div>
+            <span class="pill pill-amber"><?= $totalPend ?></span>
+        </div>
+        <div class="pend-lista">
+            <?php foreach ($pendInicio as $p) { render_pendencia($p, funil_etapas($empresaId), wa_pode_atender($usuario) && wa_central_ativa($empresaId)); } ?>
+        </div>
+        <?php if ($totalPend > count($pendInicio)): ?><a class="btn btn-outline btn-block" href="/pages/pendencias.php">Ver todas as <?= $totalPend ?> pendências</a><?php endif; ?>
+    </div>
+<?php endif; ?>
+
+<?php
 // Leads do próprio usuário que vão para recuperação por falta de feedback.
 require_once __DIR__ . '/../includes/recuperacao.php';
 $emRisco = recuperacao_em_risco($usuario, 6);

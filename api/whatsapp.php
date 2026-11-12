@@ -20,7 +20,7 @@
  *   book_remover        { empreendimento_id }
  *   boas_vindas_template{ empreendimento_id, template_id? }
  *   jornada_status      { id, status: ativa|pausada }          (gerenciar_jornadas)
- *   jornada_config      { id, origens[], template_id? }        (gerenciar_jornadas)
+ *   jornada_config      { id, origens[], passo[chave][template_id|horas|horas_uteis] }  (gerenciar_jornadas)
  */
 require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/whatsapp.php';
@@ -382,17 +382,33 @@ switch ($acao) {
         $cfg = $j['gatilho_config'];
         $cfg['origens'] = $origens;
         $pdo->prepare('UPDATE jornadas SET gatilho_config = :g, atualizado_em = NOW() WHERE id = :id')->execute(['g' => json_encode($cfg), 'id' => $j['id']]);
-        $tid = (int) ($_POST['template_id'] ?? 0) ?: null;
-        if ($tid && (!($tpl = wa_template($empresaId, $tid)) || $tpl['status'] !== 'aprovado')) {
-            api_erro('Escolha um template aprovado.', 422);
-        }
-        $passo = jornada_passo((int) $j['id'], 'boas_vindas');
-        if ($passo) {
+        // Ajustes por passo — só o que cada tipo permite mudar.
+        foreach ((array) ($_POST['passo'] ?? []) as $chave => $campos) {
+            $passo = jornada_passo((int) $j['id'], (string) $chave);
+            if (!$passo || !is_array($campos)) {
+                continue;
+            }
             $pc = $passo['config'];
-            $pc['template_id'] = $tid;
+            if ($passo['tipo'] === 'enviar_template' && array_key_exists('template_id', $campos)) {
+                $tid = (int) $campos['template_id'] ?: null;
+                if ($tid && (!($tpl = wa_template($empresaId, $tid)) || $tpl['status'] !== 'aprovado')) {
+                    api_erro('Escolha templates aprovados.', 422);
+                }
+                $pc['template_id'] = $tid;
+            } elseif ($passo['tipo'] === 'esperar') {
+                foreach (['horas', 'horas_uteis'] as $k) {
+                    if (array_key_exists($k, $campos)) {
+                        $h = (float) str_replace(',', '.', (string) $campos[$k]);
+                        if ($h < 0.5 || $h > 168) {
+                            api_erro('Os tempos de espera vão de 0,5 a 168 horas.', 422);
+                        }
+                        $pc[$k] = $h;
+                    }
+                }
+            }
             $pdo->prepare('UPDATE jornada_passos SET config = :c WHERE id = :id')->execute(['c' => json_encode($pc), 'id' => $passo['id']]);
         }
-        auditoria_registrar($empresaId, $uid, 'jornada.configurada', 'jornada', (int) $j['id'], ['origens' => $origens, 'template_id' => $tid]);
+        auditoria_registrar($empresaId, $uid, 'jornada.configurada', 'jornada', (int) $j['id'], ['origens' => $origens]);
         api_responder(['ok' => true, 'mensagem' => 'Configuração da jornada salva.']);
 
     default:

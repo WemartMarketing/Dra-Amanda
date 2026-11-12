@@ -892,3 +892,15 @@ function wmToast(msg, persistir) {
         });
     });
 })();
+
+// ------------------------------------------------ Pendências: abre o formulário no próprio cartão
+document.querySelectorAll('[data-pend-abrir]').forEach(function (b) {
+    b.addEventListener('click', function () {
+        var alvo = document.getElementById(b.dataset.pendAbrir);
+        if (!alvo) return;
+        var cartao = b.closest('.pend');
+        cartao.querySelectorAll('.pend-form').forEach(function (f) { if (f !== alvo) f.hidden = true; });
+        alvo.hidden = !alvo.hidden;
+        if (!alvo.hidden) { var campo = alvo.querySelector('textarea'); if (campo) campo.focus(); }
+    });
+});

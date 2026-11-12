@@ -20,8 +20,10 @@
 require_once __DIR__ . '/whatsapp.php';
 require_once __DIR__ . '/automacao_fila.php';
 require_once __DIR__ . '/leads.php';
+require_once __DIR__ . '/pendencias.php';
 
 const JORNADA_BOAS_VINDAS = 'Boas-vindas a novo lead';
+const JORNADA_FOLLOW_UP = 'Follow-up de lead sem resposta';
 
 function jornada_log(int $empresaId, int $execucaoId, ?string $passo, string $evento, ?string $detalhe = null): void
 {
@@ -59,6 +61,130 @@ function jornada_garantir_boas_vindas(int $empresaId): int
                      'cfg' => json_encode(['template' => 'do_empreendimento', 'template_id' => null, 'ignorar_horario' => true, 'se_bloqueado' => 'encerrar']), 'p' => 'fim']);
     $passo->execute(['j' => $id, 'c' => 'fim', 'o' => 2, 't' => 'encerrar', 'ti' => 'Fim', 'cfg' => null, 'p' => null]);
     return $id;
+}
+
+/**
+ * Garante a jornada padrão de follow-up (seção 7), criada desligada:
+ *   2 h úteis sem resposta → lembrete · 24 h → pergunta ao corretor se houve
+ *   resposta por outro canal · 48 h sem resposta → nova abordagem · fim.
+ * Para sozinha quando o cliente responde ou o lead sai de "Tentando contato /
+ * Primeiro contato". A recuperação em 4 dias continua sendo a regra de
+ * Recuperação de leads (ver includes/recuperacao.php).
+ */
+function jornada_garantir_follow_up(int $empresaId): int
+{
+    $pdo = db();
+    $stmt = $pdo->prepare('SELECT id FROM jornadas WHERE empresa_id = :e AND nome = :n LIMIT 1');
+    $stmt->execute(['e' => $empresaId, 'n' => JORNADA_FOLLOW_UP]);
+    if ($id = $stmt->fetchColumn()) {
+        return (int) $id;
+    }
+    $pdo->prepare("INSERT INTO jornadas (empresa_id, nome, descricao, gatilho, gatilho_config, status, max_mensagens)
+                   VALUES (:e, :n, :d, 'novo_lead', :g, 'rascunho', 2)")
+        ->execute(['e' => $empresaId, 'n' => JORNADA_FOLLOW_UP,
+                   'd' => 'Acompanha o lead que ainda não respondeu: lembrete, pergunta ao corretor e uma nova abordagem — e para sozinha quando o cliente responde.',
+                   'g' => json_encode(['origens' => ['meta_ads'], 'parar_quando_responder' => true, 'somente_categorias' => ['novo_lead', 'primeiro_contato']])]);
+    $id = (int) $pdo->lastInsertId();
+    $semResposta = ['se' => ['cliente_respondeu', 'corretor_confirmou', 'humano_respondeu']];
+    $passos = [
+        ['espera_1', 'esperar', 'Esperar 2 horas úteis', ['horas_uteis' => 2], 'checa_1', null],
+        ['checa_1', 'condicao', 'Houve resposta?', $semResposta, 'fim', 'lembrete'],
+        ['lembrete', 'enviar_template', 'Lembrete', ['template_id' => null, 'ignorar_horario' => false, 'se_bloqueado' => 'seguir', 'se_sem_template' => 'pular'], 'espera_2', null],
+        ['espera_2', 'esperar', 'Esperar até completar 24 h', ['horas' => 22], 'confirmar', null],
+        ['confirmar', 'confirmar_atendimento', 'Perguntar ao corretor', ['so_se_tentativa' => true], 'espera_3', null],
+        ['espera_3', 'esperar', 'Esperar até completar 48 h', ['horas' => 24], 'checa_2', null],
+        ['checa_2', 'condicao', 'Houve resposta?', $semResposta, 'fim', 'reengajamento'],
+        ['reengajamento', 'enviar_template', 'Nova abordagem', ['template_id' => null, 'ignorar_horario' => false, 'se_bloqueado' => 'seguir', 'se_sem_template' => 'pular'], 'fim', null],
+        ['fim', 'encerrar', 'Fim', [], null, null],
+    ];
+    $ins = $pdo->prepare('INSERT INTO jornada_passos (jornada_id, chave, ordem, tipo, titulo, config, proximo_chave, senao_chave) VALUES (:j, :c, :o, :t, :ti, :cfg, :p, :n)');
+    foreach ($passos as $i => [$chave, $tipo, $titulo, $cfg, $prox, $senao]) {
+        $ins->execute(['j' => $id, 'c' => $chave, 'o' => $i + 1, 't' => $tipo, 'ti' => $titulo, 'cfg' => $cfg ? json_encode($cfg) : null, 'p' => $prox, 'n' => $senao]);
+    }
+    return $id;
+}
+
+/** Soma minutos ÚTEIS (dentro do horário e dos dias de envio da empresa). */
+function jornada_somar_minutos_uteis(DateTimeImmutable $de, int $minutos, string $ini, string $fim, string $dias): DateTimeImmutable
+{
+    $diasOk = array_map('intval', array_filter(explode(',', str_replace(' ', '', $dias)), 'strlen'));
+    if ($ini >= $fim || !$diasOk) {
+        return $de->modify("+$minutos minutes");   // sem horário comercial definido: tempo corrido
+    }
+    $cursor = $de;
+    $resta = $minutos;
+    for ($i = 0; $i < 60 && $resta > 0; $i++) {
+        $dia = $cursor->format('Y-m-d');
+        $abre = new DateTimeImmutable("$dia $ini", $cursor->getTimezone());
+        $fecha = new DateTimeImmutable("$dia $fim", $cursor->getTimezone());
+        if (!in_array((int) $cursor->format('N'), $diasOk, true) || $cursor >= $fecha) {
+            $cursor = (new DateTimeImmutable("$dia $ini", $cursor->getTimezone()))->modify('+1 day');
+            continue;
+        }
+        if ($cursor < $abre) {
+            $cursor = $abre;
+        }
+        $livre = intdiv($fecha->getTimestamp() - $cursor->getTimestamp(), 60);
+        $usar = min($livre, $resta);
+        $cursor = $cursor->modify("+$usar minutes");
+        $resta -= $usar;
+        if ($resta > 0) {
+            $cursor = $abre->modify('+1 day');
+        }
+    }
+    return $cursor;
+}
+
+/** Avalia uma regra de condição para a execução. */
+function jornada_condicao(int $empresaId, array $x, string $regra): bool
+{
+    $pdo = db();
+    $desde = $x['iniciada_em'];
+    $leadId = (int) $x['lead_id'];
+    switch ($regra) {
+        case 'cliente_respondeu':
+            $stmt = $pdo->prepare("SELECT 1 FROM whatsapp_mensagens m JOIN whatsapp_conversas cv ON cv.id = m.conversa_id
+                                   WHERE cv.empresa_id = :e AND cv.lead_id = :l AND m.direcao = 'entrada' AND m.tipo <> 'reacao' AND m.criado_em >= :d LIMIT 1");
+            break;
+        case 'humano_respondeu':
+            $stmt = $pdo->prepare("SELECT 1 FROM whatsapp_mensagens m JOIN whatsapp_conversas cv ON cv.id = m.conversa_id
+                                   WHERE cv.empresa_id = :e AND cv.lead_id = :l AND m.direcao = 'saida' AND m.enviada_por IS NOT NULL
+                                     AND m.status NOT IN ('falhou','cancelada') AND m.criado_em >= :d LIMIT 1");
+            break;
+        case 'corretor_confirmou':
+            $stmt = $pdo->prepare("SELECT 1 FROM corretor_pendencias WHERE empresa_id = :e AND lead_id = :l AND status = 'resolvida' AND resposta = 'respondeu' AND resolvida_em >= :d LIMIT 1");
+            break;
+        case 'houve_tentativa':
+            // Tentativa feita por uma PESSOA (ligação, clique no WhatsApp, contato registrado) desde que o lead chegou.
+            $stmt = $pdo->prepare("SELECT 1 FROM lead_eventos ev JOIN leads l ON l.id = ev.lead_id
+                                   WHERE l.empresa_id = :e AND ev.lead_id = :l AND ev.usuario_id IS NOT NULL AND ev.tipo IN ('ligacao','whatsapp','contato')
+                                     AND ev.criado_em >= :d LIMIT 1");
+            break;
+        case 'tem_responsavel':
+            $stmt = $pdo->prepare('SELECT 1 FROM leads WHERE empresa_id = :e AND id = :l AND responsavel_id IS NOT NULL AND :d IS NOT NULL');
+            break;
+        default:
+            return false;
+    }
+    $stmt->execute(['e' => $empresaId, 'l' => $leadId, 'd' => $desde]);
+    return (bool) $stmt->fetchColumn();
+}
+
+/** Encerra as execuções que param quando há resposta (follow-ups de "sem resposta"). */
+function jornada_parar_por_resposta(int $empresaId, int $leadId, string $motivo): int
+{
+    $stmt = db()->prepare("SELECT x.id, j.gatilho_config FROM jornada_execucoes x JOIN jornadas j ON j.id = x.jornada_id
+                           WHERE x.empresa_id = :e AND x.lead_id = :l AND x.status IN ('ativa','aguardando','pausada')");
+    $stmt->execute(['e' => $empresaId, 'l' => $leadId]);
+    $n = 0;
+    foreach ($stmt->fetchAll() as $x) {
+        $cfg = json_decode((string) $x['gatilho_config'], true) ?: [];
+        if (!empty($cfg['parar_quando_responder'])) {
+            jornada_finalizar($empresaId, (int) $x['id'], 'concluida', $motivo);
+            $n++;
+        }
+    }
+    return $n;
 }
 
 function jornada_carregar(int $empresaId, int $id): ?array
@@ -195,6 +321,11 @@ function jornada_tarefa_passo(array $tarefa): array
         jornada_finalizar($empresaId, $execId, 'cancelada', 'Lead encerrado no funil');
         return ['status' => 'ok', 'mensagem' => 'Lead encerrado.'];
     }
+    $somente = (array) ($jornada['gatilho_config']['somente_categorias'] ?? []);
+    if ($somente && !in_array($x['lead_etapa'], $somente, true)) {
+        jornada_finalizar($empresaId, $execId, 'concluida', 'Lead avançou no funil');
+        return ['status' => 'ok', 'mensagem' => 'Lead avançou.'];
+    }
     $chave = (string) ($tarefa['payload']['passo'] ?? $x['passo_chave']);
     $passo = jornada_passo((int) $x['jornada_id'], $chave);
     if (!$passo) {
@@ -218,6 +349,10 @@ function jornada_tarefa_passo(array $tarefa): array
                 $r = ['ok' => false, 'motivo' => 'Lead sem telefone válido para WhatsApp.'];
             } elseif ($passo['tipo'] === 'enviar_template') {
                 $tpl = jornada_template_do_passo($empresaId, $passo, $x['empreendimento_id'] ? (int) $x['empreendimento_id'] : null);
+                if (!$tpl && ($cfg['se_sem_template'] ?? '') === 'pular') {
+                    jornada_log($empresaId, $execId, $chave, 'pulado', 'Nenhum template definido para este passo.');
+                    break;
+                }
                 $r = $tpl
                     ? wa_enfileirar($empresaId, (int) $contato['id'], ['tipo' => 'template', 'template_id' => (int) $tpl['id'], 'dados' => wa_dados_lead($empresaId, (int) $x['lead_id'])],
                         ['idempotencia' => 'jornada:' . $execId . ':' . $chave, 'jornada_execucao_id' => $execId, 'ignorar_horario' => !empty($cfg['ignorar_horario']), 'lead_id' => (int) $x['lead_id']])
@@ -245,12 +380,64 @@ function jornada_tarefa_passo(array $tarefa): array
             break;
 
         case 'esperar':
-            $min = max(1, (int) ($cfg['minutos'] ?? 60));
-            jornada_log($empresaId, $execId, $chave, 'esperando', $min . ' minuto(s)');
+            $agora = new DateTimeImmutable('now', new DateTimeZone('America/Sao_Paulo'));
+            if (!empty($cfg['horas_uteis'])) {
+                $wc = wa_config($empresaId);
+                $quando = jornada_somar_minutos_uteis($agora, (int) round((float) $cfg['horas_uteis'] * 60), $wc['envio_inicio'], $wc['envio_fim'], $wc['envio_dias']);
+                $texto = $cfg['horas_uteis'] . ' hora(s) útil(eis)';
+            } else {
+                $min = !empty($cfg['horas']) ? (int) round((float) $cfg['horas'] * 60) : max(1, (int) ($cfg['minutos'] ?? 60));
+                $quando = $agora->modify("+$min minutes");
+                $texto = $min >= 60 ? round($min / 60, 1) . ' h' : $min . ' min';
+            }
+            jornada_log($empresaId, $execId, $chave, 'esperando', $texto . ' — até ' . $quando->format('d/m H:i'));
             if ($seguir) {
                 $pdo->prepare("UPDATE jornada_execucoes SET status = 'aguardando' WHERE id = :id")->execute(['id' => $execId]);
-                jornada_agendar_passo($empresaId, $execId, $seguir, new DateTimeImmutable('+' . $min . ' minutes'));
-                return ['status' => 'ok', 'mensagem' => 'Aguardando ' . $min . ' min.'];
+                jornada_agendar_passo($empresaId, $execId, $seguir, $quando);
+                return ['status' => 'ok', 'mensagem' => 'Aguardando até ' . $quando->format('d/m H:i')];
+            }
+            break;
+
+        case 'condicao':
+            $regras = (array) ($cfg['se'] ?? []);
+            $verdadeira = null;
+            foreach ($regras as $regra) {
+                if (jornada_condicao($empresaId, $x, (string) $regra)) {
+                    $verdadeira = $regra;
+                    break;
+                }
+            }
+            jornada_log($empresaId, $execId, $chave, $verdadeira ? 'condicao_sim' : 'condicao_nao', $verdadeira ? 'Sim: ' . $verdadeira : 'Nenhuma das condições: ' . implode(', ', $regras));
+            $seguir = $verdadeira ? $passo['proximo_chave'] : $passo['senao_chave'];
+            break;
+
+        case 'confirmar_atendimento':
+            $stmt = $pdo->prepare('SELECT nome, responsavel_id FROM leads WHERE id = :l');
+            $stmt->execute(['l' => $x['lead_id']]);
+            $lead = $stmt->fetch();
+            if (!$lead['responsavel_id']) {
+                jornada_log($empresaId, $execId, $chave, 'pulado', 'Lead ainda sem corretor: ninguém para perguntar.');
+            } elseif (jornada_condicao($empresaId, $x, 'cliente_respondeu')) {
+                jornada_log($empresaId, $execId, $chave, 'pulado', 'O cliente já respondeu pelo WhatsApp: não é preciso perguntar.');
+            } elseif (!empty($cfg['so_se_tentativa']) && !jornada_condicao($empresaId, $x, 'houve_tentativa')) {
+                jornada_log($empresaId, $execId, $chave, 'pulado', 'Nenhuma tentativa de contato registrada pelo corretor.');
+            } else {
+                $pid = pendencia_criar($empresaId, (int) $lead['responsavel_id'], (int) $x['lead_id'], 'confirmar_resposta',
+                    'O cliente ' . $lead['nome'] . ' respondeu à sua tentativa de contato?', 'jornada:' . $execId . ':' . $chave, $execId);
+                jornada_log($empresaId, $execId, $chave, $pid ? 'perguntou' : 'pulado', $pid ? 'Pergunta enviada à central de pendências do corretor.' : 'Já havia pergunta aberta para este lead.');
+            }
+            break;
+
+        case 'criar_tarefa':
+        case 'notificar_corretor':
+            $stmt = $pdo->prepare('SELECT responsavel_id FROM leads WHERE id = :l');
+            $stmt->execute(['l' => $x['lead_id']]);
+            if ($resp = $stmt->fetchColumn()) {
+                pendencia_criar($empresaId, (int) $resp, (int) $x['lead_id'], 'tarefa_jornada', (string) ($cfg['titulo'] ?? $passo['titulo'] ?? 'Tarefa da jornada'),
+                                'jornada:' . $execId . ':' . $chave, $execId);
+                jornada_log($empresaId, $execId, $chave, 'tarefa', (string) ($cfg['titulo'] ?? $passo['titulo']));
+            } else {
+                jornada_log($empresaId, $execId, $chave, 'pulado', 'Lead sem corretor.');
             }
             break;
 
@@ -373,6 +560,15 @@ function jornada_ao_receber_mensagem(int $empresaId, int $conversaId, int $mensa
     }
     if ($msg['tipo'] === 'reacao') {
         return;
+    }
+    // O cliente respondeu: os lembretes de "sem resposta" param (seção 9).
+    jornada_parar_por_resposta($empresaId, $leadId, 'Cliente respondeu pelo WhatsApp');
+    // Atendimento humano em primeiro lugar: avisa o corretor responsável na central de pendências.
+    $stmt = $pdo->prepare('SELECT nome, responsavel_id FROM leads WHERE id = :l AND empresa_id = :e');
+    $stmt->execute(['l' => $leadId, 'e' => $empresaId]);
+    $leadInfo = $stmt->fetch();
+    if ($leadInfo && $leadInfo['responsavel_id']) {
+        pendencia_criar($empresaId, (int) $leadInfo['responsavel_id'], $leadId, 'responder_whatsapp', $leadInfo['nome'] . ' mandou mensagem no WhatsApp', 'wa:' . $mensagemId);
     }
     $acao = jornada_acao_do_botao($empresaId, $conversaId, $msg);
     $contatoId = (int) $msg['contato_id'];

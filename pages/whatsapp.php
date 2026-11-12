@@ -34,21 +34,34 @@ $finalidades = ['boas_vindas' => 'Boas-vindas a novo lead', 'follow_up' => 'Lemb
                 'remarketing' => 'Remarketing (marketing)', 'outro' => 'Outro uso'];
 
 if ($aba === 'jornadas') {
-    $jornadaId = jornada_garantir_boas_vindas($empresaId);
-    $jornada = jornada_carregar($empresaId, $jornadaId);
-    $passoBv = jornada_passo($jornadaId, 'boas_vindas');
-    $estat = jornada_estatisticas($empresaId, $jornadaId);
+    $idsJornadas = [jornada_garantir_boas_vindas($empresaId), jornada_garantir_follow_up($empresaId)];
+    $jornadasTela = [];
+    foreach ($idsJornadas as $jid) {
+        $j = jornada_carregar($empresaId, $jid);
+        $stmt = db()->prepare('SELECT * FROM jornada_passos WHERE jornada_id = :j ORDER BY ordem, id');
+        $stmt->execute(['j' => $jid]);
+        $j['passos'] = array_map(function ($p) { $p['config'] = json_decode((string) $p['config'], true) ?: []; return $p; }, $stmt->fetchAll());
+        $j['estat'] = jornada_estatisticas($empresaId, $jid);
+        $jornadasTela[] = $j;
+    }
     $stmt = db()->prepare('SELECT emp.id, emp.nome, emp.book_arquivo, t.nome AS tpl_nome, t.status AS tpl_status FROM empreendimentos emp
                            LEFT JOIN whatsapp_templates t ON t.id = emp.wa_template_boas_vindas_id AND t.empresa_id = emp.empresa_id
                            WHERE emp.empresa_id = :e AND emp.ativo = 1 ORDER BY emp.nome');
     $stmt->execute(['e' => $empresaId]);
     $cobertura = $stmt->fetchAll();
-    $stmt = db()->prepare("SELECT x.*, l.nome AS lead_nome,
+    $passoBv = jornada_passo($idsJornadas[0], 'boas_vindas');
+    $tplPadrao = !empty($passoBv['config']['template_id']) ? wa_template($empresaId, (int) $passoBv['config']['template_id']) : null;
+    $stmt = db()->prepare("SELECT x.*, l.nome AS lead_nome, j.nome AS jornada_nome,
                                   (SELECT CONCAT(lg.evento, '|', COALESCE(lg.detalhe, '')) FROM jornada_logs lg WHERE lg.execucao_id = x.id ORDER BY lg.id DESC LIMIT 1) AS ultimo
-                           FROM jornada_execucoes x JOIN leads l ON l.id = x.lead_id WHERE x.empresa_id = :e AND x.jornada_id = :j ORDER BY x.id DESC LIMIT 15");
-    $stmt->execute(['e' => $empresaId, 'j' => $jornadaId]);
+                           FROM jornada_execucoes x JOIN leads l ON l.id = x.lead_id JOIN jornadas j ON j.id = x.jornada_id
+                           WHERE x.empresa_id = :e ORDER BY x.id DESC LIMIT 20");
+    $stmt->execute(['e' => $empresaId]);
     $execucoes = $stmt->fetchAll();
     $podeJornada = usuario_tem_permissao($usuario, 'gerenciar_jornadas');
+    $tplNome = [];
+    foreach ($templates as $t) {
+        $tplNome[(int) $t['id']] = $t['nome'];
+    }
 }
 
 if ($aba === 'atividade') {
@@ -202,58 +215,90 @@ require __DIR__ . '/../includes/layout_start.php';
     <?php endif; ?>
 
 <?php elseif ($aba === 'jornadas'):
-    $statusJ = ['ativa' => ['Ligada', 'pill-green'], 'pausada' => ['Pausada', 'pill-amber'], 'rascunho' => ['Desligada', 'pill-muted'], 'desativada' => ['Desativada', 'pill-muted']][$jornada['status']];
-    $origensSel = (array) ($jornada['gatilho_config']['origens'] ?? []);
+    $statusJ = ['ativa' => ['Ligada', 'pill-green'], 'pausada' => ['Pausada', 'pill-amber'], 'rascunho' => ['Desligada', 'pill-muted'], 'desativada' => ['Desativada', 'pill-muted']];
     $rotOrigens = lead_origens();
-    $tplPadrao = !empty($passoBv['config']['template_id']) ? wa_template($empresaId, (int) $passoBv['config']['template_id']) : null;
     $statusX = ['ativa' => ['Em andamento', 'pill-blue'], 'aguardando' => ['Aguardando', 'pill-blue'], 'pausada' => ['Pausada', 'pill-amber'],
                 'concluida' => ['Concluída', 'pill-green'], 'cancelada' => ['Encerrada', 'pill-muted'], 'erro' => ['Erro', 'pill-red']];
+    $rotTipo = ['esperar' => 'Espera', 'condicao' => 'Condição', 'enviar_template' => 'Mensagem', 'enviar_documento' => 'Book', 'confirmar_atendimento' => 'Corretor',
+                'criar_tarefa' => 'Tarefa', 'notificar_corretor' => 'Aviso', 'encerrar' => 'Fim'];
+    $rotRegra = ['cliente_respondeu' => 'o cliente respondeu', 'corretor_confirmou' => 'o corretor confirmou resposta', 'humano_respondeu' => 'alguém respondeu pelo WhatsApp',
+                 'houve_tentativa' => 'houve tentativa de contato', 'tem_responsavel' => 'tem corretor'];
 ?>
-    <div class="card">
+    <?php foreach ($jornadasTela as $j): $jid = (int) $j['id']; $origensSel = (array) ($j['gatilho_config']['origens'] ?? []); [$stRot, $stPill] = $statusJ[$j['status']]; $passosPorChave = array_column($j['passos'], null, 'chave'); ?>
+    <div class="card jornada-card">
         <div class="card-head">
-            <div><h2><?= e($jornada['nome']) ?></h2><p><?= e($jornada['descricao']) ?></p></div>
-            <span class="pill <?= $statusJ[1] ?>"><?= $statusJ[0] ?></span>
+            <div><h2><?= e($j['nome']) ?></h2><p><?= e($j['descricao']) ?></p></div>
+            <span class="pill <?= $stPill ?>"><?= $stRot ?></span>
         </div>
-        <ol class="jornada-fluxo" aria-label="Como a jornada funciona">
-            <li><span class="jf-tipo">Gatilho</span><b>Lead novo chega</b><small>Origens: <?= e(implode(', ', array_map(fn ($o) => $rotOrigens[$o] ?? $o, $origensSel)) ?: '—') ?></small></li>
-            <li><span class="jf-tipo">Verificação</span><b>Pode receber?</b><small>Autorização do cliente, template aprovado, não descadastrado, limite de mensagens</small></li>
-            <li><span class="jf-tipo">Mensagem</span><b>Boas-vindas do empreendimento</b><small>A qualquer hora, mesmo sem corretor online<?= $tplPadrao ? ' · padrão: ' . e($tplPadrao['nome']) : '' ?></small></li>
-            <li><span class="jf-tipo">Resposta</span><b>Botões do cliente</b><small>“Quero o book” → envia o PDF · “Falar com consultor” → avisa · “Agora não” → encerra</small></li>
-            <li><span class="jf-tipo">Fim</span><b>Corretor assume</b><small>A roleta distribui normalmente; a conversa fica no WhatsApp do sistema</small></li>
+        <ol class="jornada-fluxo" aria-label="Passos da jornada <?= e($j['nome']) ?>">
+            <li><span class="jf-tipo">Gatilho</span><b>Lead novo chega</b><small>Origens: <?= e(implode(', ', array_map(fn ($o) => $rotOrigens[$o] ?? $o, $origensSel)) ?: '—') ?><?= !empty($j['gatilho_config']['parar_quando_responder']) ? ' · para quando o cliente responde' : '' ?></small></li>
+            <?php foreach ($j['passos'] as $ps): $c = $ps['config']; ?>
+                <li class="jf-<?= e($ps['tipo']) ?>"><span class="jf-tipo"><?= e($rotTipo[$ps['tipo']] ?? $ps['tipo']) ?></span><b><?= e($ps['titulo'] ?: $ps['tipo']) ?></b><small><?php
+                    if ($ps['tipo'] === 'esperar') {
+                        echo !empty($c['horas_uteis']) ? e($c['horas_uteis']) . ' hora(s) útil(eis) (dentro do horário de envio)' : e($c['horas'] ?? round(($c['minutos'] ?? 60) / 60, 1)) . ' h';
+                    } elseif ($ps['tipo'] === 'condicao') {
+                        echo 'Se ' . e(implode(' ou ', array_map(fn ($r) => $rotRegra[$r] ?? $r, (array) ($c['se'] ?? []))))
+                           . ' → ' . e($passosPorChave[$ps['proximo_chave']]['titulo'] ?? 'fim') . '; senão → ' . e($passosPorChave[$ps['senao_chave']]['titulo'] ?? 'fim');
+                    } elseif ($ps['tipo'] === 'enviar_template') {
+                        $nomeT = !empty($c['template_id']) ? ($tplNome[(int) $c['template_id']] ?? 'template removido') : null;
+                        echo ($c['template'] ?? '') === 'do_empreendimento' ? 'Mensagem do empreendimento' . ($nomeT ? ' (padrão: ' . e($nomeT) . ')' : '') : ($nomeT ? e($nomeT) : 'Nenhum template escolhido — este passo é pulado');
+                        echo !empty($c['ignorar_horario']) ? ' · a qualquer hora' : ' · só no horário de envio';
+                    } elseif ($ps['tipo'] === 'confirmar_atendimento') {
+                        echo 'Pergunta ao corretor “o cliente respondeu?”' . (!empty($c['so_se_tentativa']) ? ', só se ele registrou tentativa' : '');
+                    } elseif ($ps['tipo'] === 'encerrar') {
+                        echo 'Encerra a jornada';
+                    }
+                ?></small></li>
+            <?php endforeach; ?>
         </ol>
         <div class="chip-row" style="margin:6px 0 14px;">
-            <span class="pill pill-muted">Leads que entraram: <?= $estat['iniciadas'] ?? 0 ?></span>
-            <span class="pill pill-green">Receberam a mensagem: <?= $estat['com_mensagem'] ?? 0 ?></span>
-            <span class="pill <?= ($estat['bloqueadas'] ?? 0) ? 'pill-amber' : 'pill-muted' ?>">Não enviadas (regras): <?= $estat['bloqueadas'] ?? 0 ?></span>
-            <span class="pill pill-blue">Books enviados: <?= $estat['books'] ?? 0 ?></span>
+            <span class="pill pill-muted">Leads que entraram: <?= (int) ($j['estat']['iniciadas'] ?? 0) ?></span>
+            <span class="pill pill-blue">Em andamento: <?= (int) ($j['estat']['andamento'] ?? 0) ?></span>
+            <span class="pill pill-green">Receberam mensagem: <?= (int) ($j['estat']['com_mensagem'] ?? 0) ?></span>
+            <span class="pill <?= ($j['estat']['bloqueadas'] ?? 0) ? 'pill-amber' : 'pill-muted' ?>">Não enviadas (regras): <?= (int) ($j['estat']['bloqueadas'] ?? 0) ?></span>
+            <?php if (!empty($j['estat']['books'])): ?><span class="pill pill-blue">Books: <?= (int) $j['estat']['books'] ?></span><?php endif; ?>
         </div>
         <?php if ($podeJornada): ?>
+            <details class="jornada-config"<?= $j['status'] === 'rascunho' ? ' open' : '' ?>><summary>Ajustar esta jornada</summary>
             <form data-api-form action="/api/whatsapp.php">
-                <input type="hidden" name="acao" value="jornada_config"><input type="hidden" name="id" value="<?= (int) $jornada['id'] ?>">
+                <input type="hidden" name="acao" value="jornada_config"><input type="hidden" name="id" value="<?= $jid ?>">
                 <div class="field"><span class="label-like">Quais leads entram</span><div>
                     <?php foreach ($rotOrigens as $o => $rot): if ($o === 'importacao') continue; ?>
                         <label class="dia-chip"><input type="checkbox" name="origens[]" value="<?= e($o) ?>" <?= in_array($o, $origensSel, true) ? 'checked' : '' ?>><span><?= e($rot) ?></span></label>
                     <?php endforeach; ?>
                 </div><small class="field-hint">Listas importadas ficam de fora: para elas, use campanhas com autorização.</small></div>
-                <div class="field"><label for="j-tpl">Mensagem padrão (para empreendimentos sem mensagem própria)</label>
-                    <select id="j-tpl" name="template_id"><option value="">— nenhuma: só envia quem tem mensagem no empreendimento —</option>
-                        <?php foreach ($templates as $t): if ($t['status'] !== 'aprovado') continue; ?><option value="<?= (int) $t['id'] ?>" <?= $tplPadrao && (int) $tplPadrao['id'] === (int) $t['id'] ? 'selected' : '' ?>><?= e($t['nome']) ?></option><?php endforeach; ?>
-                    </select></div>
+                <div class="form-grid">
+                <?php foreach ($j['passos'] as $ps): $c = $ps['config']; $ch = e($ps['chave']); ?>
+                    <?php if ($ps['tipo'] === 'enviar_template'): ?>
+                        <div class="field"><label for="p-<?= $jid ?>-<?= $ch ?>"><?= e($ps['titulo']) ?>: template<?= ($c['template'] ?? '') === 'do_empreendimento' ? ' padrão (empreendimentos sem mensagem própria)' : '' ?></label>
+                            <select id="p-<?= $jid ?>-<?= $ch ?>" name="passo[<?= $ch ?>][template_id]"><option value="">— nenhum (passo pulado) —</option>
+                                <?php foreach ($templates as $t): if ($t['status'] !== 'aprovado') continue; ?><option value="<?= (int) $t['id'] ?>" <?= (int) ($c['template_id'] ?? 0) === (int) $t['id'] ? 'selected' : '' ?>><?= e($t['nome']) ?><?= $t['categoria'] === 'marketing' ? ' (marketing)' : '' ?></option><?php endforeach; ?>
+                            </select></div>
+                    <?php elseif ($ps['tipo'] === 'esperar'): ?>
+                        <div class="field"><label for="p-<?= $jid ?>-<?= $ch ?>"><?= e($ps['titulo']) ?> — <?= !empty($c['horas_uteis']) ? 'horas úteis' : 'horas' ?></label>
+                            <input type="number" id="p-<?= $jid ?>-<?= $ch ?>" name="passo[<?= $ch ?>][<?= !empty($c['horas_uteis']) ? 'horas_uteis' : 'horas' ?>]" min="0.5" max="168" step="0.5" value="<?= e($c['horas_uteis'] ?? $c['horas'] ?? 1) ?>"></div>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+                </div>
                 <div class="form-alert" data-form-alerta hidden></div>
                 <div class="actions">
-                    <button type="submit" class="btn btn-outline"><?= icon('check') ?>Salvar configuração</button>
-                    <?php if ($jornada['status'] === 'ativa'): ?>
-                        <button type="button" class="btn btn-outline" data-api-acao="/api/whatsapp.php" data-acao="jornada_status" data-id="<?= (int) $jornada['id'] ?>" data-status="pausada" data-confirmar="Pausar as boas-vindas automáticas?">Pausar</button>
-                    <?php else: ?>
-                        <button type="button" class="btn btn-primary" data-api-acao="/api/whatsapp.php" data-acao="jornada_status" data-id="<?= (int) $jornada['id'] ?>" data-status="ativa"><?= icon('zap') ?>Ligar boas-vindas automáticas</button>
-                    <?php endif; ?>
+                    <button type="submit" class="btn btn-outline"><?= icon('check') ?>Salvar ajustes</button>
                 </div>
             </form>
+            </details>
+            <div class="actions" style="margin-top:12px;">
+                <?php if ($j['status'] === 'ativa'): ?>
+                    <button type="button" class="btn btn-outline" data-api-acao="/api/whatsapp.php" data-acao="jornada_status" data-id="<?= $jid ?>" data-status="pausada" data-confirmar="Pausar esta jornada? Os leads que estão nela ficam parados até ela voltar.">Pausar jornada</button>
+                <?php else: ?>
+                    <button type="button" class="btn btn-primary" data-api-acao="/api/whatsapp.php" data-acao="jornada_status" data-id="<?= $jid ?>" data-status="ativa"><?= icon('zap') ?>Ligar esta jornada</button>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
     </div>
+    <?php endforeach; ?>
 
     <div class="card" style="margin-top:20px;">
-        <div class="card-head"><div><h2>Empreendimentos</h2><p>Mensagem e book de cada um. Configure na página do empreendimento.</p></div></div>
+        <div class="card-head"><div><h2>Empreendimentos</h2><p>Mensagem de boas-vindas e book de cada um. Configure na página do empreendimento.</p></div></div>
         <?php if ($cobertura): ?>
             <div class="table-wrap"><table class="report-table">
                 <thead><tr><th>Empreendimento</th><th>Mensagem de boas-vindas</th><th>Book</th></tr></thead>
@@ -271,22 +316,23 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
 
     <div class="card" style="margin-top:20px;">
-        <div class="card-head"><div><h2>Últimos leads na jornada</h2><p>O que aconteceu com cada um — inclusive por que uma mensagem não saiu.</p></div></div>
+        <div class="card-head"><div><h2>Últimos leads nas jornadas</h2><p>O que aconteceu com cada um — inclusive por que uma mensagem não saiu.</p></div></div>
         <?php if ($execucoes): ?>
             <div class="table-wrap"><table class="report-table">
-                <thead><tr><th>Lead</th><th>Entrou</th><th>Situação</th><th>Último registro</th></tr></thead>
+                <thead><tr><th>Lead</th><th>Jornada</th><th>Entrou</th><th>Situação</th><th>Último registro</th></tr></thead>
                 <tbody>
                 <?php foreach ($execucoes as $x): [$rot, $pill] = $statusX[$x['status']] ?? [$x['status'], 'pill-muted']; [$ev, $det] = array_pad(explode('|', (string) $x['ultimo'], 2), 2, ''); ?>
                     <tr>
                         <td data-rotulo="Lead"><?php if (rbac_pode_ver_lead($usuario, (int) $x['lead_id'])): ?><a class="lead-link" href="/pages/lead.php?id=<?= (int) $x['lead_id'] ?>"><?= e($x['lead_nome']) ?></a><?php else: ?><?= e($x['lead_nome']) ?><?php endif; ?></td>
+                        <td data-rotulo="Jornada"><?= e($x['jornada_nome']) ?></td>
                         <td data-rotulo="Entrou"><?= e(date('d/m H:i', strtotime($x['iniciada_em']))) ?></td>
-                        <td data-rotulo="Situação"><span class="pill <?= $pill ?>"><?= e($rot) ?></span></td>
+                        <td data-rotulo="Situação"><span class="pill <?= $pill ?>"><?= e($rot) ?></span><?= $x['status'] === 'aguardando' && $x['proxima_acao_em'] ? '<br><span class="muted">próximo passo ' . e(date('d/m H:i', strtotime($x['proxima_acao_em']))) . '</span>' : '' ?></td>
                         <td data-rotulo="Último registro"><?= e($x['motivo'] ?: $det ?: $ev) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table></div>
-        <?php else: ?><p class="empty-note">Nenhum lead passou pela jornada ainda.</p><?php endif; ?>
+        <?php else: ?><p class="empty-note">Nenhum lead passou pelas jornadas ainda.</p><?php endif; ?>
     </div>
 
 <?php elseif ($aba === 'templates'): ?>

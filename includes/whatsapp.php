@@ -573,6 +573,9 @@ function wa_tarefa_enviar(array $tarefa): array
     $pdo->prepare('UPDATE whatsapp_conversas SET ultima_saida_em = NOW(), ultima_mensagem_em = NOW(), ultima_previa = :p,
                           humano_assumiu_em = IF(:humano = 1, COALESCE(humano_assumiu_em, NOW()), humano_assumiu_em) WHERE id = :id')
         ->execute(['p' => $previa, 'humano' => $msg['enviada_por'] !== null ? 1 : 0, 'id' => $msg['conversa_id']]);
+    if ($msg['lead_id'] && $msg['enviada_por'] !== null && function_exists('pendencias_resolver_whatsapp')) {
+        pendencias_resolver_whatsapp($empresaId, (int) $msg['lead_id'], (int) $msg['enviada_por']);
+    }
     if ($msg['lead_id']) {
         $quem = $msg['enviada_por'] === null ? 'Mensagem automática' : 'Mensagem';
         wa_lead_evento((int) $msg['lead_id'], $msg['enviada_por'] !== null ? (int) $msg['enviada_por'] : null,
