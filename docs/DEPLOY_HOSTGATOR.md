@@ -105,6 +105,15 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 - Em uma empresa real, pule os seeds e cadastre empresa e Master pelo
   **Superadmin** (`superadmin@wemart.demo` existe só se o seed foi
   importado — em produção crie o seu e troque a senha).
+- **Acesso principal pelo Terminal:** `php ferramentas/definir_acesso.php`
+  cria ou atualiza um Superadmin WeMart ou o Master de uma empresa. A
+  senha é digitada na hora, sem aparecer na tela, e só o hash vai para o
+  banco. O script também oferece desativar as contas de demonstração
+  (e-mails `*.demo`, senha pública `demo123`). A pasta `ferramentas/` é
+  bloqueada para acesso pelo navegador.
+- A caixa com as contas de demonstração na tela de login só aparece com
+  `define('MOSTRAR_CONTAS_DEMO', true);` no `includes/config.php`. Em
+  produção, deixe sem essa linha ou com `false`.
 
 ## 5. Rotinas automáticas (Cron Jobs do cPanel)
 

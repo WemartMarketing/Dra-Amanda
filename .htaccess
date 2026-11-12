@@ -6,6 +6,7 @@ DirectoryIndex index.php
     RewriteCond %{REQUEST_URI} ^/includes/ [NC,OR]
     RewriteCond %{REQUEST_URI} ^/sql/ [NC,OR]
     RewriteCond %{REQUEST_URI} ^/cron/ [NC,OR]
+    RewriteCond %{REQUEST_URI} ^/ferramentas/ [NC,OR]
     RewriteCond %{REQUEST_URI} ^/storage/ [NC]
     RewriteRule ^ - [F,L]
 </IfModule>

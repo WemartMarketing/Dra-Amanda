@@ -16,6 +16,10 @@ define('DB_PASS', 'troque_pela_senha');
 // Nome da aplicação exibido na interface.
 define('APP_NAME', 'WeMart Sales');
 
+// Mostra na tela de login as contas de demonstração (senha pública
+// demo123). Deixe false em produção; true só em ambiente de testes.
+define('MOSTRAR_CONTAS_DEMO', false);
+
 // Fuso horário usado para exibir datas/horas.
 date_default_timezone_set('America/Sao_Paulo');
 

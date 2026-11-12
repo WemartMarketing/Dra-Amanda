@@ -61,12 +61,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" class="btn btn-primary">Entrar</button>
         </form>
 
+        <?php if (defined('MOSTRAR_CONTAS_DEMO') && MOSTRAR_CONTAS_DEMO): ?>
         <div class="login-demo">
             <b>Conta de demonstração</b><br>
             corretor: carlos@hmvendas.demo · senha: demo123<br>
             gestor: fernanda.gestora@hmvendas.demo · senha: demo123<br>
             superadmin: superadmin@wemart.demo · senha: demo123
         </div>
+        <?php endif; ?>
     </div>
     <p class="login-legal">Ao entrar você concorda com o uso dos dados conforme a LGPD — <a href="/privacidade.php">privacidade e uso dos dados</a>.</p>
 </div>
