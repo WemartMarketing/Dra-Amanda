@@ -12,11 +12,8 @@
  * Só roda pela linha de comando (403 via navegador). GET_LOCK impede duas
  * execuções ao mesmo tempo; cada etapa falha sozinha sem parar as outras.
  */
-if (PHP_SAPI !== 'cli') {
-    http_response_code(403);
-    header('Content-Type: text/plain; charset=utf-8');
-    exit("Acesso negado: esta rotina só roda pelo cron do servidor.\n");
-}
+require_once __DIR__ . '/../includes/terminal.php';
+terminal_exigir();
 
 require_once __DIR__ . '/../includes/roleta.php';
 require_once __DIR__ . '/../includes/meta.php';

@@ -105,7 +105,7 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 - Em uma empresa real, pule os seeds e cadastre empresa e Master pelo
   **Superadmin** (`superadmin@wemart.demo` existe só se o seed foi
   importado — em produção crie o seu e troque a senha).
-- **Acesso principal pelo Terminal:** `php ferramentas/definir_acesso.php`
+- **Acesso principal pelo Terminal:** `php -q ferramentas/definir_acesso.php`
   cria ou atualiza um Superadmin WeMart ou o Master de uma empresa. A
   senha é digitada na hora, sem aparecer na tela, e só o hash vai para o
   banco. O script também oferece desativar as contas de demonstração

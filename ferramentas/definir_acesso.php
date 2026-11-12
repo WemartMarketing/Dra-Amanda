@@ -3,17 +3,15 @@
  * Cria ou atualiza o acesso principal (Superadmin WeMart ou Master de uma
  * empresa) direto no banco — roda SOMENTE pelo Terminal do servidor:
  *
- *   php ferramentas/definir_acesso.php
+ *   php -q ferramentas/definir_acesso.php
  *
  * A senha é digitada na hora (sem aparecer na tela) e só o hash vai para
  * o banco: nenhuma senha fica no código, no GitHub ou no histórico do
  * terminal. Também oferece desativar as contas de demonstração (*.demo),
  * cuja senha é pública.
  */
-if (PHP_SAPI !== 'cli') {
-    http_response_code(404);
-    exit;
-}
+require_once __DIR__ . '/../includes/terminal.php';
+terminal_exigir();
 
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/funcoes.php';
