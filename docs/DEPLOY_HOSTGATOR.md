@@ -90,8 +90,9 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 11 | `sql/migration_006_integracoes_oferta.sql` | Etapa 5 (Meta Lead Ads, oferta ativa, recuperação automática) |
 | 12 | `sql/seed_006.sql` | **só para demonstração** — regra de recuperação, uma lista de oferta ativa, leads parados (não cria nada do Meta) |
 | 13 | `sql/migration_007_dashboards.sql` | Etapa 6 (colunas dos dashboards, índices dos relatórios, permissão de auditoria) |
+| 14 | `sql/migration_008_whatsapp_jornadas.sql` | WhatsApp + Jornadas Inteligentes — Fase 1 (estrutura; ver `docs/WHATSAPP_JORNADAS.md`) |
 
-- Quem já rodou os passos 1–12 roda apenas o **13** (não há seed da
+- Quem já rodou até o 13 roda apenas o **14**. Quem já rodou os passos 1–12 roda o **13** e o **14** (não há seed da
   Etapa 6). Quem estava no passo 10 roda 11, 12 (se usa demonstração) e 13.
 - Rode os arquivos **na ordem** numa instalação nova. Se precisar repetir
   algum depois (por exemplo, se uma importação parou no meio), pode rodar de

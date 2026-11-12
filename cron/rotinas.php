@@ -7,7 +7,8 @@
  *   2. tenta distribuir a fila de espera da roleta;
  *   3. tenta de novo os avisos do Meta Lead Ads com erro (espera crescente);
  *   4. aplica a recuperação automática por inatividade;
- *   5. apaga arquivos temporários de importação com mais de 1 hora.
+ *   5. apaga arquivos temporários de importação com mais de 1 hora;
+ *   6. executa a fila de automação (WhatsApp/Jornadas) — tarefas vencidas.
  *
  * Só roda pela linha de comando (403 via navegador). GET_LOCK impede duas
  * execuções ao mesmo tempo; cada etapa falha sozinha sem parar as outras.
@@ -19,6 +20,7 @@ require_once __DIR__ . '/../includes/roleta.php';
 require_once __DIR__ . '/../includes/meta.php';
 require_once __DIR__ . '/../includes/recuperacao.php';
 require_once __DIR__ . '/../includes/importacao.php';
+require_once __DIR__ . '/../includes/automacao.php';
 
 $pdo = db();
 // Mesma trava de cron/processar_fila.php: as duas nunca rodam juntas.
@@ -50,6 +52,10 @@ try {
         return $r['perdidos'] . ' recuperado(s), ' . $r['redistribuidos'] . ' redistribuído(s), ' . $r['em_fila'] . ' na fila';
     });
     $etapa('temporários', fn () => importacao_limpar_temporarios(3600) . ' apagado(s)');
+    $etapa('automação', function () {
+        $r = automacao_executar(200);
+        return $r['executadas'] . ' tarefa(s), ' . $r['ok'] . ' ok, ' . $r['reagendadas'] . ' reagendada(s), ' . $r['falhas'] . ' falha(s), ' . $r['travadas_retomadas'] . ' retomada(s)';
+    });
     fwrite(STDOUT, '[' . date('Y-m-d H:i:s') . '] ' . implode(' · ', $log) . "\n");
 } finally {
     $pdo->query("SELECT RELEASE_LOCK('wemart_fila')");

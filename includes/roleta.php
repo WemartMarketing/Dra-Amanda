@@ -19,6 +19,7 @@ require_once __DIR__ . '/leads.php';
 require_once __DIR__ . '/auditoria.php';
 require_once __DIR__ . '/transferencia.php';
 require_once __DIR__ . '/rbac.php';
+require_once __DIR__ . '/roleta_horarios.php';
 
 const ROLETA_FUSO = 'America/Sao_Paulo';
 
@@ -56,6 +57,19 @@ function roleta_dias_texto(?string $dias): string
 
 function roleta_horario_texto(array $roleta): string
 {
+    $roletaId = (int) ($roleta['roleta_id'] ?? $roleta['id'] ?? 0);
+    if ($roletaId && roleta_horarios_personalizados($roletaId)) {
+        $rot = roleta_dias_rotulos();
+        $partes = [];
+        foreach (roleta_horarios_linhas($roletaId) as $h) {
+            $txt = $rot[(int) $h['dia_semana']] . ' ' . substr($h['inicio'], 0, 5) . '–' . substr($h['fim'], 0, 5);
+            if ($h['pausa_inicio'] && $h['pausa_fim']) {
+                $txt .= ' (pausa ' . substr($h['pausa_inicio'], 0, 5) . '–' . substr($h['pausa_fim'], 0, 5) . ')';
+            }
+            $partes[] = $txt;
+        }
+        return implode(' · ', $partes);
+    }
     if (!$roleta['horario_inicio'] || !$roleta['horario_fim']) {
         return 'Qualquer horário';
     }
@@ -83,6 +97,21 @@ function roleta_carregar(int $empresaId, int $roletaId): ?array
  */
 function roleta_no_horario(array $roleta, ?DateTime $agora = null): array
 {
+    // Linha vinda de roleta_sessoes traz o id da SESSÃO em "id": o da roleta está em "roleta_id".
+    $roletaId = (int) ($roleta['roleta_id'] ?? $roleta['id'] ?? 0);
+    $empresaId = (int) ($roleta['empresa_id'] ?? 0);
+    if ($roletaId && $empresaId) {
+        $tz = new DateTimeZone(ROLETA_FUSO);
+        $quando = $agora ? DateTimeImmutable::createFromMutable($agora)->setTimezone($tz) : new DateTimeImmutable('now', $tz);
+        $sit = roleta_exp_situacao(
+            $roleta,
+            roleta_horarios_linhas($roletaId),
+            roleta_excecoes_linhas($empresaId, $roletaId, $quando),
+            $quando
+        );
+        return [$sit['aberta'], $sit['aberta'] ? '' : $sit['motivo']];
+    }
+    // Sem identificação da roleta (não deveria acontecer): regra antiga.
     $agora = $agora ?: roleta_agora();
     $dias = roleta_dias_lista($roleta['dias_semana'] ?? '1,2,3,4,5,6,7');
     if (!in_array((int) $agora->format('N'), $dias, true)) {
@@ -196,7 +225,7 @@ function roleta_fechar_sessao(int $sessaoId, string $motivo): void
  */
 function roleta_fechar_expiradas(?int $empresaId = null, ?int $roletaId = null): int
 {
-    $sql = 'SELECT s.id, s.roleta_id, s.ultima_verificacao_em, r.ativa, r.dias_semana, r.horario_inicio, r.horario_fim, r.validade_presenca_min
+    $sql = 'SELECT s.id, s.roleta_id, r.empresa_id, s.ultima_verificacao_em, r.ativa, r.dias_semana, r.horario_inicio, r.horario_fim, r.validade_presenca_min
             FROM roleta_sessoes s INNER JOIN roletas r ON r.id = s.roleta_id
             WHERE s.saiu_em IS NULL';
     $params = [];

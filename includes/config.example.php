@@ -20,6 +20,10 @@ define('APP_NAME', 'WeMart Sales');
 // demo123). Deixe false em produção; true só em ambiente de testes.
 define('MOSTRAR_CONTAS_DEMO', false);
 
+// Libera os testes automatizados (php tests/…) que criam e apagam uma
+// empresa fictícia. NUNCA defina como true no servidor de produção.
+define('TESTES_PERMITIDOS', false);
+
 // Fuso horário usado para exibir datas/horas.
 date_default_timezone_set('America/Sao_Paulo');
 

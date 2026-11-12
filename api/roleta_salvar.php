@@ -89,6 +89,7 @@ if ($id) {
     db()->prepare("UPDATE roletas SET {$sets} WHERE id = :id AND empresa_id = :empresa_id")
         ->execute($dados + ['id' => $id, 'empresa_id' => $empresaId]);
     // Pausar, mudar horário/dias ou desligar a exigência fecha quem não se encaixa mais.
+    roleta_horarios_sincronizar_simples($id, $dados['horario_inicio'], $dados['horario_fim'], $dados['dias_semana']);
     roleta_fechar_expiradas($empresaId, $id);
     auditoria_registrar($empresaId, (int) $usuario['id'], $atual['ativa'] && !$dados['ativa'] ? 'roleta.pausada' : 'roleta.editada', 'roleta', $id, $dados);
     api_responder(['ok' => true, 'id' => $id, 'mensagem' => 'Regras da roleta salvas.']);
@@ -98,5 +99,6 @@ $colunas = array_keys($dados);
 db()->prepare('INSERT INTO roletas (empresa_id, ' . implode(', ', $colunas) . ') VALUES (:empresa_id, :' . implode(', :', $colunas) . ')')
     ->execute($dados + ['empresa_id' => $empresaId]);
 $novoId = (int) db()->lastInsertId();
+roleta_horarios_sincronizar_simples($novoId, $dados['horario_inicio'], $dados['horario_fim'], $dados['dias_semana']);
 auditoria_registrar($empresaId, (int) $usuario['id'], 'roleta.criada', 'roleta', $novoId, $dados);
 api_responder(['ok' => true, 'id' => $novoId, 'mensagem' => 'Roleta criada.']);

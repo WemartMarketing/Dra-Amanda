@@ -36,13 +36,13 @@ function funcoes_rotulos_escopo(): array
 function funcoes_definicao_padrao(): array
 {
     return [
-        'master_empresa'  => ['nome' => 'Master da empresa', 'escopo' => 'toda_empresa',        'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'excluir_leads', 'redistribuir_leads', 'gerenciar_roletas', 'gerenciar_equipes', 'gerenciar_empreendimentos', 'gerenciar_plantoes', 'exportar_relatorios', 'visualizar_indicadores', 'administrar_usuarios', 'configurar_funil', 'acessar_arquivos_leads', 'participar_roleta', 'gerenciar_integracoes', 'configurar_recuperacao', 'gerenciar_oferta_ativa', 'visualizar_auditoria']],
+        'master_empresa'  => ['nome' => 'Master da empresa', 'escopo' => 'toda_empresa',        'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'excluir_leads', 'redistribuir_leads', 'gerenciar_roletas', 'gerenciar_equipes', 'gerenciar_empreendimentos', 'gerenciar_plantoes', 'exportar_relatorios', 'visualizar_indicadores', 'administrar_usuarios', 'configurar_funil', 'acessar_arquivos_leads', 'participar_roleta', 'gerenciar_integracoes', 'configurar_recuperacao', 'gerenciar_oferta_ativa', 'visualizar_auditoria', 'whatsapp_atender', 'whatsapp_configurar', 'gerenciar_jornadas', 'gerenciar_campanhas_wa']],
         'gp_lider'        => ['nome' => 'GP Líder',          'escopo' => 'todos_produtos',       'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'exportar_relatorios']],
         'gerente_geral'   => ['nome' => 'Gerente Geral',     'escopo' => 'todos_produtos',       'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'exportar_relatorios', 'gerenciar_equipes', 'gerenciar_oferta_ativa']],
         'gp_produto'      => ['nome' => 'GP do Produto',     'escopo' => 'produtos_vinculados',  'permissoes' => ['visualizar_leads', 'visualizar_indicadores']],
-        'superintendente' => ['nome' => 'Superintendente',   'escopo' => 'superintendencia',     'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'redistribuir_leads', 'gerenciar_equipes', 'acessar_arquivos_leads', 'gerenciar_oferta_ativa']],
-        'gerente'         => ['nome' => 'Gerente',           'escopo' => 'equipe',               'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'redistribuir_leads', 'visualizar_indicadores', 'acessar_arquivos_leads']],
-        'corretor'        => ['nome' => 'Corretor',          'escopo' => 'propria_carteira',     'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'acessar_arquivos_leads', 'participar_roleta']],
+        'superintendente' => ['nome' => 'Superintendente',   'escopo' => 'superintendencia',     'permissoes' => ['visualizar_leads', 'visualizar_indicadores', 'redistribuir_leads', 'gerenciar_equipes', 'acessar_arquivos_leads', 'gerenciar_oferta_ativa', 'whatsapp_atender']],
+        'gerente'         => ['nome' => 'Gerente',           'escopo' => 'equipe',               'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'redistribuir_leads', 'visualizar_indicadores', 'acessar_arquivos_leads', 'whatsapp_atender']],
+        'corretor'        => ['nome' => 'Corretor',          'escopo' => 'propria_carteira',     'permissoes' => ['visualizar_leads', 'criar_leads', 'editar_leads', 'acessar_arquivos_leads', 'participar_roleta', 'whatsapp_atender']],
     ];
 }
 
