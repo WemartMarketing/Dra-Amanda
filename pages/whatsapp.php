@@ -3,7 +3,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/lead_componentes.php';
-require_once __DIR__ . '/../includes/whatsapp.php';
+require_once __DIR__ . '/../includes/whatsapp_conversas.php';
 
 $usuario = auth_require();
 $crumb = 'WhatsApp';
@@ -67,11 +67,7 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
 </div>
 
-<div class="tabs" role="tablist" aria-label="Seções do WhatsApp">
-    <?php foreach ($abas as $chave => $rotulo): ?>
-        <a role="tab" href="?aba=<?= $chave ?>" class="tab<?= $aba === $chave ? ' is-current' : '' ?>" aria-selected="<?= $aba === $chave ? 'true' : 'false' ?>"><?= e($rotulo) ?></a>
-    <?php endforeach; ?>
-</div>
+<?php wa_render_abas($usuario, $aba); ?>
 
 <?php if ($conta): $teste = (int) $conta['modo_teste'] === 1; ?>
     <div class="wa-modo <?= $teste ? 'is-teste' : ($conta['status'] === 'ativa' ? 'is-real' : 'is-parado') ?>" role="status">

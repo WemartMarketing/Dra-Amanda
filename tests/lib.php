@@ -70,6 +70,15 @@ function criar_empresa_teste(string $sufixo = ''): int
 
 function apagar_empresa_teste(int $empresaId): void
 {
-    db()->prepare('DELETE FROM auditoria WHERE empresa_id = :e')->execute(['e' => $empresaId]);
-    db()->prepare("DELETE FROM empresas WHERE id = :e AND nome LIKE 'Teste automatizado%'")->execute(['e' => $empresaId]);
+    $nome = db()->prepare('SELECT nome FROM empresas WHERE id = :e');
+    $nome->execute(['e' => $empresaId]);
+    if (!str_starts_with((string) $nome->fetchColumn(), 'Teste automatizado')) {
+        return; // nunca apaga empresa que não foi criada pelos testes
+    }
+    // Ordem: o que aponta para usuários sai antes deles; usuários antes das funções (FK sem cascata).
+    foreach (['DELETE FROM auditoria WHERE empresa_id = :e', 'DELETE FROM leads WHERE empresa_id = :e',
+              'UPDATE equipes SET gerente_id = NULL WHERE empresa_id = :e', 'DELETE FROM usuarios WHERE empresa_id = :e',
+              'DELETE FROM empresas WHERE id = :e'] as $sql) {
+        db()->prepare($sql)->execute(['e' => $empresaId]);
+    }
 }

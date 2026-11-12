@@ -4,7 +4,7 @@ Módulo nativo do WeMart Sales para manter o relacionamento com o lead
 mesmo quando nenhum corretor está online, usando **somente** a WhatsApp
 Business Platform (Cloud API oficial da Meta).
 
-> **Situação atual: Fases 1 e 2 concluídas.** O envio, o recebimento e os
+> **Situação atual: Fases 1, 2 e 3 concluídas.** O envio, o recebimento e os
 > status já estão programados e testados contra um **simulador** da Graph
 > API, mas **ainda não foram validados com uma conta real da Meta**.
 > Toda conta nova nasce em **modo de teste**: nada é enviado até alguém
@@ -32,7 +32,7 @@ Nenhum módulo anterior foi removido ou duplicado.
 |---|---|---|
 | 1 | Banco, fila persistente, regras de envio/consentimento, horários das roletas, testes | **concluída** |
 | 2 | Webhook `webhook/whatsapp.php` (mensagens + status), cliente da Cloud API com **modo de teste**, sincronização de templates, tela de conexão | **concluída** (validação real pendente) |
-| 3 | Central de conversas (3 colunas no computador, tela simples no celular), botão **Conversar no WhatsApp** na ficha e nos cards | a fazer |
+| 3 | Central de conversas (3 colunas no computador, tela simples no celular), botão **Conversar no WhatsApp** na ficha e nos cards | **concluída** |
 | 4 | Jornada "novo lead": boas-vindas por empreendimento, oferta e envio do book (PDF), fila quando a roleta está fechada | a fazer |
 | 5 | Follow-ups (esperar/condição), central de pendências do corretor ("o cliente respondeu?") | a fazer |
 | 6 | Integração com recuperação/redistribuição, tela de horário por dia, pausas e feriados das roletas | a fazer |
@@ -220,6 +220,95 @@ php tests/whatsapp_fase2_test.php
   conectar, testar, ativar recebimento, sincronizar e configurar template,
   ligar envio real (recusando a frase errada), enviar teste, confirmações
   de entrega e leitura e resposta do cliente.
+
+## Fase 3 — Central de conversas
+
+### O que o usuário vê
+
+- **Menu WhatsApp:**
+  - quem atende vai direto para **Conversas**, com o número de conversas
+    com mensagem nova (no celular, o número aparece em "Mais");
+  - quem configura vê também as abas Templates, Conexão e Atividade.
+- **Computador**, em três colunas:
+  - **lista:** busca por nome ou telefone; filtros "Não lidas",
+    "Aguardando você" e "Sem lead" (este só para o Master);
+  - **conversa:** bolhas com quem enviou, horário e ✓ enviada, ✓✓
+    entregue, ✓✓ azul lida, ⚠ falhou com o motivo;
+  - **dados do cliente:** empreendimento, corretor, etapa, próximas
+    atividades e autorizações (LGPD).
+- **Celular:** uma tela por vez (lista → conversa → dados do cliente), com
+  letras e botões grandes. O aviso de modo de teste some com a conversa
+  aberta, porque cada mensagem já avisa.
+- **Botão "Conversar no WhatsApp"** no card do Kanban, na lista de leads,
+  no Início e na ficha: abre a conversa **dentro do WeMart**. Se ainda não
+  existe conversa, ela é criada. Se a empresa ainda não ligou o WhatsApp,
+  o botão continua abrindo o WhatsApp do aparelho, como antes.
+- **O que dá para enviar**, conforme a situação:
+  - **cliente escreveu nas últimas 24 h:** texto livre e anexos (PDF, JPG
+    e PNG de até 15 MB);
+  - **fora das 24 h:** só um template aprovado, com prévia já preenchida
+    com os dados do lead. Template com dado faltando não aparece como
+    pronto, para não enviar "{{2}}" ao cliente;
+  - **sem autorização registrada:** um aviso explica, e o corretor pode
+    registrar como o cliente autorizou. A evidência fica no histórico da
+    LGPD;
+  - **cliente pediu para sair:** nada pode ser enviado, a não ser que ele
+    volte a escrever.
+- **Mensagens novas aparecem sozinhas:** a tela consulta a cada 5 segundos
+  enquanto está aberta e para quando a aba fica em segundo plano. Não usa
+  WebSocket nem Node.js.
+- **Arquivos que o cliente manda** (foto, documento) são baixados da Meta
+  só na primeira vez que alguém abre, e só por quem pode ver a conversa.
+  Em modo de teste não há download.
+
+### Quem vê o quê
+
+- **A conversa segue o lead**: quem enxerga o lead (pela função, equipe,
+  superintendência ou carteira) enxerga a conversa.
+- Quando o lead é **transferido**, o corretor e o gerente anteriores
+  perdem o acesso na hora. O novo responsável recebe o histórico completo.
+  Nada é copiado.
+- Número que ainda não é lead só aparece para o **Master**, que pode
+  ligá-lo a um lead.
+- Se um cliente escreveu **antes** de virar lead, inclusive de um número
+  antigo sem o 9, a conversa é reaproveitada quando o corretor abre pelo
+  lead. Ele vê o que o cliente já tinha escrito.
+- Tentativas de abrir conversa fora da carteira, pela tela ou direto pela
+  API, recebem "não encontrada" (404), sem confirmar se ela existe.
+
+### Arquivos
+
+`includes/whatsapp_conversas.php` (escopo, lista, abrir pelo lead,
+mídia), `api/conversas.php`, `api/whatsapp_midia.php`,
+`pages/conversas.php`, `assets/js/conversas.js`. Botões alterados em
+`includes/lead_componentes.php`, `pages/leads.php`, `pages/inicio.php` e
+`pages/lead.php`. Não há migração nova.
+
+### Testes (`tests/whatsapp_fase3_test.php`)
+
+- São 47 verificações e todas passam. Cobrem:
+  - quem vê cada conversa (corretor, outro corretor, gerente, Master,
+    outra empresa);
+  - filtros e busca;
+  - contador de não lidas;
+  - carregar só as mensagens novas;
+  - resposta do corretor;
+  - transferência;
+  - botão pelo lead (criar, reaproveitar, lead de outro corretor, sem
+    telefone, número antigo sem o 9);
+  - link interno x wa.me;
+  - templates prontos;
+  - caminhos de arquivo.
+- Para conferir que os testes pegam erros de verdade, a regra de escopo
+  foi desligada de propósito, e 8 verificações acusaram o vazamento.
+- Também foi feito o fluxo pela tela com as contas de demonstração:
+  - o corretor responde e envia um PDF;
+  - uma mensagem nova chega e aparece sem recarregar;
+  - ele registra a autorização do cliente e envia um template;
+  - ele tenta abrir a conversa de outro corretor (bloqueado na tela e na
+    API);
+  - o Master liga um número desconhecido a um lead;
+  - tudo conferido no iPhone e num Android de 360 px, sem rolagem lateral.
 
 ## Dependências externas (Meta)
 

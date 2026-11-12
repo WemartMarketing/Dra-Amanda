@@ -141,7 +141,7 @@ require __DIR__ . '/../includes/layout_start.php';
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($leads as $lead): $whats = lead_link_whatsapp($lead['telefone']); ?>
+            <?php foreach ($leads as $lead): $whats = wa_link_conversar($usuario, $lead); ?>
                 <tr class="<?= $lead['atrasado'] ? 'is-late' : '' ?>">
                     <?php if ($podeTransferir): ?><td class="col-check"><input type="checkbox" value="<?= (int) $lead['id'] ?>" data-selecionar-lead aria-label="Selecionar <?= e($lead['nome']) ?>"></td><?php endif; ?>
                     <td class="col-cliente">
@@ -155,7 +155,7 @@ require __DIR__ . '/../includes/layout_start.php';
                     <td class="txt-muted"><?= e(tempo_relativo($lead['ultima_atividade_em'] ?? $lead['criado_em'])) ?></td>
                     <td class="col-acoes">
                         <?php if ($whats): ?>
-                            <a class="icon-btn icon-btn-whats" href="<?= e($whats) ?>" target="_blank" rel="noopener" data-registrar="whatsapp" data-lead="<?= (int) $lead['id'] ?>" aria-label="WhatsApp de <?= e($lead['nome']) ?>"><?= icon('whatsapp') ?></a>
+                            <a class="icon-btn icon-btn-whats" <?= wa_link_atributos($whats, (int) $lead['id']) ?> aria-label="Conversar no WhatsApp com <?= e($lead['nome']) ?>"><?= icon('whatsapp') ?></a>
                             <a class="icon-btn" href="tel:<?= e(lead_telefone_normalizado($lead['telefone'])) ?>" data-registrar="ligacao" data-lead="<?= (int) $lead['id'] ?>" aria-label="Ligar para <?= e($lead['nome']) ?>"><?= icon('phone') ?></a>
                         <?php endif; ?>
                         <a class="icon-btn" href="/pages/lead.php?id=<?= (int) $lead['id'] ?>" aria-label="Abrir ficha de <?= e($lead['nome']) ?>"><?= icon('arrow-r') ?></a>

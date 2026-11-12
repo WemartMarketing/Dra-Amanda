@@ -29,6 +29,12 @@ $ehCorretor = ($usuario['escopo'] ?? '') === 'propria_carteira';
 // Gestores (quem vê indicadores) começam pelo Dashboard; corretores, pelo Início.
 $ehGestor = !$ehCorretor && usuario_tem_permissao($usuario, 'visualizar_indicadores');
 $inicioHref = $ehGestor ? '/pages/dashboard.php' : '/pages/inicio.php';
+// WhatsApp: quem atende vai para as conversas (com o número de não lidas); quem só configura, para a configuração.
+require_once __DIR__ . '/whatsapp_conversas.php';
+$waAtende = empty($usuario['eh_superadmin']) && wa_pode_atender($usuario) && wa_central_ativa((int) $usuario['empresa_ativa_id']);
+$waHref = $waAtende ? '/pages/conversas.php' : (usuario_tem_permissao($usuario, 'whatsapp_configurar') ? '/pages/whatsapp.php' : null);
+$waNaoLidas = $waAtende ? wa_conversas_nao_lidas($usuario) : 0;
+
 $navItems = [
     ['key' => 'dashboard',  'href' => '/pages/dashboard.php',  'label' => 'Dashboard',                                  'icon' => 'chart',    'mostrar' => $ehGestor],
     ['key' => 'inicio',     'href' => '/pages/inicio.php',     'label' => 'Início',                                     'icon' => 'home',     'mostrar' => true],
@@ -45,7 +51,7 @@ $navItems = [
     ['key' => 'usuarios',   'href' => '/pages/usuarios.php',   'label' => 'Usuários e acessos',                         'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'administrar_usuarios')],
     ['key' => 'funil',      'href' => '/pages/funil.php',      'label' => 'Etapas do funil',                            'icon' => 'settings', 'mostrar' => usuario_tem_permissao($usuario, 'configurar_funil')],
     ['key' => 'recuperacao', 'href' => '/pages/recuperacao.php', 'label' => 'Recuperação de leads',                     'icon' => 'clock',    'mostrar' => usuario_tem_permissao($usuario, 'configurar_recuperacao')],
-    ['key' => 'whatsapp',   'href' => '/pages/whatsapp.php',   'label' => 'WhatsApp',                                   'icon' => 'whatsapp', 'mostrar' => usuario_tem_permissao($usuario, 'whatsapp_configurar')],
+    ['key' => 'whatsapp',   'href' => $waHref,                 'label' => 'WhatsApp',                                   'icon' => 'whatsapp', 'mostrar' => $waHref !== null, 'contador' => $waNaoLidas],
     ['key' => 'integracoes', 'href' => '/pages/integracoes.php', 'label' => 'Integrações',                              'icon' => 'zap',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_integracoes')],
     ['key' => 'auditoria',  'href' => '/pages/auditoria.php',  'label' => 'Auditoria',                                  'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'visualizar_auditoria')],
     ['key' => 'perfil',     'href' => '/pages/perfil.php',     'label' => 'Meu perfil',                                 'icon' => 'user',     'mostrar' => true],
@@ -84,7 +90,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
         <div class="navtitle">Área de trabalho</div>
         <nav class="nav">
             <?php foreach ($navItems as $item): ?>
-                <a href="<?= $item['href'] ?>" class="<?= $navAtivo === $item['key'] ? 'active' : '' ?>"<?= $navAtivo === $item['key'] ? ' aria-current="page"' : '' ?>><?= icon($item['icon']) ?><?= htmlspecialchars($item['label']) ?></a>
+                <a href="<?= $item['href'] ?>" class="<?= $navAtivo === $item['key'] ? 'active' : '' ?>"<?= $navAtivo === $item['key'] ? ' aria-current="page"' : '' ?>><?= icon($item['icon']) ?><?= htmlspecialchars($item['label']) ?><?php if (!empty($item['contador'])): ?><b class="nav-badge" aria-label="<?= (int) $item['contador'] ?> com mensagem nova"><?= (int) $item['contador'] > 99 ? '99+' : (int) $item['contador'] ?></b><?php endif; ?></a>
             <?php endforeach; ?>
         </nav>
         <div class="sidefooter">

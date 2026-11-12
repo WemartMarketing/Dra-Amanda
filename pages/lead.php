@@ -133,7 +133,7 @@ if ($podeArquivos) {
 $responsaveisAgenda = !$ehCorretor ? rbac_usuarios_atribuiveis($usuario) : [];
 $destinos = $podeTransferir ? array_values(array_filter(rbac_usuarios_atribuiveis($usuario), fn ($d) => (int) $d['id'] !== (int) $lead['responsavel_id'])) : [];
 
-$whats = lead_link_whatsapp($lead['telefone']);
+$whats = wa_link_conversar($usuario, $lead);
 $tel = lead_telefone_normalizado($lead['telefone']);
 $atrasado = lead_esta_atrasado($lead + ['compromisso_vencido' => (bool) array_filter($pendentes, fn ($c) => strtotime($c['inicio']) < time())]);
 $abas = ['resumo' => 'Resumo', 'atendimento' => 'Atendimento', 'historico' => 'Histórico', 'agenda' => 'Agenda', 'arquivos' => 'Arquivos'];
@@ -163,7 +163,7 @@ require __DIR__ . '/../includes/layout_start.php';
     <div class="lead-actions" aria-label="Ações do lead">
         <?php if ($tel): ?>
             <a class="btn btn-primary" href="tel:<?= e($tel) ?>" data-registrar="ligacao" data-lead="<?= (int) $lead['id'] ?>"><?= icon('phone') ?>Ligar</a>
-            <?php if ($whats): ?><a class="btn btn-success" href="<?= e($whats) ?>" target="_blank" rel="noopener" data-registrar="whatsapp" data-lead="<?= (int) $lead['id'] ?>"><?= icon('whatsapp') ?>WhatsApp</a><?php endif; ?>
+            <?php if ($whats): ?><a class="btn btn-success" <?= wa_link_atributos($whats, (int) $lead['id']) ?>><?= icon('whatsapp') ?><?= $whats['interno'] ? '<span class="so-desktop">Conversar no&nbsp;</span>WhatsApp' : 'WhatsApp' ?></a><?php endif; ?>
         <?php endif; ?>
         <?php if ($podeEditar): ?>
             <button type="button" class="btn btn-outline btn-wide" data-open-modal="modal-registro" data-registro-tipo="contato"><?= icon('user') ?>Registrar contato</button>

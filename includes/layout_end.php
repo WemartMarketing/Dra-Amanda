@@ -13,7 +13,7 @@
     <a href="/pages/leads.php" class="<?= $navAtivo === 'leads' ? 'active' : '' ?>"><?= icon('list') ?>Leads</a>
     <a href="/pages/kanban.php" class="<?= $navAtivo === 'kanban' ? 'active' : '' ?>"><?= icon('kanban') ?>Kanban</a>
     <a href="/pages/agenda.php" class="<?= $navAtivo === 'agenda' ? 'active' : '' ?>"><?= icon('calendar') ?>Agenda</a>
-    <button type="button" data-open-modal="menu-mais" class="<?= !in_array($navAtivo, $principaisMobile, true) ? 'active' : '' ?>"><?= icon('more') ?>Mais</button>
+    <button type="button" data-open-modal="menu-mais" class="<?= !in_array($navAtivo, $principaisMobile, true) ? 'active' : '' ?>"><?= icon('more') ?>Mais<?php if (!empty($waNaoLidas) && !in_array('whatsapp', $principaisMobile, true)): ?><b class="nav-badge nav-badge-mais" aria-label="Mensagens novas no WhatsApp"><?= (int) $waNaoLidas > 99 ? '99+' : (int) $waNaoLidas ?></b><?php endif; ?></button>
 </nav>
 
 <div class="modal-overlay modal-sheet" id="menu-mais" hidden>
@@ -22,7 +22,7 @@
         <h2 id="menu-mais-titulo">Menu</h2>
         <nav class="menu-mais-lista">
             <?php foreach ($navItems as $item): if (in_array($item['key'], $principaisMobile, true)) continue; ?>
-                <a href="<?= $item['href'] ?>" class="<?= $navAtivo === $item['key'] ? 'active' : '' ?>"><?= icon($item['icon']) ?><?= htmlspecialchars($item['label']) ?></a>
+                <a href="<?= $item['href'] ?>" class="<?= $navAtivo === $item['key'] ? 'active' : '' ?>"><?= icon($item['icon']) ?><?= htmlspecialchars($item['label']) ?><?php if (!empty($item['contador'])): ?><b class="nav-badge" aria-label="<?= (int) $item['contador'] ?> com mensagem nova"><?= (int) $item['contador'] > 99 ? '99+' : (int) $item['contador'] ?></b><?php endif; ?></a>
             <?php endforeach; ?>
             <a href="/logout.php"><?= icon('logout') ?>Sair</a>
         </nav>

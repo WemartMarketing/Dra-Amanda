@@ -148,14 +148,14 @@ if ($emRisco): $regraRec = recuperacao_regra($empresaId); ?>
             <div><h2>Atividades pendentes</h2><p>Retorno vencido, compromisso atrasado ou lead novo sem contato há mais de 48 h.</p></div>
             <span class="pill <?= $totalAtrasados ? 'pill-red' : 'pill-green' ?>"><?= $totalAtrasados ?></span>
         </div>
-        <?php foreach ($pendentes as $lead): $whats = lead_link_whatsapp($lead['telefone']); ?>
+        <?php foreach ($pendentes as $lead): $whats = wa_link_conversar($usuario, $lead); ?>
             <div class="task-row">
                 <div class="avatar"><?= e(lead_iniciais($lead['nome'])) ?></div>
                 <div class="who-info">
                     <strong><a href="/pages/lead.php?id=<?= (int) $lead['id'] ?>"><?= e($lead['nome']) ?></a></strong>
                     <span><?= e($lead['etapa_nome'] ?? lead_etapa_rotulo($lead['etapa'])) ?> · <?= e(lead_proxima_acao($lead)) ?><?= $ehCorretor ? '' : ' · ' . e($lead['responsavel_nome'] ?? '') ?></span>
                 </div>
-                <?php if ($whats): ?><a class="icon-btn icon-btn-whats" href="<?= e($whats) ?>" target="_blank" rel="noopener" data-registrar="whatsapp" data-lead="<?= (int) $lead['id'] ?>" aria-label="WhatsApp de <?= e($lead['nome']) ?>"><?= icon('whatsapp') ?></a><?php endif; ?>
+                <?php if ($whats): ?><a class="icon-btn icon-btn-whats" <?= wa_link_atributos($whats, (int) $lead['id']) ?> aria-label="Conversar no WhatsApp com <?= e($lead['nome']) ?>"><?= icon('whatsapp') ?></a><?php endif; ?>
                 <a href="/pages/lead.php?id=<?= (int) $lead['id'] ?>&aba=atendimento" class="btn btn-primary btn-sm"><?= icon('arrow-r') ?>Atender</a>
             </div>
         <?php endforeach; ?>

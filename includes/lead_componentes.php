@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/whatsapp_conversas.php';
 /**
  * Componentes de interface reaproveitados entre Kanban, lista de leads,
  * ficha e agenda: card do lead e os modais "Mover etapa", "Transferir" e
@@ -15,7 +16,7 @@ function e(?string $texto): string
 /** Card do lead (Kanban e lista em cards no celular). */
 function render_lead_card(array $lead, bool $mostrarResponsavel, bool $podeMover): void
 {
-    $whats = lead_link_whatsapp($lead['telefone']);
+    $whats = wa_link_conversar(current_user(), $lead);
     $tel = lead_telefone_normalizado($lead['telefone']);
     ?>
     <article class="kcard<?= $lead['atrasado'] ? ' is-late' : '' ?>" <?= $podeMover ? 'draggable="true"' : '' ?> data-id="<?= (int) $lead['id'] ?>" data-etapa="<?= (int) $lead['etapa_id'] ?>">
@@ -38,7 +39,7 @@ function render_lead_card(array $lead, bool $mostrarResponsavel, bool $podeMover
         <div class="kcard-foot"><?= icon('clock') ?> Última atividade: <?= e(mb_strtolower(tempo_relativo($lead['ultima_atividade_em'] ?? $lead['criado_em']))) ?></div>
         <div class="kcard-actions">
             <?php if ($whats): ?>
-                <a class="icon-btn icon-btn-whats" href="<?= e($whats) ?>" target="_blank" rel="noopener" data-registrar="whatsapp" data-lead="<?= (int) $lead['id'] ?>" aria-label="WhatsApp de <?= e($lead['nome']) ?>"><?= icon('whatsapp') ?></a>
+                <a class="icon-btn icon-btn-whats" <?= wa_link_atributos($whats, (int) $lead['id']) ?> aria-label="Conversar no WhatsApp com <?= e($lead['nome']) ?>"><?= icon('whatsapp') ?></a>
                 <a class="icon-btn" href="tel:<?= e($tel) ?>" data-registrar="ligacao" data-lead="<?= (int) $lead['id'] ?>" aria-label="Ligar para <?= e($lead['nome']) ?>"><?= icon('phone') ?></a>
             <?php endif; ?>
             <?php if ($podeMover): ?>
