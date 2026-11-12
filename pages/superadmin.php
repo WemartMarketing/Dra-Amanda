@@ -10,6 +10,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/icons.php';
+require_once __DIR__ . '/../includes/logo.php';
 
 $usuario = auth_require();
 if (empty($usuario['eh_superadmin'])) {
@@ -34,6 +35,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
 <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token()) ?>">
 <title>Superadmin — <?= htmlspecialchars(APP_NAME) ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
+<?= favicon_tags() ?>
 </head>
 <body>
 <div class="content" style="margin:0;width:100%;">

@@ -278,6 +278,10 @@ claros, como o login). Use `logo_html()` ou `logo_html('claro')`. Ao trocar
 o arquivo, aumente o `?v=` em `logo_html()` para os navegadores não usarem
 a versão antiga em cache.
 
+O ícone da aba (favicon) é o foguete da logo: `favicon.ico` na raiz e as
+versões PNG em `assets/img/favicon/` (32 px, 192 px e 180 px para a tela
+inicial do iPhone). As tags ficam em `favicon_tags()`, no mesmo arquivo.
+
 ## Rodando localmente
 
 Banco de desenvolvimento: MySQL/MariaDB em `localhost`, banco

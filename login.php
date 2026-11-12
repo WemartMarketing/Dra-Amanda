@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token()) ?>">
 <title>Entrar — <?= htmlspecialchars(APP_NAME) ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
+<?= favicon_tags() ?>
 </head>
 <body>
 <div class="login-shell">

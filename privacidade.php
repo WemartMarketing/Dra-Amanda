@@ -38,6 +38,7 @@ if ($lista) { $html .= '</ul>'; }
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacidade e uso dos dados — <?= htmlspecialchars(APP_NAME) ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
+<?= favicon_tags() ?>
 </head>
 <body>
 <main class="legal-doc card">

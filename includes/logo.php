@@ -12,3 +12,16 @@ function logo_html(string $fundo = 'escuro'): string
     $arquivo = $fundo === 'claro' ? 'wemart-sales-logo-escuro.png' : 'wemart-sales-logo-branco.png';
     return '<img src="/assets/img/' . $arquivo . '?v=1" alt="WeMart Sales" class="brand-logo" width="1269" height="148">';
 }
+
+/**
+ * Ícone da aba do navegador (favicon) e da tela inicial do celular: o
+ * foguete da logo em branco sobre um quadrado azul-marinho. Chame dentro
+ * do <head> de toda página.
+ */
+function favicon_tags(): string
+{
+    return '<link rel="icon" href="/favicon.ico?v=1" sizes="any">' . "\n"
+         . '<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon/favicon-32.png?v=1">' . "\n"
+         . '<link rel="icon" type="image/png" sizes="192x192" href="/assets/img/favicon/icon-192.png?v=1">' . "\n"
+         . '<link rel="apple-touch-icon" href="/assets/img/favicon/apple-touch-icon.png?v=1">';
+}
