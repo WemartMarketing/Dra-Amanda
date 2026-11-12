@@ -176,32 +176,58 @@ function fila_processar(array $tratadores, int $limite = 50): array
     }
     foreach (fila_reivindicar($limite, array_keys($tratadores)) as $tarefa) {
         $r['executadas']++;
-        $fn = $tratadores[$tarefa['tipo']] ?? null;
-        if (!$fn) {
-            fila_falhar($tarefa, 'Tipo de tarefa desconhecido: ' . $tarefa['tipo'], true);
-            $r['falhas']++;
-            continue;
-        }
-        try {
-            $res = $fn($tarefa);
-        } catch (Throwable $e) {
-            error_log('[automacao_fila] tarefa ' . $tarefa['id'] . ': ' . $e->getMessage());
-            $res = ['status' => 'falha', 'mensagem' => 'Erro interno ao executar a tarefa.'];
-        }
-        $status = $res['status'] ?? 'falha';
-        $msg = (string) ($res['mensagem'] ?? '');
-        if ($status === 'ok') {
-            fila_concluir($tarefa, $msg !== '' ? $msg : 'ok');
-            $r['ok']++;
-        } elseif ($status === 'adiar' && ($res['quando'] ?? null) instanceof DateTimeInterface) {
-            fila_adiar($tarefa, $res['quando'], $msg);
-            $r['adiadas']++;
-        } else {
-            $out = fila_falhar($tarefa, $msg !== '' ? $msg : 'Falha sem detalhe.', $status === 'falha_definitiva');
-            $out === 'falhou' ? $r['falhas']++ : $r['reagendadas']++;
-        }
+        $r[fila_executar_tarefa($tarefa, $tratadores)]++;
     }
     return $r;
+}
+
+/**
+ * Executa uma tarefa JÁ reivindicada. Devolve a chave do contador:
+ * ok | reagendadas | falhas | adiadas.
+ */
+function fila_executar_tarefa(array $tarefa, array $tratadores): string
+{
+    $fn = $tratadores[$tarefa['tipo']] ?? null;
+    if (!$fn) {
+        fila_falhar($tarefa, 'Tipo de tarefa desconhecido: ' . $tarefa['tipo'], true);
+        return 'falhas';
+    }
+    try {
+        $res = $fn($tarefa);
+    } catch (Throwable $e) {
+        error_log('[automacao_fila] tarefa ' . $tarefa['id'] . ': ' . $e->getMessage());
+        $res = ['status' => 'falha', 'mensagem' => 'Erro interno ao executar a tarefa.'];
+    }
+    $status = $res['status'] ?? 'falha';
+    $msg = (string) ($res['mensagem'] ?? '');
+    if ($status === 'ok') {
+        fila_concluir($tarefa, $msg !== '' ? $msg : 'ok');
+        return 'ok';
+    }
+    if ($status === 'adiar' && ($res['quando'] ?? null) instanceof DateTimeInterface) {
+        fila_adiar($tarefa, $res['quando'], $msg);
+        return 'adiadas';
+    }
+    return fila_falhar($tarefa, $msg !== '' ? $msg : 'Falha sem detalhe.', $status === 'falha_definitiva') === 'falhou' ? 'falhas' : 'reagendadas';
+}
+
+/**
+ * Executa AGORA uma tarefa específica pela chave_unica (ex.: envio de teste
+ * pela tela), sem esperar o cron e sem mexer nas outras. Respeita a mesma
+ * reivindicação atômica: se o cron já pegou, não executa de novo.
+ */
+function fila_executar_chave(string $chaveUnica, array $tratadores): ?string
+{
+    $stmt = db()->prepare("SELECT id FROM automacao_fila WHERE chave_unica = :c AND status = 'pendente' AND executar_em <= NOW()");
+    $stmt->execute(['c' => $chaveUnica]);
+    $id = (int) $stmt->fetchColumn();
+    $token = bin2hex(random_bytes(8));
+    if (!$id || !fila_tomar($id, $token)) {
+        return null;
+    }
+    $tarefa = db()->query('SELECT * FROM automacao_fila WHERE id = ' . $id)->fetch();
+    $tarefa['payload'] = $tarefa['payload'] !== null ? (json_decode($tarefa['payload'], true) ?: []) : [];
+    return fila_executar_tarefa($tarefa, $tratadores);
 }
 
 /** Resumo para o painel/Superadmin. */

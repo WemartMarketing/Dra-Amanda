@@ -43,5 +43,8 @@ define('APP_KEY', '');
 // ----------------------------------------------------------------------
 define('META_APP_SECRET', '');     // Configurações do app → Básico → Chave secreta do aplicativo
 define('META_VERIFY_TOKEN', '');   // texto livre e longo que você inventa e cola no painel de Webhooks
+// Opcional: token de verificação próprio para o webhook do WhatsApp
+// (webhook/whatsapp.php). Vazio = usa o META_VERIFY_TOKEN.
+define('WA_VERIFY_TOKEN', '');
 define('META_GRAPH_VERSION', 'v21.0'); // versão da Graph API; atualize quando a Meta descontinuar a atual
 define('META_GRAPH_BASE_URL', 'https://graph.facebook.com');

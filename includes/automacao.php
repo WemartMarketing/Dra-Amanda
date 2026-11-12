@@ -8,12 +8,13 @@
  * Tarefas de tipo sem tratador ficam paradas na fila (não são perdidas).
  */
 require_once __DIR__ . '/automacao_fila.php';
+require_once __DIR__ . '/whatsapp.php';
 
 /** @return array<string, callable(array): array> */
 function automacao_tratadores(): array
 {
     return [
-        // Fase 2: 'wa_enviar' => 'wa_tarefa_enviar', 'wa_webhook' => …
+        'wa_enviar' => 'wa_tarefa_enviar',          // Fase 2: envio de WhatsApp (real ou simulado)
         // Fase 4: 'jornada_passo' => 'jornada_tarefa_passo', …
     ];
 }

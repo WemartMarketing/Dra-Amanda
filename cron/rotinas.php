@@ -8,7 +8,8 @@
  *   3. tenta de novo os avisos do Meta Lead Ads com erro (espera crescente);
  *   4. aplica a recuperação automática por inatividade;
  *   5. apaga arquivos temporários de importação com mais de 1 hora;
- *   6. executa a fila de automação (WhatsApp/Jornadas) — tarefas vencidas.
+ *   6. reprocessa avisos do WhatsApp que falharam (espera crescente);
+ *   7. executa a fila de automação (envios de WhatsApp, Jornadas) — tarefas vencidas.
  *
  * Só roda pela linha de comando (403 via navegador). GET_LOCK impede duas
  * execuções ao mesmo tempo; cada etapa falha sozinha sem parar as outras.
@@ -52,6 +53,10 @@ try {
         return $r['perdidos'] . ' recuperado(s), ' . $r['redistribuidos'] . ' redistribuído(s), ' . $r['em_fila'] . ' na fila';
     });
     $etapa('temporários', fn () => importacao_limpar_temporarios(3600) . ' apagado(s)');
+    $etapa('whatsapp', function () {
+        $r = wa_processar_pendentes(300);
+        return $r['tentados'] . ' aviso(s), ' . $r['processados'] . ' ok, ' . $r['erros'] . ' erro(s)';
+    });
     $etapa('automação', function () {
         $r = automacao_executar(200);
         return $r['executadas'] . ' tarefa(s), ' . $r['ok'] . ' ok, ' . $r['reagendadas'] . ' reagendada(s), ' . $r['falhas'] . ' falha(s), ' . $r['travadas_retomadas'] . ' retomada(s)';

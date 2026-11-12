@@ -4,10 +4,11 @@ Módulo nativo do WeMart Sales para manter o relacionamento com o lead
 mesmo quando nenhum corretor está online, usando **somente** a WhatsApp
 Business Platform (Cloud API oficial da Meta).
 
-> **Situação atual: Fase 1 concluída (estrutura).** Nenhuma mensagem é
-> enviada ainda: não existe cliente da API nem webhook do WhatsApp. Nada
-> neste documento deve ser lido como "integração funcionando" antes de
-> ser validado com credenciais reais da Meta (ver
+> **Situação atual: Fases 1 e 2 concluídas.** O envio, o recebimento e os
+> status já estão programados e testados contra um **simulador** da Graph
+> API, mas **ainda não foram validados com uma conta real da Meta**.
+> Toda conta nova nasce em **modo de teste**: nada é enviado até alguém
+> ligar o envio real conscientemente (ver
 > [Dependências externas](#dependências-externas-meta)).
 
 ## Como o módulo se encaixa no que já existe
@@ -30,7 +31,7 @@ Nenhum módulo anterior foi removido ou duplicado.
 | Fase | Entrega | Situação |
 |---|---|---|
 | 1 | Banco, fila persistente, regras de envio/consentimento, horários das roletas, testes | **concluída** |
-| 2 | Webhook `webhook/whatsapp.php` (mensagens + status), cliente da Cloud API com **modo de teste**, sincronização de templates, tela de conexão | a fazer |
+| 2 | Webhook `webhook/whatsapp.php` (mensagens + status), cliente da Cloud API com **modo de teste**, sincronização de templates, tela de conexão | **concluída** (validação real pendente) |
 | 3 | Central de conversas (3 colunas no computador, tela simples no celular), botão **Conversar no WhatsApp** na ficha e nos cards | a fazer |
 | 4 | Jornada "novo lead": boas-vindas por empreendimento, oferta e envio do book (PDF), fila quando a roleta está fechada | a fazer |
 | 5 | Follow-ups (esperar/condição), central de pendências do corretor ("o cliente respondeu?") | a fazer |
@@ -109,6 +110,116 @@ php tests/whatsapp_fase1_test.php
   - migrações antigas rodadas de novo depois da 008, sem desfazer nada;
   - as 20 telas existentes nos perfis corretor, gerente e gestor, com o mesmo resultado de antes;
   - salvar a roleta pela tela atual atualiza a grade nova.
+
+## Fase 2 — o que foi entregue
+
+### Arquivos
+
+| Arquivo | Papel |
+|---|---|
+| `webhook/whatsapp.php` | Webhook público. Na verificação (GET), confere o token. Os avisos (POST) só são aceitos com assinatura HMAC válida; sem ela ou com ela errada → 403 e nada é gravado. Cada mensagem ou status vira um aviso com chave única, então um aviso repetido pela Meta é descartado. A Meta recebe 200 na hora e o processamento vem depois (o que falhar fica para o cron). |
+| `includes/whatsapp_api.php` | Cliente da Cloud API: token só no cabeçalho `Authorization` (nunca na URL), TLS verificado e timeouts curtos. Monta texto, template (variáveis numeradas ou nomeadas), documento, botões e envio de arquivo. Também traduz cada erro da Meta para português e diz se vale tentar de novo. |
+| `includes/whatsapp.php` | Envio pela fila, recebimento de mensagens, status, templates, teste de conexão e inscrição no webhook |
+| `api/whatsapp.php` + `pages/whatsapp.php` | Tela **WhatsApp** no menu, com as abas Conexão, Templates e Atividade (só para quem tem `whatsapp_configurar`) |
+| `sql/migration_009_whatsapp_fase2.sql` | Guarda quando o recebimento foi ativado e quando chegou o último aviso |
+
+### Como uma mensagem sai
+
+1. `wa_enfileirar()` confere as regras (consentimento, janela, template
+   aprovado, descadastro, teto e horário) e valida as variáveis. Se puder,
+   grava a mensagem como **na fila** e agenda a tarefa. A chave de
+   idempotência impede a mesma mensagem duas vezes.
+2. O cron, o webhook ou o botão "Enviar teste" executam a tarefa. **As
+   regras são conferidas de novo** neste momento, porque o cliente pode
+   ter se descadastrado ou revogado a autorização depois do agendamento.
+3. **Modo de teste**: a mensagem é marcada como "simulada" e nada chega à
+   Meta. **Envio real**: a mensagem vai para a Cloud API.
+4. O resultado da Cloud API é tratado assim:
+   - **Erro temporário** (limite de envio, Meta fora do ar): volta para a
+     fila com espera crescente.
+   - **Erro definitivo** (fora das 24 h, template pausado, número inválido):
+     falha registrada, sem insistir.
+   - **Efeitos automáticos**: token inválido → a conta fica "com erro" e
+     nada mais sai; template pausado ou desativado pela Meta → marcado
+     aqui; cliente que saiu do marketing → autorização de marketing
+     revogada.
+
+### Como uma mensagem chega
+
+- A empresa é identificada **só** pelo número que recebeu a mensagem
+  (`phone_number_id` cadastrado). Número desconhecido → aviso ignorado.
+- O contato é procurado com e sem o 9 do celular, porque contas antigas
+  do WhatsApp usam 8 dígitos. Ele é ligado ao lead da empresa com o mesmo
+  telefone, em qualquer formato.
+- A mensagem abre a janela de 24 h, aparece no histórico do lead e soma
+  nas não lidas.
+- A mensagem do cliente **não** conta como atividade do corretor, para não
+  esconder um lead parado.
+- Uma reação (👍) não abre a janela.
+- "PARAR" (ou outra palavra configurada) descadastra o contato. Frases
+  como "não quero parar" não descadastram.
+- Status (enviada → entregue → lida) **só avança**: um aviso atrasado não
+  volta o status. Se a confirmação chega antes de o envio ter sido
+  gravado, o aviso é tentado de novo.
+- Mudança de status de template enviada pela Meta (aprovado, pausado,
+  rejeitado) é aplicada na hora.
+
+### Passo a passo para conectar o número real
+
+1. No `includes/config.php` do servidor: `META_APP_SECRET`,
+   `META_VERIFY_TOKEN` (ou um `WA_VERIFY_TOKEN` próprio) e `APP_KEY`,
+   todos já usados pelo Lead Ads.
+2. No app da Meta → WhatsApp → Configuração:
+   - URL do webhook = a que aparece na tela **WhatsApp → Conexão**;
+   - token de verificação = o do config;
+   - assinar os campos `messages` e `message_template_status_update`.
+3. Na tela **WhatsApp → Conexão**:
+   - **Conectar número oficial**: IDs da WABA e do número, e o token
+     permanente;
+   - **Testar conexão**;
+   - **Ativar recebimento**.
+4. **Templates → Sincronizar com a Meta**. Em cada template: para que
+   serve, a qual dado cada variável se liga e o que cada botão faz.
+5. **Enviar teste** para o seu próprio número, ainda em modo de teste
+   (fica "simulado").
+6. Só então **Ligar envio real**: exige digitar ENVIAR DE VERDADE e ter a
+   conexão testada e o recebimento ativado. Faça um novo **Enviar teste**
+   com um template de utilidade (ex.: `hello_world`) e confira a entrega
+   na aba **Atividade**. **Esse é o primeiro teste real da integração.**
+
+### Testes (`tests/whatsapp_fase2_test.php`)
+
+```
+php tests/whatsapp_fase2_test.php
+```
+
+- São 97 verificações e todas passam.
+- O teste sobe um **simulador da Graph API** (`tests/mock_graph.php`) e o
+  próprio sistema, ambos em 127.0.0.1. Nenhuma requisição sai para a Meta.
+- O simulador só responde no servidor de testes do PHP (`php -S`), além de
+  a pasta `tests/` ser bloqueada no `.htaccess`.
+- Cobrem:
+  - **Webhook:** assinatura, verificação, aviso repetido, número
+    desconhecido, isolamento entre empresas, celular sem o 9, botão,
+    reação, PARAR.
+  - **Envio:** montagem das requisições (token só no cabeçalho, ordem das
+    variáveis), idempotência, teto de frequência, regras conferidas de
+    novo na hora do envio, modo de teste sem nenhuma chamada.
+  - **Erros da Meta:** limite (tenta de novo e envia), fora da janela (não
+    insiste), template pausado, token expirado (conta bloqueada), Meta
+    fora do ar.
+  - **Status:** fora de ordem e antes do envio ser gravado.
+  - **Templates:** sincronização com paginação, preservando o que foi
+    configurado no WeMart; template apagado na Meta; aviso de template
+    pausado.
+  - **Conta e cron:** teste de conexão, inscrição no webhook, cron.
+- Para conferir que os testes pegam erros de verdade, três proteções foram
+  removidas de propósito (assinatura, ordem dos status, nova conferência
+  das regras) e os testes acusaram cada uma.
+- Também foi feito o fluxo completo **pela tela**, contra o simulador:
+  conectar, testar, ativar recebimento, sincronizar e configurar template,
+  ligar envio real (recusando a frase errada), enviar teste, confirmações
+  de entrega e leitura e resposta do cliente.
 
 ## Dependências externas (Meta)
 

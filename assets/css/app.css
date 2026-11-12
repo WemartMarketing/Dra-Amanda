@@ -1355,3 +1355,24 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
     .bottom-nav a, .bottom-nav button { font-size: 11px; }
     .bottom-nav a svg, .bottom-nav button svg { width: 20px; height: 20px; }
 }
+
+/* ------------------------------------------------ WhatsApp (Fase 2) */
+.wa-modo { display: flex; gap: 12px; align-items: flex-start; border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; border: 1px solid; }
+.wa-modo svg { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }
+.wa-modo b { display: block; font-size: 15px; }
+.wa-modo span { font-size: 14px; }
+.wa-modo.is-teste { background: #fff6e6; border-color: #f6dfb2; color: #7a530c; }
+.wa-modo.is-real { background: #e8f7f1; border-color: #bfe7d6; color: #0f6b4c; }
+.wa-modo.is-parado { background: #fde7ea; border-color: #f3c1c9; color: #a8293d; }
+.wa-template { margin-top: 18px; }
+.wa-bolha { background: #e7fbe0; border-radius: 4px 14px 14px 14px; padding: 12px 14px; max-width: 520px; font-size: 14.5px; line-height: 1.5; color: #1d2a1f; box-shadow: 0 1px 1px rgba(0,0,0,.06); }
+.wa-bolha small { display: block; color: #6b7b6d; font-size: 12.5px; margin-top: 6px; }
+.wa-bolha-botoes { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.wa-bolha-botoes span { background: #fff; border-radius: 10px; text-align: center; padding: 8px; color: #027eb5; font-weight: 700; font-size: 14px; }
+.label-like { display: block; font-size: 13.5px; font-weight: 700; color: #4b5570; margin-bottom: 8px; }
+@media (max-width: 880px) {
+    .wa-modo span, .wa-bolha { font-size: 15px; }
+    .int-checks { grid-template-columns: 1fr; }
+}
+.field .dia-chip { display: inline-flex; width: auto; }
+.wa-tel { white-space: nowrap; }

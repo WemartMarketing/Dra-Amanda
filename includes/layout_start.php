@@ -45,6 +45,7 @@ $navItems = [
     ['key' => 'usuarios',   'href' => '/pages/usuarios.php',   'label' => 'Usuários e acessos',                         'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'administrar_usuarios')],
     ['key' => 'funil',      'href' => '/pages/funil.php',      'label' => 'Etapas do funil',                            'icon' => 'settings', 'mostrar' => usuario_tem_permissao($usuario, 'configurar_funil')],
     ['key' => 'recuperacao', 'href' => '/pages/recuperacao.php', 'label' => 'Recuperação de leads',                     'icon' => 'clock',    'mostrar' => usuario_tem_permissao($usuario, 'configurar_recuperacao')],
+    ['key' => 'whatsapp',   'href' => '/pages/whatsapp.php',   'label' => 'WhatsApp',                                   'icon' => 'whatsapp', 'mostrar' => usuario_tem_permissao($usuario, 'whatsapp_configurar')],
     ['key' => 'integracoes', 'href' => '/pages/integracoes.php', 'label' => 'Integrações',                              'icon' => 'zap',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_integracoes')],
     ['key' => 'auditoria',  'href' => '/pages/auditoria.php',  'label' => 'Auditoria',                                  'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'visualizar_auditoria')],
     ['key' => 'perfil',     'href' => '/pages/perfil.php',     'label' => 'Meu perfil',                                 'icon' => 'user',     'mostrar' => true],
