@@ -147,6 +147,9 @@ function roleta_exp_quando(DateTimeImmutable $quando, DateTimeImmutable $agora):
 
 function roleta_horarios_linhas(int $roletaId): array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return [];   // sem a tabela nova: vale o horário antigo da roleta
+    }
     $stmt = db()->prepare('SELECT dia_semana, inicio, fim, pausa_inicio, pausa_fim FROM roleta_horarios WHERE roleta_id = :r ORDER BY dia_semana');
     $stmt->execute(['r' => $roletaId]);
     return $stmt->fetchAll();
@@ -155,6 +158,9 @@ function roleta_horarios_linhas(int $roletaId): array
 /** Exceções entre ontem e daqui a 15 dias (da roleta ou da empresa toda). */
 function roleta_excecoes_linhas(int $empresaId, int $roletaId, DateTimeImmutable $agora): array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return [];
+    }
     $stmt = db()->prepare('SELECT roleta_id, data, tipo, inicio, fim, descricao FROM roleta_excecoes
                            WHERE empresa_id = :e AND (roleta_id = :r OR roleta_id IS NULL) AND data BETWEEN :d1 AND :d2');
     $stmt->execute(['e' => $empresaId, 'r' => $roletaId, 'd1' => $agora->modify('-1 day')->format('Y-m-d'), 'd2' => $agora->modify('+15 day')->format('Y-m-d')]);
@@ -179,6 +185,9 @@ function roleta_situacao(array $roleta, ?DateTimeImmutable $agora = null): array
  */
 function roleta_horarios_sincronizar_simples(int $roletaId, ?string $inicio, ?string $fim, string $dias): bool
 {
+    if (!modulo_whatsapp_instalado()) {
+        return false;
+    }
     $atuais = roleta_horarios_linhas($roletaId);
     $simples = true;
     foreach ($atuais as $h) {
@@ -373,6 +382,9 @@ function roleta_excecao_remover(int $empresaId, int $id): bool
 /** Exceções de hoje em diante que valem para a roleta (dela e da empresa toda). */
 function roleta_excecoes_futuras(int $empresaId, int $roletaId): array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return [];
+    }
     $stmt = db()->prepare('SELECT x.*, r.nome AS roleta_nome FROM roleta_excecoes x LEFT JOIN roletas r ON r.id = x.roleta_id
                            WHERE x.empresa_id = :e AND (x.roleta_id = :r OR x.roleta_id IS NULL) AND x.data >= :hoje ORDER BY x.data, x.roleta_id IS NULL');
     $stmt->execute(['e' => $empresaId, 'r' => $roletaId, 'hoje' => (new DateTimeImmutable('today', new DateTimeZone(ROLETA_FUSO)))->format('Y-m-d')]);

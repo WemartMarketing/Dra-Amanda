@@ -23,3 +23,23 @@ function db(): PDO
     }
     return $pdo;
 }
+
+/**
+ * O módulo de WhatsApp/Jornadas já foi instalado neste banco (migrações
+ * 008–010)? Enquanto não, o CRM funciona normalmente, só sem as partes do
+ * WhatsApp — em vez de cair com erro 500 depois de um `git pull` feito antes
+ * das migrações. Consulta uma vez por requisição.
+ */
+function modulo_whatsapp_instalado(): bool
+{
+    static $ok = null;
+    if ($ok === null) {
+        $stmt = db()->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()
+                             AND TABLE_NAME IN ('whatsapp_contas','corretor_pendencias','jornada_execucoes','roleta_horarios','roleta_excecoes')");
+        $ok = (int) $stmt->fetchColumn() === 5;
+        if (!$ok) {
+            error_log('[WeMart] Módulo WhatsApp ainda não instalado neste banco: rode sql/migration_008, 009 e 010 (ver docs/DEPLOY_HOSTGATOR.md).');
+        }
+    }
+    return $ok;
+}

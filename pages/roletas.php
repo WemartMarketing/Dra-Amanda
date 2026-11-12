@@ -295,7 +295,9 @@ require __DIR__ . '/../includes/layout_start.php';
                 <?php endforeach; ?>
             </div>
 
-            <?php if ($podeGerenciar): ?>
+            <?php if (!modulo_whatsapp_instalado()): ?>
+                <div class="rule-box"><?= icon('alert') ?><span>Horário por dia, pausas e feriados ficam disponíveis depois que o administrador rodar as atualizações do banco (migrações 008, 009 e 010).</span></div>
+            <?php elseif ($podeGerenciar): ?>
             <details class="ajuste-box" <?= isset($_GET['horarios']) ? 'open' : '' ?>>
                 <summary><?= icon('clock') ?>Horário de cada dia da semana</summary>
                 <form data-api-form action="/api/roleta_horarios.php" class="grade-form">
@@ -335,7 +337,7 @@ require __DIR__ . '/../includes/layout_start.php';
                 </div>
             <?php endforeach; ?>
             <?php if (!$excecoes): ?><p class="empty-note">Nenhum feriado ou data especial cadastrado.</p><?php endif; ?>
-            <?php if ($podeGerenciar): ?>
+            <?php if ($podeGerenciar && modulo_whatsapp_instalado()): ?>
                 <details class="ajuste-box">
                     <summary><?= icon('plus') ?>Adicionar feriado ou data especial</summary>
                     <form data-api-form action="/api/roleta_horarios.php">

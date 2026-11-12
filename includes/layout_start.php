@@ -31,12 +31,23 @@ $ehGestor = !$ehCorretor && usuario_tem_permissao($usuario, 'visualizar_indicado
 $inicioHref = $ehGestor ? '/pages/dashboard.php' : '/pages/inicio.php';
 // WhatsApp: quem atende vai para as conversas (com o número de não lidas); quem só configura, para a configuração.
 require_once __DIR__ . '/whatsapp_conversas.php';
-$waAtende = empty($usuario['eh_superadmin']) && wa_pode_atender($usuario) && wa_central_ativa((int) $usuario['empresa_ativa_id']);
-$waHref = $waAtende ? '/pages/conversas.php' : (usuario_tem_permissao($usuario, 'whatsapp_configurar') ? '/pages/whatsapp.php'
-    : (usuario_tem_permissao($usuario, 'gerenciar_campanhas_wa') ? '/pages/campanhas.php' : null));
-$waNaoLidas = $waAtende ? wa_conversas_nao_lidas($usuario) : 0;
-require_once __DIR__ . '/pendencias.php';
-$pendCount = pendencias_contar($usuario);
+// Contadores do topo: se o banco ainda não recebeu as migrações do WhatsApp
+// (008–010), o CRM continua funcionando — só sem os contadores — e o motivo
+// vai para o log do PHP, em vez de derrubar todas as páginas com erro 500.
+$waAtende = false;
+$waNaoLidas = 0;
+$pendCount = 0;
+try {
+    $waAtende = empty($usuario['eh_superadmin']) && wa_pode_atender($usuario) && wa_central_ativa((int) $usuario['empresa_ativa_id']);
+    $waNaoLidas = $waAtende ? wa_conversas_nao_lidas($usuario) : 0;
+    require_once __DIR__ . '/pendencias.php';
+    $pendCount = pendencias_contar($usuario);
+} catch (PDOException $e) {
+    $waAtende = false;
+    error_log('[layout] contadores do WhatsApp indisponíveis (rode as migrações 008, 009 e 010): ' . $e->getMessage());
+}
+$waHref = !modulo_whatsapp_instalado() ? null : ($waAtende ? '/pages/conversas.php' : (usuario_tem_permissao($usuario, 'whatsapp_configurar') ? '/pages/whatsapp.php'
+    : (usuario_tem_permissao($usuario, 'gerenciar_campanhas_wa') ? '/pages/campanhas.php' : null)));
 
 $navItems = [
     ['key' => 'dashboard',  'href' => '/pages/dashboard.php',  'label' => 'Dashboard',                                  'icon' => 'chart',    'mostrar' => $ehGestor],

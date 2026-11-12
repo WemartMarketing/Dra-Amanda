@@ -179,6 +179,9 @@ function jornada_condicao(int $empresaId, array $x, string $regra): bool
  */
 function jornada_lead_atribuido(int $leadId): void
 {
+    if (!modulo_whatsapp_instalado()) {
+        return;
+    }
     $stmt = db()->prepare("SELECT x.id, x.empresa_id, x.passo_chave, u.nome FROM jornada_execucoes x JOIN leads l ON l.id = x.lead_id
                            LEFT JOIN usuarios u ON u.id = l.responsavel_id
                            WHERE x.lead_id = :l AND x.status IN ('ativa','aguardando','pausada')");
@@ -191,6 +194,9 @@ function jornada_lead_atribuido(int $leadId): void
 /** O lead foi para a recuperação por inatividade: registra nas jornadas em andamento. */
 function jornada_lead_recuperado(int $empresaId, int $leadId, string $texto): void
 {
+    if (!modulo_whatsapp_instalado()) {
+        return;
+    }
     $stmt = db()->prepare("SELECT id, passo_chave FROM jornada_execucoes WHERE empresa_id = :e AND lead_id = :l AND status IN ('ativa','aguardando','pausada')");
     $stmt->execute(['e' => $empresaId, 'l' => $leadId]);
     foreach ($stmt->fetchAll() as $x) {
@@ -272,6 +278,9 @@ function jornada_finalizar(int $empresaId, int $execucaoId, string $status, stri
  */
 function jornada_disparar(string $gatilho, int $empresaId, int $leadId, array $contexto = []): array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return [];
+    }
     $pdo = db();
     $stmt = $pdo->prepare('SELECT empreendimento_id, origem FROM leads WHERE id = :l AND empresa_id = :e AND excluido_em IS NULL');
     $stmt->execute(['l' => $leadId, 'e' => $empresaId]);
@@ -317,6 +326,9 @@ function jornada_disparar(string $gatilho, int $empresaId, int $leadId, array $c
  */
 function jornada_evento_gatilho(string $gatilho, int $empresaId, int $leadId, array $contexto = []): array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return [];
+    }
     $novas = jornada_disparar($gatilho, $empresaId, $leadId, $contexto);
     foreach ($novas as $execId) {
         $stmt = db()->prepare('SELECT passo_chave FROM jornada_execucoes WHERE id = :id');
@@ -607,6 +619,9 @@ function jornada_acao_do_botao(int $empresaId, int $conversaId, array $msg): ?st
  */
 function jornada_ao_receber_mensagem(int $empresaId, int $conversaId, int $mensagemId, bool $descadastro): void
 {
+    if (!modulo_whatsapp_instalado()) {
+        return;
+    }
     $pdo = db();
     $stmt = $pdo->prepare('SELECT m.*, cv.lead_id, cv.contato_id FROM whatsapp_mensagens m JOIN whatsapp_conversas cv ON cv.id = m.conversa_id WHERE m.id = :id AND m.empresa_id = :e');
     $stmt->execute(['id' => $mensagemId, 'e' => $empresaId]);
@@ -738,6 +753,9 @@ function jornada_estatisticas(int $empresaId, int $jornadaId): array
  */
 function jornada_lead_chegou(int $empresaId, int $leadId, string $origem, array $fieldData = [], ?array $form = null): array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return ['ok' => false, 'motivo' => 'Módulo WhatsApp não instalado'];
+    }
     try {
         $resposta = $form ? jornada_consentimento_do_formulario($fieldData, $form['wa_consentimento_campo'] ?? null) : null;
         if ($resposta !== null) {

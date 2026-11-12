@@ -287,6 +287,9 @@ function wa_config(int $empresaId): array
 /** Conta ativa da empresa (a primeira ativa; a estrutura aceita mais de uma). */
 function wa_conta_da_empresa(int $empresaId): ?array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return null;
+    }
     $stmt = db()->prepare("SELECT * FROM whatsapp_contas WHERE empresa_id = :e ORDER BY status = 'ativa' DESC, id LIMIT 1");
     $stmt->execute(['e' => $empresaId]);
     return $stmt->fetch() ?: null;

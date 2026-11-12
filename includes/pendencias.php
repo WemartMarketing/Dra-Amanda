@@ -46,6 +46,9 @@ function pendencia_criar(int $empresaId, int $usuarioId, int $leadId, string $ti
 /** Pendências visíveis agora para o usuário (abertas + adiadas cujo lembrete venceu). */
 function pendencias_do_usuario(array $usuario, int $limite = 50): array
 {
+    if (!modulo_whatsapp_instalado()) {
+        return [];
+    }
     $stmt = db()->prepare("SELECT p.*, l.nome AS lead_nome, l.telefone, l.etapa_id, emp.nome AS empreendimento
                            FROM corretor_pendencias p
                            JOIN leads l ON l.id = p.lead_id AND l.empresa_id = p.empresa_id AND l.excluido_em IS NULL AND l.responsavel_id = p.usuario_id
@@ -59,7 +62,7 @@ function pendencias_do_usuario(array $usuario, int $limite = 50): array
 
 function pendencias_contar(array $usuario): int
 {
-    if (!empty($usuario['eh_superadmin'])) {
+    if (!empty($usuario['eh_superadmin']) || !modulo_whatsapp_instalado()) {
         return 0;
     }
     $stmt = db()->prepare("SELECT COUNT(*) FROM corretor_pendencias p
@@ -159,6 +162,9 @@ function pendencias_resolver_whatsapp(int $empresaId, int $leadId, int $usuarioI
  */
 function pendencias_seguir_responsavel(int $leadId): int
 {
+    if (!modulo_whatsapp_instalado()) {
+        return 0;
+    }
     $pdo = db();
     $stmt = $pdo->prepare('SELECT id, empresa_id, nome, responsavel_id FROM leads WHERE id = :l AND excluido_em IS NULL');
     $stmt->execute(['l' => $leadId]);
