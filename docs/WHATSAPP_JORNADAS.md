@@ -18,7 +18,7 @@ Business Platform (Cloud API oficial da Meta).
 | Webhook da Meta Lead Ads (`webhook/meta.php`, HMAC com `META_APP_SECRET`) | Mesmo app da Meta e mesmo modelo de "caixa de entrada" (`meta_eventos` → `whatsapp_webhook_eventos`) |
 | Tokens cifrados com `APP_KEY` (`includes/cripto.php`) | Token do WhatsApp de cada empresa, nunca em texto puro |
 | Roleta, fila de espera e rodízio (`includes/roleta.php`) | A automação **não** distribui lead: quem distribui continua sendo a roleta, com presença e elegibilidade |
-| Recuperação por 4 dias sem feedback (`includes/recuperacao.php`) | A jornada consulta e respeita essa regra (Fase 6) |
+| Recuperação por 4 dias sem feedback (`includes/recuperacao.php`) | Integrada às jornadas e pendências (Fase 6) |
 | Transferência de lead (`includes/transferencia.php`) | Conversa e jornada seguem o lead, sem recomeçar |
 | Permissões por função (`funcoes`, `rbac.php`) | Acesso à conversa = acesso ao lead; permissões novas abaixo |
 | Cron com trava (`cron/rotinas.php`, `GET_LOCK`) | Nova etapa "automação" executa a fila de tarefas |
@@ -35,7 +35,7 @@ Nenhum módulo anterior foi removido ou duplicado.
 | 3 | Central de conversas (3 colunas no computador, tela simples no celular), botão **Conversar no WhatsApp** na ficha e nos cards | **concluída** |
 | 4 | Jornada "novo lead": boas-vindas por empreendimento, oferta e envio do book (PDF), fila quando a roleta está fechada | **concluída** |
 | 5 | Follow-ups (esperar/condição), central de pendências do corretor ("o cliente respondeu?") | **concluída** |
-| 6 | Integração com recuperação/redistribuição, tela de horário por dia, pausas e feriados das roletas | a fazer |
+| 6 | Integração com recuperação/redistribuição, tela de horário por dia, pausas e feriados das roletas | **concluída** |
 | 7 | Editor visual de jornadas com simulação, campanhas/disparador, relatórios e exportação Excel | a fazer |
 
 ## Fase 1 — o que foi entregue
@@ -428,8 +428,8 @@ mudar em "Ajustar esta jornada"):
 
 A jornada **para sozinha** quando: o cliente responde, o corretor confirma o
 atendimento, o lead avança no funil, é perdido ou pede descadastro. A
-etapa de 4 dias (recuperação) continua sendo a regra de **Recuperação** que já
-existe; a integração completa fica na Fase 6.
+etapa de 4 dias (recuperação) é a regra de **Recuperação** que já existe,
+integrada na Fase 6.
 
 ### Central de pendências (sem pop-ups)
 - Sino no topo (computador e celular) com o número de pendências, card no
@@ -451,6 +451,61 @@ parada por resposta/etapa, pendências: criar sem duplicar, transferência,
 "não respondeu" não envia, "sim" encerra a jornada, isolamento entre contas)
 + 3 mutações detectadas. Fluxo pela tela conferido com dados de demonstração,
 no computador e no celular.
+
+## Fase 6 — Recuperação, redistribuição e expediente das roletas
+
+### Horário por dia, pausas e feriados (Roletas → card "Horários e feriados")
+- **Próximos 7 dias** da roleta, já com pausas e feriados (também na tela
+  "Minha roleta" do corretor).
+- **Horário de cada dia da semana**: abre/fecha por dia, pausa opcional
+  (ex.: almoço) e plantão que passa da meia-noite. Validação: pausa dentro do
+  expediente, horários válidos, pelo menos um dia aberto.
+- **Feriados e datas especiais**: "fechado o dia todo" ou "horário especial",
+  só nesta roleta ou em **todas as roletas da empresa**. A mesma data
+  cadastrada de novo substitui a anterior.
+- Ao salvar, quem ficou fora do expediente sai da roleta e, se ela abriu, a
+  **fila de espera é processada na hora** (além do cron a cada 15 min).
+- Lead que chega com a roleta fechada espera na fila; só vai para corretor
+  disponível (pausado, sem presença ou fora do limite do dia não recebe).
+- API: `api/roleta_horarios.php` (permissão `gerenciar_roletas`).
+
+### Troca de corretor (transferência, roleta, recuperação)
+`lead_apos_atribuicao()` (em `includes/leads.php`) roda sempre que o lead
+ganha um novo dono:
+- "Responder no WhatsApp" e tarefas **passam para o novo corretor**;
+- "O cliente respondeu à **sua** tentativa?" do corretor anterior é
+  **cancelada** (a pergunta não faz sentido para o novo);
+- se o cliente estava esperando resposta no WhatsApp, o novo corretor recebe
+  "Responder no WhatsApp";
+- as jornadas **continuam de onde estavam** (registro "novo corretor"),
+  boas-vindas nunca recomeçam, e o limite de mensagens conta o que já saiu;
+- a pergunta "o cliente respondeu?" só considera tentativas do corretor
+  **atual**.
+
+### Recuperação integrada
+- Mensagem **real** enviada pelo corretor responsável na Central de conversas
+  conta como atuação válida (renova o prazo). Mensagem automática, simulada
+  (modo de teste) ou de outra pessoa não conta.
+- Lead de **corretor desativado** vai para a recuperação na próxima rodada,
+  sem esperar o prazo.
+- Continuam valendo: visita/retorno futuro segura o lead; etapas encerradas
+  (sem interesse, contrato assinado, perdido) nunca entram; quem perdeu o lead
+  não o recebe de volta; a estrutura anterior perde o acesso e fica só com
+  números agregados.
+- A jornada de follow-up mostra, no fim do fluxo, o bloco "Recuperação e
+  redistribuição" com a regra atual da empresa.
+- Descadastro do WhatsApp não impede a redistribuição (o novo corretor pode
+  ligar); só impede mensagens.
+
+### Testes da Fase 6
+`php tests/whatsapp_fase6_test.php` — 57 verificações: validação da grade,
+feriados (substituição, alcance, data passada, outra empresa), fila com roleta
+fechada → abre → distribui, corretor indisponível não recebe, transferência
+durante a jornada (pendências, boas-vindas não recomeçam, limite de
+mensagens), atuação real × simulada pelo WhatsApp (envio real só para o
+simulador local), recuperação com redistribuição, corretor desativado, visita
+agendada, isolamento entre empresas. 5 mutações detectadas. Fluxo pela tela
+conferido no computador e no celular.
 
 ## Dependências externas (Meta)
 

@@ -8,7 +8,9 @@
  *   - a categoria da etapa está entre as categorias da regra (nunca as
  *     encerradas: sem interesse, contrato assinado, perdido);
  *   - o último feedback VÁLIDO (leads.ultimo_feedback_em — ver
- *     lead_registrar_feedback()) é mais antigo que `dias_sem_feedback`;
+ *     lead_registrar_feedback(); mensagem REAL de WhatsApp enviada pelo
+ *     corretor responsável também conta) é mais antigo que
+ *     `dias_sem_feedback` — OU o corretor responsável foi desativado;
  *   - não há visita nem retorno agendado para o futuro.
  *
  * Na perda (uma transação): linha em lead_transferencias (motivo
@@ -76,7 +78,8 @@ function recuperacao_condicoes(array $regra, int $dias): array
     }
     $sql = 'leads.responsavel_id IS NOT NULL AND leads.excluido_em IS NULL
         AND leads.etapa IN (' . implode(',', $ph) . ")
-        AND COALESCE(leads.ultimo_feedback_em, leads.ultima_atividade_em, leads.criado_em) < DATE_SUB(NOW(), INTERVAL :rc_dias DAY)
+        AND (COALESCE(leads.ultimo_feedback_em, leads.ultima_atividade_em, leads.criado_em) < DATE_SUB(NOW(), INTERVAL :rc_dias DAY)
+             OR EXISTS (SELECT 1 FROM usuarios rc_u WHERE rc_u.id = leads.responsavel_id AND rc_u.ativo = 0))
         AND NOT EXISTS (SELECT 1 FROM agenda_compromissos rc_ag WHERE rc_ag.lead_id = leads.id AND rc_ag.status = 'agendado'
                         AND rc_ag.tipo IN ('visita','retorno') AND rc_ag.inicio >= NOW())";
     return [$sql, $params];
@@ -141,8 +144,15 @@ function recuperacao_perder_lead(int $leadId, array $regra): ?string
         $anterior = (int) $lead['responsavel_id'];
         $de = estrutura_do_lead($lead);
         $feedback = $lead['ultimo_feedback_em'] ?: ($lead['ultima_atividade_em'] ?: $lead['criado_em']);
-        $dias = max($regra['dias_sem_feedback'], (int) floor((time() - strtotime($feedback)) / 86400));
-        $texto = 'Sem feedback válido há ' . $dias . ' dia' . ($dias === 1 ? '' : 's') . ' — enviado para recuperação';
+        $dias = (int) floor((time() - strtotime($feedback)) / 86400);
+        $stmt = $pdo->prepare('SELECT ativo FROM usuarios WHERE id = :u');
+        $stmt->execute(['u' => $anterior]);
+        if ((int) $stmt->fetchColumn() === 0 && $dias < $regra['dias_sem_feedback']) {
+            $texto = 'Corretor responsável desativado — enviado para recuperação';
+        } else {
+            $dias = max($regra['dias_sem_feedback'], $dias);
+            $texto = 'Sem feedback válido há ' . $dias . ' dia' . ($dias === 1 ? '' : 's') . ' — enviado para recuperação';
+        }
 
         $upd = $pdo->prepare('UPDATE leads SET responsavel_id = NULL, equipe_id = NULL, atribuido_em = NULL, primeiro_contato_em = NULL WHERE id = :id AND responsavel_id = :ant');
         $upd->execute(['id' => $leadId, 'ant' => $anterior]);
@@ -181,6 +191,10 @@ function recuperacao_perder_lead(int $leadId, array $regra): ?string
         }
         throw $e;
     }
+
+    // Jornadas em andamento continuam (sem recomeçar boas-vindas); fica o registro.
+    require_once __DIR__ . '/jornadas.php';
+    jornada_lead_recuperado($empresaId, $leadId, $texto);
 
     if ($regra['redistribuir_automaticamente']) {
         $res = roleta_distribuir_lead($leadId, 'recuperacao', null);

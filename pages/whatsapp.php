@@ -215,6 +215,9 @@ require __DIR__ . '/../includes/layout_start.php';
     <?php endif; ?>
 
 <?php elseif ($aba === 'jornadas'):
+    require_once __DIR__ . '/../includes/recuperacao.php';
+    $regraRec = recuperacao_regra($empresaId);
+    $podeRecuperacao = usuario_tem_permissao($usuario, 'configurar_recuperacao');
     $statusJ = ['ativa' => ['Ligada', 'pill-green'], 'pausada' => ['Pausada', 'pill-amber'], 'rascunho' => ['Desligada', 'pill-muted'], 'desativada' => ['Desativada', 'pill-muted']];
     $rotOrigens = lead_origens();
     $statusX = ['ativa' => ['Em andamento', 'pill-blue'], 'aguardando' => ['Aguardando', 'pill-blue'], 'pausada' => ['Pausada', 'pill-amber'],
@@ -250,6 +253,12 @@ require __DIR__ . '/../includes/layout_start.php';
                     }
                 ?></small></li>
             <?php endforeach; ?>
+            <?php if ($j['nome'] === JORNADA_FOLLOW_UP): ?>
+                <li class="jf-recuperacao"><span class="jf-tipo">Depois</span><b>Recuperação e redistribuição</b><small><?= $regraRec['ativa']
+                    ? 'Sem atuação válida por ' . (int) $regraRec['dias_sem_feedback'] . ' dia(s): o lead sai do corretor e ' . ($regraRec['redistribuir_automaticamente'] ? 'vai para outro pela roleta' : 'espera um gestor na fila')
+                      . '. A jornada continua, sem repetir as boas-vindas.'
+                    : 'Recuperação automática desligada.' ?><?php if ($podeRecuperacao): ?> <a href="/pages/recuperacao.php">Ajustar regra</a><?php endif; ?></small></li>
+            <?php endif; ?>
         </ol>
         <div class="chip-row" style="margin:6px 0 14px;">
             <span class="pill pill-muted">Leads que entraram: <?= (int) ($j['estat']['iniciadas'] ?? 0) ?></span>

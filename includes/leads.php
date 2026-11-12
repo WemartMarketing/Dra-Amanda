@@ -92,6 +92,19 @@ function lead_marcar_atribuicao(int $leadId): void
 {
     db()->prepare('UPDATE leads SET ultimo_feedback_em = NOW(), atribuido_em = NOW(), primeiro_contato_em = NULL WHERE id = :id')
         ->execute(['id' => $leadId]);
+    lead_apos_atribuicao($leadId);
+}
+
+/**
+ * Depois que o lead ganha um (novo) dono: pendências e jornadas acompanham
+ * o novo corretor (includes/pendencias.php e includes/jornadas.php). Nunca
+ * reinicia boas-vindas nem dispara mensagem.
+ */
+function lead_apos_atribuicao(int $leadId): void
+{
+    require_once __DIR__ . '/jornadas.php';
+    pendencias_seguir_responsavel($leadId);
+    jornada_lead_atribuido($leadId);
 }
 
 /** Grava uma linha no histórico (lead_eventos). Atividades de atendimento também atualizam ultima_atividade_em. */

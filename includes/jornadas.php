@@ -155,9 +155,11 @@ function jornada_condicao(int $empresaId, array $x, string $regra): bool
             $stmt = $pdo->prepare("SELECT 1 FROM corretor_pendencias WHERE empresa_id = :e AND lead_id = :l AND status = 'resolvida' AND resposta = 'respondeu' AND resolvida_em >= :d LIMIT 1");
             break;
         case 'houve_tentativa':
-            // Tentativa feita por uma PESSOA (ligação, clique no WhatsApp, contato registrado) desde que o lead chegou.
+            // Tentativa feita pelo corretor RESPONSÁVEL ATUAL (ligação, clique no WhatsApp, contato
+            // registrado) desde que o lead chegou — depois de uma transferência, a tentativa do
+            // corretor anterior não gera pergunta para o novo.
             $stmt = $pdo->prepare("SELECT 1 FROM lead_eventos ev JOIN leads l ON l.id = ev.lead_id
-                                   WHERE l.empresa_id = :e AND ev.lead_id = :l AND ev.usuario_id IS NOT NULL AND ev.tipo IN ('ligacao','whatsapp','contato')
+                                   WHERE l.empresa_id = :e AND ev.lead_id = :l AND ev.usuario_id = l.responsavel_id AND ev.tipo IN ('ligacao','whatsapp','contato')
                                      AND ev.criado_em >= :d LIMIT 1");
             break;
         case 'tem_responsavel':
@@ -168,6 +170,32 @@ function jornada_condicao(int $empresaId, array $x, string $regra): bool
     }
     $stmt->execute(['e' => $empresaId, 'l' => $leadId, 'd' => $desde]);
     return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * O lead ganhou um (novo) corretor: as jornadas em andamento CONTINUAM de
+ * onde estavam (nada de boas-vindas de novo; os limites de mensagens já
+ * contam o que foi enviado) — só fica registrado no histórico da execução.
+ */
+function jornada_lead_atribuido(int $leadId): void
+{
+    $stmt = db()->prepare("SELECT x.id, x.empresa_id, x.passo_chave, u.nome FROM jornada_execucoes x JOIN leads l ON l.id = x.lead_id
+                           LEFT JOIN usuarios u ON u.id = l.responsavel_id
+                           WHERE x.lead_id = :l AND x.status IN ('ativa','aguardando','pausada')");
+    $stmt->execute(['l' => $leadId]);
+    foreach ($stmt->fetchAll() as $x) {
+        jornada_log((int) $x['empresa_id'], (int) $x['id'], $x['passo_chave'], 'novo_corretor', 'Lead passou para ' . ($x['nome'] ?: 'outro corretor') . '; a jornada continua de onde estava.');
+    }
+}
+
+/** O lead foi para a recuperação por inatividade: registra nas jornadas em andamento. */
+function jornada_lead_recuperado(int $empresaId, int $leadId, string $texto): void
+{
+    $stmt = db()->prepare("SELECT id, passo_chave FROM jornada_execucoes WHERE empresa_id = :e AND lead_id = :l AND status IN ('ativa','aguardando','pausada')");
+    $stmt->execute(['e' => $empresaId, 'l' => $leadId]);
+    foreach ($stmt->fetchAll() as $x) {
+        jornada_log($empresaId, (int) $x['id'], $x['passo_chave'], 'recuperacao', $texto);
+    }
 }
 
 /** Encerra as execuções que param quando há resposta (follow-ups de "sem resposta"). */

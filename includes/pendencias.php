@@ -141,3 +141,43 @@ function pendencias_resolver_whatsapp(int $empresaId, int $leadId, int $usuarioI
                    WHERE empresa_id = :e AND lead_id = :l AND tipo = 'responder_whatsapp' AND status IN ('aberta','adiada')")
         ->execute(['u' => $usuarioId, 'e' => $empresaId, 'l' => $leadId]);
 }
+
+/**
+ * O lead mudou de dono (transferência, roleta, redistribuição da
+ * recuperação). As atividades pendentes acompanham o novo corretor:
+ *   - "Responder no WhatsApp" e tarefas passam para ele;
+ *   - "O cliente respondeu à sua tentativa?" era sobre a tentativa do
+ *     corretor ANTERIOR — é cancelada (o novo não tem como responder);
+ *   - se a última mensagem da conversa é do cliente e ninguém respondeu,
+ *     o novo corretor recebe "Responder no WhatsApp".
+ * Sem responsável (lead na fila da recuperação) nada muda: as pendências
+ * ficam guardadas até alguém receber o lead. Devolve quantas mudaram.
+ */
+function pendencias_seguir_responsavel(int $leadId): int
+{
+    $pdo = db();
+    $stmt = $pdo->prepare('SELECT id, empresa_id, nome, responsavel_id FROM leads WHERE id = :l AND excluido_em IS NULL');
+    $stmt->execute(['l' => $leadId]);
+    $lead = $stmt->fetch();
+    if (!$lead || !$lead['responsavel_id']) {
+        return 0;
+    }
+    $empresaId = (int) $lead['empresa_id'];
+    $novo = (int) $lead['responsavel_id'];
+    $canc = $pdo->prepare("UPDATE corretor_pendencias SET status = 'cancelada', resposta = 'transferido', resolvida_em = NOW()
+                           WHERE empresa_id = :e AND lead_id = :l AND tipo = 'confirmar_resposta' AND usuario_id <> :u AND status IN ('aberta','adiada')");
+    $canc->execute(['e' => $empresaId, 'l' => $leadId, 'u' => $novo]);
+    $mov = $pdo->prepare("UPDATE corretor_pendencias SET usuario_id = :u, status = 'aberta', lembrar_em = NULL
+                          WHERE empresa_id = :e AND lead_id = :l AND tipo <> 'confirmar_resposta' AND usuario_id <> :u2 AND status IN ('aberta','adiada')");
+    $mov->execute(['u' => $novo, 'u2' => $novo, 'e' => $empresaId, 'l' => $leadId]);
+    $total = $canc->rowCount() + $mov->rowCount();
+
+    // Cliente esperando resposta no WhatsApp (última mensagem é dele).
+    $stmt = $pdo->prepare('SELECT id FROM whatsapp_conversas WHERE empresa_id = :e AND lead_id = :l AND ultima_entrada_em IS NOT NULL
+                           AND (ultima_saida_em IS NULL OR ultima_entrada_em > ultima_saida_em) ORDER BY ultima_entrada_em DESC LIMIT 1');
+    $stmt->execute(['e' => $empresaId, 'l' => $leadId]);
+    if ($stmt->fetchColumn() && pendencia_criar($empresaId, $novo, $leadId, 'responder_whatsapp', $lead['nome'] . ' está esperando resposta no WhatsApp')) {
+        $total++;
+    }
+    return $total;
+}

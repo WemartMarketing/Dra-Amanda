@@ -576,6 +576,13 @@ function wa_tarefa_enviar(array $tarefa): array
     if ($msg['lead_id'] && $msg['enviada_por'] !== null && function_exists('pendencias_resolver_whatsapp')) {
         pendencias_resolver_whatsapp($empresaId, (int) $msg['lead_id'], (int) $msg['enviada_por']);
     }
+    // Mensagem REAL do corretor responsável conta como atuação válida (prazo da
+    // recuperação). Mensagem automática ou simulada (modo de teste) não conta.
+    if ($msg['lead_id'] && $msg['enviada_por'] !== null && !$simulada) {
+        $pdo->prepare('UPDATE leads SET ultimo_feedback_em = NOW(),
+                primeiro_contato_em = COALESCE(primeiro_contato_em, NOW()) WHERE id = :l AND responsavel_id = :u')
+            ->execute(['l' => (int) $msg['lead_id'], 'u' => (int) $msg['enviada_por']]);
+    }
     if ($msg['lead_id']) {
         $quem = $msg['enviada_por'] === null ? 'Mensagem automática' : 'Mensagem';
         wa_lead_evento((int) $msg['lead_id'], $msg['enviada_por'] !== null ? (int) $msg['enviada_por'] : null,

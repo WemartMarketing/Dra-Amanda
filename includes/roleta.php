@@ -486,6 +486,7 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
             lead_registrar_evento($leadId, $executorId, 'atribuicao', 'Recebido pela roleta ' . $roleta['nome'] . ' — atribuído a ' . $escolhido['nome']);
             auditoria_registrar($empresaId, $executorId, 'roleta.lead_distribuido', 'lead', $leadId, ['roleta_id' => $roletaId, 'usuario_id' => $uid, 'origem' => $origem]);
             $pdo->commit();
+            lead_apos_atribuicao($leadId);
             return ['status' => 'distribuido', 'usuario_id' => $uid, 'usuario_nome' => $escolhido['nome'], 'roleta_id' => $roletaId, 'roleta_nome' => $roleta['nome']];
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {

@@ -86,9 +86,17 @@ require __DIR__ . '/../includes/layout_start.php';
             <li class="is-ok"><?= icon('check') ?>Registrar atendimento ou contato com o que aconteceu</li>
             <li class="is-ok"><?= icon('check') ?>Marcar visita/retorno como realizado ou cliente ausente</li>
             <li class="is-ok"><?= icon('check') ?>Receber o lead (cadastro, roleta, transferência, oferta ativa)</li>
+            <li class="is-ok"><?= icon('check') ?>Responder o cliente pela Central de conversas (mensagem real; no modo de teste não conta)</li>
+            <li class="is-ok"><?= icon('check') ?>Responder “Sim, respondeu” ou “Não respondeu” em Pendências</li>
             <li class="is-no"><?= icon('x') ?>Anotação, arquivo ou edição de dados</li>
             <li class="is-no"><?= icon('x') ?>Só clicar em Ligar ou WhatsApp</li>
             <li class="is-no"><?= icon('x') ?>Só criar um compromisso (mas visita/retorno futuro segura o lead)</li>
+        </ul>
+        <div class="subhead">Com o WhatsApp e as jornadas</div>
+        <ul class="regra-lista">
+            <li class="is-ok"><?= icon('check') ?><span>Lead de corretor <b>desativado</b> vai para a recuperação na próxima rodada, sem esperar o prazo</span></li>
+            <li class="is-ok"><?= icon('check') ?>O novo corretor recebe o histórico, a conversa do WhatsApp e as pendências (“responder o cliente”)</li>
+            <li class="is-ok"><?= icon('check') ?>As jornadas continuam de onde estavam: boas-vindas não são enviadas de novo e o limite de mensagens já conta o que foi enviado</li>
         </ul>
         <div class="rule-box"><?= icon('alert') ?><span>Quando o lead é recuperado, o gerente e a superintendência anteriores deixam de ver o cadastro e ficam só com o número agregado em Relatórios → Perdas por inatividade.</span></div>
     </div>

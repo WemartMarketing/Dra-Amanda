@@ -55,8 +55,12 @@ $periodos = ['hoje' => 'Hoje', '7d' => 'Últimos 7 dias', '30d' => 'Últimos 30 
 $periodo = array_key_exists($_GET['periodo'] ?? '', $periodos) ? $_GET['periodo'] : '7d';
 $filtroCorretor = (int) ($_GET['corretor'] ?? 0);
 
+$proximosDias = $excecoes = $grade = [];
 if ($roleta) {
     $noHorario = roleta_no_horario($roleta);
+    $proximosDias = roleta_proximos_dias($roleta, 7);
+    $excecoes = roleta_excecoes_futuras($empresaId, $selecionadaId);
+    $grade = roleta_grade_para_tela($roleta);
     $corretores = roleta_status_corretores($roleta);
 
     $stmt = db()->prepare('SELECT e.id, e.nome, re.prioridade FROM roleta_empreendimentos re INNER JOIN empreendimentos e ON e.id = re.empreendimento_id WHERE re.roleta_id = :r ORDER BY re.prioridade, e.nome');
@@ -153,6 +157,12 @@ function roleta_form_regras(?array $r, array $plantoes): void
             </select>
             <small class="field-hint">Endereço, coordenadas e raio vêm do plantão — cadastre em <a href="/pages/plantoes.php">Plantões</a>.</small>
         </div>
+        <?php if ($r && roleta_horarios_personalizados((int) $r['id'])): ?>
+            <?php foreach ($dias as $n): ?><input type="hidden" name="dias_semana[]" value="<?= $n ?>"><?php endforeach; ?>
+            <input type="hidden" name="horario_inicio" value="<?= substr((string) ($r['horario_inicio'] ?? ''), 0, 5) ?>">
+            <input type="hidden" name="horario_fim" value="<?= substr((string) ($r['horario_fim'] ?? ''), 0, 5) ?>">
+            <div class="rule-box"><?= icon('clock') ?><span>Esta roleta tem <b>horário diferente por dia</b> (ou pausa). Ajuste em <b>Horários e feriados</b>, na página da roleta.</span></div>
+        <?php else: ?>
         <fieldset class="field dias-semana"><legend>Dias de funcionamento</legend>
             <?php foreach (roleta_dias_rotulos() as $n => $rotulo): ?>
                 <label class="dia-chip"><input type="checkbox" name="dias_semana[]" value="<?= $n ?>" <?= in_array($n, $dias, true) ? 'checked' : '' ?>><span><?= e($rotulo) ?></span></label>
@@ -164,6 +174,8 @@ function roleta_form_regras(?array $r, array $plantoes): void
                 <input type="time" name="horario_fim" value="<?= substr((string) ($r['horario_fim'] ?? ''), 0, 5) ?>" aria-label="Fim">
             </div>
         </div>
+        <?php if ($r): ?><small class="field-hint">Horário diferente em cada dia, pausa de almoço ou feriados: use <b>Horários e feriados</b>.</small><?php endif; ?>
+        <?php endif; ?>
         <label class="checkbox-row"><input type="checkbox" name="exigir_presenca" value="1" <?= !$r || !empty($r['exigir_presenca']) ? 'checked' : '' ?>> Exigir presença no plantão (GPS) para entrar e receber leads</label>
         <div class="form-grid">
             <div class="field"><label>Precisão máxima do GPS (m)</label><input type="number" name="precisao_maxima_metros" min="10" max="2000" value="<?= (int) ($r['precisao_maxima_metros'] ?? 150) ?>"></div>
@@ -266,6 +278,85 @@ require __DIR__ . '/../includes/layout_start.php';
                     </select>
                     <button type="submit" class="btn btn-outline btn-sm">Adicionar</button>
                 </form>
+            <?php endif; ?>
+        </div>
+
+        <div class="card" id="horarios">
+            <div class="card-head">
+                <div><h2>Horários e feriados</h2><p>Quando esta roleta distribui leads. Fora do horário, os leads esperam na fila e são entregues quando ela abrir.</p></div>
+            </div>
+            <div class="dias-proximos">
+                <?php foreach ($proximosDias as $d): ?>
+                    <div class="dia-proximo <?= $d['texto'] === 'Fechado' ? 'is-fechado' : '' ?>">
+                        <span class="dia-rotulo"><?= e($d['rotulo']) ?></span>
+                        <strong><?= e($d['texto']) ?></strong>
+                        <?php if ($d['exc']): ?><span class="pill pill-amber"><?= e($d['exc']) ?></span><?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <?php if ($podeGerenciar): ?>
+            <details class="ajuste-box" <?= isset($_GET['horarios']) ? 'open' : '' ?>>
+                <summary><?= icon('clock') ?>Horário de cada dia da semana</summary>
+                <form data-api-form action="/api/roleta_horarios.php" class="grade-form">
+                    <input type="hidden" name="acao" value="grade">
+                    <input type="hidden" name="roleta_id" value="<?= (int) $roleta['id'] ?>">
+                    <div class="grade-cab" aria-hidden="true"><span>Dia</span><span>Abre</span><span>Fecha</span><span>Pausa (opcional)</span></div>
+                    <?php foreach (roleta_dias_rotulos() as $n => $rotulo): $g = $grade[$n]; ?>
+                        <div class="grade-dia">
+                            <label class="grade-dia-nome"><input type="checkbox" name="dias[<?= $n ?>][aberto]" value="1" <?= $g['aberto'] ? 'checked' : '' ?>> <?= e($rotulo) ?></label>
+                            <input type="time" name="dias[<?= $n ?>][inicio]" value="<?= e($g['inicio']) ?>" aria-label="<?= e($rotulo) ?>: abre">
+                            <input type="time" name="dias[<?= $n ?>][fim]" value="<?= e($g['fim']) ?>" aria-label="<?= e($rotulo) ?>: fecha">
+                            <span class="grade-pausa">
+                                <input type="time" name="dias[<?= $n ?>][pausa_inicio]" value="<?= e($g['pausa_inicio']) ?>" aria-label="<?= e($rotulo) ?>: pausa começa">
+                                <span class="muted">até</span>
+                                <input type="time" name="dias[<?= $n ?>][pausa_fim]" value="<?= e($g['pausa_fim']) ?>" aria-label="<?= e($rotulo) ?>: pausa termina">
+                            </span>
+                        </div>
+                    <?php endforeach; ?>
+                    <small class="field-hint">Desmarque os dias em que a roleta não funciona. Fechamento antes da abertura (ex.: 18:00 às 02:00) passa da meia-noite.</small>
+                    <div class="form-alert" data-form-alerta hidden></div>
+                    <button type="submit" class="btn btn-primary"><?= icon('check') ?>Salvar horários</button>
+                </form>
+            </details>
+            <?php endif; ?>
+
+            <h3 class="sub-title">Feriados e datas especiais</h3>
+            <?php foreach ($excecoes as $x): ?>
+                <div class="excecao-row">
+                    <div>
+                        <strong><?= e(date('d/m/Y', strtotime($x['data']))) ?></strong> · <?= $x['tipo'] === 'fechado' ? 'Fechado' : 'Das ' . e(substr($x['inicio'], 0, 5)) . ' às ' . e(substr($x['fim'], 0, 5)) ?>
+                        <?php if ($x['descricao']): ?><span class="muted">— <?= e($x['descricao']) ?></span><?php endif; ?>
+                        <br><small class="muted"><?= $x['roleta_id'] ? 'Só nesta roleta' : 'Todas as roletas da empresa' ?></small>
+                    </div>
+                    <?php if ($podeGerenciar): ?>
+                        <form data-api-form action="/api/roleta_horarios.php"><input type="hidden" name="acao" value="excecao_remover"><input type="hidden" name="id" value="<?= (int) $x['id'] ?>"><button type="submit" class="remove-link">Remover</button></form>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+            <?php if (!$excecoes): ?><p class="empty-note">Nenhum feriado ou data especial cadastrado.</p><?php endif; ?>
+            <?php if ($podeGerenciar): ?>
+                <details class="ajuste-box">
+                    <summary><?= icon('plus') ?>Adicionar feriado ou data especial</summary>
+                    <form data-api-form action="/api/roleta_horarios.php">
+                        <input type="hidden" name="acao" value="excecao_salvar">
+                        <input type="hidden" name="roleta_id" value="<?= (int) $roleta['id'] ?>">
+                        <div class="form-grid">
+                            <div class="field"><label>Data</label><input type="date" name="data" required min="<?= date('Y-m-d') ?>"></div>
+                            <div class="field"><label>Nesse dia</label>
+                                <select name="tipo"><option value="fechado">Fechado o dia todo</option><option value="horario_especial">Horário especial</option></select></div>
+                            <div class="field"><label>Abre <small class="muted">(horário especial)</small></label><input type="time" name="inicio"></div>
+                            <div class="field"><label>Fecha <small class="muted">(horário especial)</small></label><input type="time" name="fim"></div>
+                        </div>
+                        <div class="field"><label>Descrição</label><input type="text" name="descricao" maxlength="190" placeholder="Ex.: Natal, Feriado municipal"></div>
+                        <fieldset class="field"><legend>Vale para</legend>
+                            <label class="checkbox-row"><input type="radio" name="alcance" value="roleta" checked> Só esta roleta</label>
+                            <label class="checkbox-row"><input type="radio" name="alcance" value="empresa"> Todas as roletas da empresa</label>
+                        </fieldset>
+                        <div class="form-alert" data-form-alerta hidden></div>
+                        <button type="submit" class="btn btn-primary"><?= icon('check') ?>Salvar data</button>
+                    </form>
+                </details>
             <?php endif; ?>
         </div>
 

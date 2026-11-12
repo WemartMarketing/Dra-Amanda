@@ -119,8 +119,16 @@ require __DIR__ . '/../includes/layout_start.php';
         <?php else: ?>
             <div class="roleta-detail-row"><span class="label">Presença</span><strong>Esta roleta não exige GPS</strong></div>
         <?php endif; ?>
-        <div class="roleta-detail-row"><span class="label">Dias</span><strong><?= e(roleta_dias_texto($roleta['dias_semana'])) ?></strong></div>
-        <div class="roleta-detail-row"><span class="label">Horário</span><strong><?= e(roleta_horario_texto($roleta)) ?></strong></div>
+        <?php if (!roleta_horarios_personalizados((int) $roleta['id'])): ?>
+            <div class="roleta-detail-row"><span class="label">Dias</span><strong><?= e(roleta_dias_texto($roleta['dias_semana'])) ?></strong></div>
+            <div class="roleta-detail-row"><span class="label">Horário</span><strong><?= e(roleta_horario_texto($roleta)) ?></strong></div>
+        <?php endif; ?>
+        <div class="subhead" style="margin-top:12px;">Próximos dias</div>
+        <div class="dias-proximos">
+            <?php foreach (roleta_proximos_dias($roleta, 7) as $d): ?>
+                <div class="dia-proximo <?= $d['texto'] === 'Fechado' ? 'is-fechado' : '' ?>"><span class="dia-rotulo"><?= e($d['rotulo']) ?></span><strong><?= e($d['texto']) ?></strong><?php if ($d['exc']): ?><span class="pill pill-amber"><?= e($d['exc']) ?></span><?php endif; ?></div>
+            <?php endforeach; ?>
+        </div>
         <p class="tip-box">Deixe esta página aberta enquanto estiver no plantão: ela confirma sua localização sozinha a cada <?= (int) $roleta['intervalo_verificacao_min'] ?> min. Se o celular bloquear a tela ou você fechar o navegador, a confirmação para e você sai da roleta depois de <?= (int) $roleta['validade_presenca_min'] ?> min sem confirmar.</p>
     </div>
 <?php endif; ?>
