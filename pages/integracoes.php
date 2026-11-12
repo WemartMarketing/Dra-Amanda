@@ -182,6 +182,49 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
 <?php endforeach; ?>
 
+<?php if (modulo_tabela_existe('meta_anuncios')):
+    $stmt = db()->prepare("SELECT sync_status, COUNT(*) AS n FROM meta_anuncios WHERE empresa_id = :e GROUP BY sync_status");
+    $stmt->execute(['e' => $empresaId]);
+    $syncCont = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $stmt = db()->prepare('SELECT validado_em FROM meta_marketing WHERE empresa_id = :e AND token_cifrado IS NOT NULL');
+    $stmt->execute(['e' => $empresaId]);
+    $mkValidado = $stmt->fetchColumn();
+    $stmt = db()->prepare('SELECT f.etapa, f.erro, f.criado_em, a.nome, a.ad_id FROM meta_criativo_falhas f LEFT JOIN meta_anuncios a ON a.id = f.meta_anuncio_id
+                           WHERE f.empresa_id = :e ORDER BY f.id DESC LIMIT 8');
+    $stmt->execute(['e' => $empresaId]);
+    $falhas = $stmt->fetchAll();
+    $rotSync = ['ok' => ['Completos', 'pill-green'], 'parcial' => ['Sem imagem', 'pill-amber'], 'pendente' => ['Aguardando', 'pill-blue'], 'erro' => ['Com erro', 'pill-red'],
+                'sem_permissao' => ['Sem acesso', 'pill-red'], 'removido' => ['Excluídos na Meta', 'pill-muted']];
+?>
+<div class="card" id="criativos">
+    <div class="card-head"><div><h2>Anúncios e criativos</h2><p>O sistema guarda de qual campanha, conjunto e anúncio veio cada lead e busca a prévia do criativo para mostrar na ficha.</p></div></div>
+    <div class="chip-row" style="margin-bottom:12px;">
+        <?php foreach ($rotSync as $k => [$rot, $pill]): if (empty($syncCont[$k])) continue; ?><span class="pill <?= $pill ?>"><?= e($rot) ?>: <?= (int) $syncCont[$k] ?></span><?php endforeach; ?>
+        <?php if (!$syncCont): ?><span class="muted">Nenhum anúncio registrado ainda: aparecem quando chegam leads de anúncios.</span><?php endif; ?>
+    </div>
+    <div class="grid-2">
+        <form data-api-form action="/api/integracoes.php">
+            <input type="hidden" name="acao" value="anuncios_token">
+            <div class="field"><label for="mk-token">Token da Marketing API <small class="muted">(opcional)</small></label>
+                <input type="password" id="mk-token" name="token" autocomplete="off" maxlength="1000" placeholder="<?= $mkValidado ? 'Token salvo — validado em ' . e(date('d/m/Y', strtotime($mkValidado))) : 'Cole aqui o token de usuário do sistema' ?>">
+                <small class="field-hint">Token de <b>usuário do sistema</b> do Gerenciador de Negócios com permissão <b>ads_read</b> nas contas de anúncio. Sem ele, o sistema tenta ler o anúncio com o token da página — nem sempre a Meta permite. Fica cifrado; deixe vazio e salve para remover.</small></div>
+            <div class="form-alert" data-form-alerta hidden></div>
+            <button type="submit" class="btn btn-primary"><?= icon('check') ?>Validar e salvar</button>
+        </form>
+        <div>
+            <p class="muted">A rotina automática atualiza os criativos a cada 15 minutos (novos primeiro) e renova o cache a cada 7 dias. Corretores não precisam de acesso ao Gerenciador de Anúncios.</p>
+            <button type="button" class="btn btn-outline" data-api-acao="/api/integracoes.php" data-acao="anuncios_sincronizar"><?= icon('zap') ?>Buscar criativos agora</button>
+            <?php if ($falhas): ?>
+                <div class="subhead" style="margin-top:14px;">Últimas falhas de sincronização</div>
+                <ul class="regra-lista">
+                    <?php foreach ($falhas as $f): ?><li class="is-no"><?= icon('x') ?><span><b><?= e($f['nome'] ?: ('Anúncio ' . $f['ad_id'])) ?></b> · <?= e(date('d/m H:i', strtotime($f['criado_em']))) ?> — <?= e($f['erro']) ?></span></li><?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card" id="eventos">
     <div class="card-head"><div><h2>Registro de eventos</h2><p>Cada aviso recebido da Meta, do mais recente para o mais antigo.</p></div></div>
     <form class="filters-row" method="get" action="#eventos">

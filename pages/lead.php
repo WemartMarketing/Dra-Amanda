@@ -136,6 +136,13 @@ $destinos = $podeTransferir ? array_values(array_filter(rbac_usuarios_atribuivei
 $whats = wa_link_conversar($usuario, $lead);
 $tel = lead_telefone_normalizado($lead['telefone']);
 $atrasado = lead_esta_atrasado($lead + ['compromisso_vencido' => (bool) array_filter($pendentes, fn ($c) => strtotime($c['inicio']) < time())]);
+// Anúncio que gerou o lead (Meta Ads) — mesma permissão da ficha.
+$criativo = null;
+if (modulo_tabela_existe('meta_anuncios')) {
+    require_once __DIR__ . '/../includes/criativo_ui.php';
+    meta_criativo_sincronizar_se_novo((int) $usuario['empresa_ativa_id'], (int) $lead['id']);
+    $criativo = meta_criativo_do_lead((int) $usuario['empresa_ativa_id'], (int) $lead['id']);
+}
 $abas = ['resumo' => 'Resumo', 'atendimento' => 'Atendimento', 'historico' => 'Histórico', 'agenda' => 'Agenda', 'arquivos' => 'Arquivos'];
 $abaAtiva = array_key_exists($_GET['aba'] ?? '', $abas) ? $_GET['aba'] : 'resumo';
 $passos = ['Ligar novamente', 'Enviar proposta', 'Enviar simulação', 'Confirmar visita', 'Aguardar documentos', 'Aguardar retorno do cliente'];
@@ -201,6 +208,7 @@ require __DIR__ . '/../includes/layout_start.php';
 
 <!-- ============================================================ Resumo -->
 <section class="tab-panel" data-painel="resumo" <?= $abaAtiva === 'resumo' ? '' : 'hidden' ?>>
+    <?php if ($criativo) render_criativo_card($criativo); ?>
     <div class="grid-2">
         <div class="card">
             <div class="card-head"><div><h2>Dados do lead</h2></div><?php if ($podeEditar): ?><button type="button" class="btn btn-outline btn-sm" data-open-modal="modal-editar-lead"><?= icon('edit') ?>Editar</button><?php endif; ?></div>

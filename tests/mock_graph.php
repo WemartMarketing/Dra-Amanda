@@ -32,6 +32,11 @@ foreach ($cen['rotas'] as $i => $rota) {
         file_put_contents($arq, (string) ($n + 1));
         $resp = $rota['respostas'][min($n, count($rota['respostas']) - 1)];
         http_response_code($resp['status']);
+        if (isset($resp['bruto_base64'])) {   // arquivo (ex.: imagem do criativo)
+            header('Content-Type: ' . ($resp['tipo'] ?? 'application/octet-stream'));
+            echo base64_decode($resp['bruto_base64']);
+            exit;
+        }
         echo json_encode($resp['corpo']);
         exit;
     }

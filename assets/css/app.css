@@ -1671,3 +1671,46 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .relaut-item { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f1f3f7; font-size: 14.5px; }
 .relaut-item b { white-space: nowrap; }
 .relaut-lista, .relaut-lista ~ .card { margin-top: 20px; }
+
+/* ---------- Origem do lead: anúncio e criativo (Meta Ads) ---------- */
+.criativo-card { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 22px; margin-bottom: 20px; align-items: start; }
+.criativo-midia { min-width: 0; }
+.criativo-preview { position: relative; display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #0f1222; cursor: zoom-in; }
+.criativo-preview img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: contain; background: #0f1222; }
+.criativo-play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; }
+.criativo-play svg { width: 56px; height: 56px; padding: 14px; border-radius: 50%; background: rgba(0,0,0,.55); fill: #fff; }
+.criativo-tag { position: absolute; left: 10px; bottom: 10px; background: rgba(0,0,0,.7); color: #fff; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; }
+.criativo-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; aspect-ratio: 4 / 5; border: 1px dashed #c9cdf7;
+    border-radius: 14px; background: #f7f7fd; color: var(--muted); font-weight: 700; text-align: center; padding: 16px; }
+.criativo-vazio svg { width: 34px; height: 34px; color: #a3a9e6; }
+.criativo-info { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.criativo-info .eyebrow, .criativo-modal .eyebrow { display: flex; align-items: center; gap: 6px; }
+.criativo-info .eyebrow svg { width: 16px; height: 16px; }
+.criativo-dados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; margin: 0; }
+.criativo-dados div { min-width: 0; }
+.criativo-dados dt { font-size: 12px; color: var(--muted); font-weight: 600; }
+.criativo-dados dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.criativo-titulo-anuncio { font-weight: 800; margin: 4px 0 0; font-size: 16px; }
+.criativo-texto { margin: 0; color: #364152; background: #f6f7fb; border-radius: 12px; padding: 10px 12px; white-space: pre-line; overflow-wrap: anywhere; }
+.criativo-acoes { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.criativo-acoes .btn svg { width: 18px; height: 18px; }
+.criativo-nota { font-size: 12.5px; color: var(--muted); margin: 0; }
+.icon-btn-anuncio { color: #6d5ff5; }
+.criativo-modal { max-width: 560px; width: calc(100% - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; }
+.criativo-modal-corpo { display: flex; flex-direction: column; gap: 12px; }
+.criativo-modal-midia { position: relative; border-radius: 14px; overflow: hidden; background: #0f1222; }
+.criativo-modal-midia img { display: block; width: 100%; max-height: 60dvh; object-fit: contain; }
+.criativo-modal .criativo-vazio { aspect-ratio: 16 / 9; }
+.criativo-modal .rule-box { margin-top: 0; }
+@media (max-width: 760px) {
+    .criativo-card { grid-template-columns: 1fr; gap: 14px; }
+    .criativo-preview img, .criativo-vazio { aspect-ratio: 1 / 1; }
+    .criativo-dados { grid-template-columns: 1fr 1fr; }
+    .criativo-acoes .btn { flex: 1 1 100%; justify-content: center; }
+}
+.kcard-criativo { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 6px; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid #dcd8fd; background: #f4f2ff; color: #5b4ee0; font-weight: 700; font-size: 13px; cursor: pointer; }
+.kcard-criativo svg { width: 16px; height: 16px; }
+.kcard-criativo:hover { background: #ebe7ff; }
+.criativo-info > .pill { align-self: flex-start; }
+.criativo-tag { top: 10px; bottom: auto; }

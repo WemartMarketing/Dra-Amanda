@@ -77,6 +77,7 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
     <div class="actions">
         <a class="btn btn-outline" href="/pages/relatorios.php?<?= e(http_build_query($publicos)) ?>"><?= icon('chart') ?>Perdas e transferências</a>
+        <a class="btn btn-outline" href="/pages/relatorio_anuncios.php?<?= e(http_build_query(array_intersect_key($publicos, array_flip(['periodo', 'de', 'ate', 'empreendimento', 'equipe'])))) ?>"><?= icon('anuncio') ?>Leads por anúncio</a>
         <?php if ($podeExportar): ?>
             <?php dash_exportar('modal-exportar', [
                 'quebra' => 'Produtividade por ' . mb_strtolower(dash_dimensoes()[$por]) . ' (tabela abaixo)',

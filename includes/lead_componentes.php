@@ -29,6 +29,9 @@ function render_lead_card(array $lead, bool $mostrarResponsavel, bool $podeMover
             <span><?= e($lead['empreendimento_nome'] ?? 'Sem empreendimento') ?></span>
             <?php if ($mostrarResponsavel): ?><span class="kcard-resp"><?= icon('user') ?><?= e($lead['responsavel_nome'] ?? '—') ?></span><?php endif; ?>
         </div>
+        <?php if (($lead['origem'] ?? '') === 'meta_ads' || !empty($lead['meta_ad_id'])): ?>
+            <button type="button" class="kcard-criativo" data-criativo-lead="<?= (int) $lead['id'] ?>" aria-label="Ver criativo do anúncio de <?= e($lead['nome']) ?>"><?= icon('anuncio') ?>Ver criativo</button>
+        <?php endif; ?>
         <div class="kcard-next<?= $lead['atrasado'] ? ' is-late' : '' ?>">
             <?= icon($lead['atrasado'] ? 'alert' : 'calendar') ?>
             <span><?= $lead['atrasado'] ? '<b>Atrasado</b> · ' : '' ?><?= e(lead_proxima_acao($lead)) ?></span>

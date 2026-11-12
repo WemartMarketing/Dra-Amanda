@@ -5,7 +5,8 @@
  *
  *   1. encerra presenças vencidas na roleta;
  *   2. tenta distribuir a fila de espera da roleta;
- *   3. tenta de novo os avisos do Meta Lead Ads com erro (espera crescente);
+ *   3. tenta de novo os avisos do Meta Lead Ads com erro (espera crescente) e
+ *      sincroniza os criativos dos anúncios que geraram leads;
  *   4. aplica a recuperação automática por inatividade;
  *   5. apaga arquivos temporários de importação com mais de 1 hora;
  *   6. reprocessa avisos do WhatsApp que falharam (espera crescente);
@@ -49,6 +50,14 @@ try {
     $etapa('meta', function () {
         $r = meta_processar_pendentes(100);
         return $r['tentados'] . ' tentado(s), ' . $r['processados'] . ' lead(s), ' . $r['duplicados'] . ' duplicado(s), ' . $r['erros'] . ' erro(s)';
+    });
+    $etapa('criativos', function () {
+        require_once __DIR__ . '/../includes/meta_criativos.php';
+        if (!modulo_tabela_existe('meta_anuncios')) {
+            return 'migração 011 pendente';
+        }
+        $r = meta_criativos_processar(30);
+        return $r['tentados'] . ' anúncio(s), ' . $r['ok'] . ' ok, ' . $r['falhas'] . ' falha(s)';
     });
     $etapa('recuperação', function () {
         $r = recuperacao_executar(null, 500);

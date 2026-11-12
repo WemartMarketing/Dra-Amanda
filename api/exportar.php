@@ -108,6 +108,16 @@ switch ($relatorio) {
         $filtrosAud = array_filter($lf, fn ($v) => $v !== null && $v !== '');
         break;
 
+    case 'anuncios_campanha':
+    case 'anuncios_anuncio':
+        require_once __DIR__ . '/../includes/relatorio_anuncios.php';
+        $por = $relatorio === 'anuncios_anuncio' ? 'anuncio' : 'campanha';
+        $colunas = relanu_colunas($por);
+        $linhas = relanu_linhas($usuario, $f, $por);
+        $titulo = $por === 'anuncio' ? 'Leads por anúncio' : 'Leads por campanha';
+        $filtrosAud = dash_filtros_publicos($f);
+        break;
+
     case 'automacao_indicadores':
     case 'automacao_empreendimento':
     case 'automacao_equipe':

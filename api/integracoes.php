@@ -15,6 +15,8 @@
  *   form_excluir      { id }
  *   evento_reprocessar{ id }
  *   form_consentimento{ id, campo?, texto? }  pergunta do formulário que autoriza contato pelo WhatsApp
+ *   anuncios_token    { token? }  token da Marketing API (vazio = remove)
+ *   anuncios_sincronizar          busca agora os criativos (até 15; o resto vai pela rotina)
  * O token da página nunca volta para o navegador.
  */
 require_once __DIR__ . '/../includes/api.php';
@@ -45,6 +47,47 @@ function int_token(array $pagina): string
 }
 
 switch ($acao) {
+    // ---------------------------------------------- Anúncios e criativos (Marketing API)
+    case 'anuncios_token':
+        require_once __DIR__ . '/../includes/meta_criativos.php';
+        if (!cripto_disponivel()) {
+            api_erro('A chave de cifragem (APP_KEY) não está configurada no servidor.', 409);
+        }
+        $token = trim((string) ($_POST['token'] ?? ''));
+        if ($token === '') {
+            $pdo->prepare('DELETE FROM meta_marketing WHERE empresa_id = :e')->execute(['e' => $empresaId]);
+            auditoria_registrar($empresaId, $uid, 'meta.anuncios_token_removido', 'empresa', $empresaId, []);
+            api_responder(['ok' => true, 'mensagem' => 'Token removido: os criativos passam a ser lidos com o token da página.']);
+        }
+        if (strlen($token) < 20 || strlen($token) > 1000 || preg_match('/\s/', $token)) {
+            api_erro('Token inválido.', 422);
+        }
+        $r = meta_graph('GET', 'me', ['fields' => 'id,name'], $token);
+        if (!$r['ok']) {
+            api_erro('A Meta recusou este token: ' . $r['erro'], 502);
+        }
+        $pdo->prepare('INSERT INTO meta_marketing (empresa_id, token_cifrado, validado_em, ultimo_erro) VALUES (:e, :t, NOW(), NULL)
+                       ON DUPLICATE KEY UPDATE token_cifrado = VALUES(token_cifrado), validado_em = NOW(), ultimo_erro = NULL')
+            ->execute(['e' => $empresaId, 't' => cripto_cifrar($token)]);
+        // Anúncios que falharam por falta de acesso ganham uma nova chance agora.
+        $pdo->prepare("UPDATE meta_anuncios SET sync_status = 'pendente', sync_tentativas = 0, proxima_sync_em = NULL WHERE empresa_id = :e AND sync_status IN ('sem_permissao','erro')")
+            ->execute(['e' => $empresaId]);
+        auditoria_registrar($empresaId, $uid, 'meta.anuncios_token_salvo', 'empresa', $empresaId, []);
+        api_responder(['ok' => true, 'mensagem' => 'Token da Marketing API validado e salvo (cifrado).']);
+
+    case 'anuncios_sincronizar':
+        require_once __DIR__ . '/../includes/meta_criativos.php';
+        $pdo->prepare("UPDATE meta_anuncios SET proxima_sync_em = NULL, sync_tentativas = LEAST(sync_tentativas, 7) WHERE empresa_id = :e AND sync_status <> 'removido'")
+            ->execute(['e' => $empresaId]);
+        $stmt = $pdo->prepare("SELECT id FROM meta_anuncios WHERE empresa_id = :e AND sync_status <> 'removido' ORDER BY sync_status = 'pendente' DESC, id LIMIT 15");
+        $stmt->execute(['e' => $empresaId]);
+        $ok = $falhas = 0;
+        foreach (array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)) as $aid) {
+            in_array(meta_criativo_sincronizar($aid), ['ok', 'parcial'], true) ? $ok++ : $falhas++;
+        }
+        auditoria_registrar($empresaId, $uid, 'meta.criativos_sincronizados', 'empresa', $empresaId, ['ok' => $ok, 'falhas' => $falhas]);
+        api_responder(['ok' => true, 'mensagem' => "$ok anúncio(s) atualizado(s)" . ($falhas ? ", $falhas com falha (veja abaixo)" : '') . '. O restante segue pela rotina automática.']);
+
     case 'pagina_salvar':
         if (!cripto_disponivel()) {
             api_erro('A chave de cifragem (APP_KEY) não está configurada no servidor. Sem ela o sistema não guarda tokens.', 409);

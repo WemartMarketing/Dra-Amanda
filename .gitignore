@@ -16,6 +16,8 @@
 !/storage/lead_arquivos/.gitkeep
 /storage/books/*
 !/storage/books/.gitkeep
+/storage/criativos/*
+!/storage/criativos/.gitkeep
 
 # Backups do banco (cron/backup.php) e temporários de importação: só no servidor
 /storage/backups/

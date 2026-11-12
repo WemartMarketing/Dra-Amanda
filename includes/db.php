@@ -43,3 +43,15 @@ function modulo_whatsapp_instalado(): bool
     }
     return $ok;
 }
+
+/** A tabela existe neste banco? (para recursos cuja migração pode ainda não ter rodado) */
+function modulo_tabela_existe(string $tabela): bool
+{
+    static $cache = [];
+    if (!isset($cache[$tabela])) {
+        $stmt = db()->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t');
+        $stmt->execute(['t' => $tabela]);
+        $cache[$tabela] = (int) $stmt->fetchColumn() === 1;
+    }
+    return $cache[$tabela];
+}

@@ -273,7 +273,12 @@ function meta_processar_evento(int $eventoId, bool $forcar = false): string
     if (!$token) {
         return $falhar('Token da página ausente ou ilegível (confira APP_KEY e cadastre o token de novo).');
     }
-    $r = meta_graph('GET', $ev['leadgen_id'], ['fields' => 'created_time,field_data,form_id,ad_id,campaign_name'], $token);
+    // Origem completa (campanha, conjunto, anúncio, plataforma). Se a Meta recusar
+    // algum desses campos, busca só o essencial — a origem nunca impede o cadastro.
+    $r = meta_graph('GET', $ev['leadgen_id'], ['fields' => 'created_time,field_data,form_id,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,platform,is_organic'], $token);
+    if (!$r['ok'] && (int) ($r['data']['error']['code'] ?? 0) === 100) {
+        $r = meta_graph('GET', $ev['leadgen_id'], ['fields' => 'created_time,field_data,form_id,ad_id,campaign_name'], $token);
+    }
     if (!$r['ok']) {
         return $falhar($r['erro']);
     }
@@ -321,6 +326,13 @@ function meta_processar_evento(int $eventoId, bool $forcar = false): string
         return $falhar('Erro ao gravar o lead no banco.');
     }
     $leadId = (int) $pdo->lastInsertId();
+    // Anúncio que gerou o lead (ids e nomes; o criativo é buscado depois, pela rotina).
+    try {
+        require_once __DIR__ . '/meta_criativos.php';
+        meta_registrar_origem($empresaId, $leadId, meta_origem_do_lead((array) $r['data'], json_decode((string) $ev['payload'], true) ?: []));
+    } catch (Throwable $e) {
+        error_log('[meta] origem do anúncio não registrada para o lead ' . $leadId . ': ' . $e->getMessage());
+    }
     lead_registrar_evento($leadId, null, 'integracao', 'Lead recebido do Meta Ads — ' . $origemTexto);
     if ($campos['observacao']) {
         lead_registrar_evento($leadId, null, 'nota', 'Respostas do formulário: ' . $campos['observacao']);
