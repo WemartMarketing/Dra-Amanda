@@ -92,9 +92,13 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 13 | `sql/migration_007_dashboards.sql` | Etapa 6 (colunas dos dashboards, índices dos relatórios, permissão de auditoria) |
 | 14 | `sql/migration_008_whatsapp_jornadas.sql` | WhatsApp + Jornadas Inteligentes — Fase 1 (estrutura; ver `docs/WHATSAPP_JORNADAS.md`) |
 | 15 | `sql/migration_009_whatsapp_fase2.sql` | WhatsApp — Fase 2 (integração com a Cloud API) |
+| 16 | `sql/migration_010_jornada_boas_vindas.sql` | Jornadas — Fase 4 (autorização de WhatsApp pelo formulário do Meta) |
 
-- Quem já rodou até o 14 roda apenas o **15**. Quem já rodou até o 13 roda o **14** e o **15**. Quem já rodou os passos 1–12 roda o **13** e o **14** (não há seed da
-  Etapa 6). Quem estava no passo 10 roda 11, 12 (se usa demonstração) e 13.
+- Atualizando um servidor que já funciona: rode, na ordem, só os arquivos
+  que ainda não rodou. Ex.: quem já rodou até o 15 roda apenas o **16**.
+  Os seeds (2, 6, 8, 10, 12) são só para demonstração; não há seed da
+  Etapa 6 em diante. Na dúvida, repita a migração: todas podem rodar mais
+  de uma vez sem estragar nada.
 - Rode os arquivos **na ordem** numa instalação nova. Se precisar repetir
   algum depois (por exemplo, se uma importação parou no meio), pode rodar de
   novo inclusive uma migração antiga depois de uma mais nova: nenhuma delas

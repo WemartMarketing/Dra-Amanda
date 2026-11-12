@@ -316,6 +316,7 @@ function wa_render_abas(array $usuario, string $ativa): void
         $abas['conversas'] = ['/pages/conversas.php', 'Conversas'];
     }
     if (usuario_tem_permissao($usuario, 'whatsapp_configurar')) {
+        $abas['jornadas'] = ['/pages/whatsapp.php?aba=jornadas', 'Jornadas'];
         $abas['templates'] = ['/pages/whatsapp.php?aba=templates', 'Templates'];
         $abas['conexao'] = ['/pages/whatsapp.php?aba=conexao', 'Conexão'];
         $abas['atividade'] = ['/pages/whatsapp.php?aba=atividade', 'Atividade'];

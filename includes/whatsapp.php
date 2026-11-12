@@ -409,7 +409,7 @@ function wa_enfileirar(int $empresaId, int $contatoId, array $envio, array $opco
 
     $regra = wa_verificar_envio($empresaId, $contatoId, [
         'tipo' => $tipo === 'template' ? 'template' : 'livre', 'automatica' => $automatica, 'template' => $template,
-        'ignorar_horario' => !empty($opcoes['ignorar_horario']),
+        'ignorar_horario' => !empty($opcoes['ignorar_horario']), 'resposta_ao_cliente' => !empty($opcoes['resposta_ao_cliente']),
     ]);
     $quando = $opcoes['executar_em'] ?? null;
     if (!$regra['pode']) {
@@ -439,6 +439,7 @@ function wa_enfileirar(int $empresaId, int $contatoId, array $envio, array $opco
     $mensagemId = (int) $pdo->lastInsertId();
     $payload['mensagem_id'] = $mensagemId;
     $payload['ignorar_horario'] = !empty($opcoes['ignorar_horario']);
+    $payload['resposta_ao_cliente'] = !empty($opcoes['resposta_ao_cliente']);
     fila_agendar($empresaId, 'wa_enviar', $payload, 'wa_enviar:' . $mensagemId, $quando, 'wa_contato', $contatoId, 5);
     return ['ok' => true, 'mensagem_id' => $mensagemId, 'agendada_para' => $quando ? $quando->format('Y-m-d H:i:s') : null];
 }
@@ -492,6 +493,7 @@ function wa_tarefa_enviar(array $tarefa): array
     $regra = wa_verificar_envio($empresaId, (int) $msg['contato_id'], [
         'tipo' => ($envio['tipo'] ?? '') === 'template' ? 'template' : 'livre', 'automatica' => $msg['enviada_por'] === null,
         'template' => $template, 'ignorar_horario' => !empty($p['ignorar_horario']),
+        'resposta_ao_cliente' => !empty($p['resposta_ao_cliente']), 'mensagem_id' => (int) $msg['id'],
     ]);
     if (!$regra['pode']) {
         if ($regra['adiar_para'] && !$ultima) {

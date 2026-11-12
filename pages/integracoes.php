@@ -121,7 +121,18 @@ require __DIR__ . '/../includes/layout_start.php';
                 <tbody>
                 <?php foreach ($forms as $f): $fid = (int) $f['id']; ?>
                     <tr>
-                        <td><b><?= e($f['nome'] ?: 'Sem nome') ?></b><br><span class="muted">ID <?= e($f['form_id']) ?></span></td>
+                        <td><b><?= e($f['nome'] ?: 'Sem nome') ?></b><br><span class="muted">ID <?= e($f['form_id']) ?></span>
+                            <details class="int-consent"><summary><?= $f['wa_consentimento_campo'] ? '✓ Autoriza WhatsApp pela pergunta “' . e($f['wa_consentimento_campo']) . '”' : 'Autorização de WhatsApp: não configurada' ?></summary>
+                                <form data-api-form action="/api/integracoes.php">
+                                    <input type="hidden" name="acao" value="form_consentimento"><input type="hidden" name="id" value="<?= $fid ?>">
+                                    <p class="muted">Preencher o formulário não autoriza mensagens. Crie no formulário do Meta uma pergunta como “Aceito receber contato pelo WhatsApp” (Sim/Não) e informe aqui.</p>
+                                    <div class="field"><label for="cs-c-<?= $fid ?>">Nome da pergunta no formulário</label><input type="text" id="cs-c-<?= $fid ?>" name="campo" maxlength="100" value="<?= e((string) $f['wa_consentimento_campo']) ?>" placeholder="ex.: aceito_contato_whatsapp"></div>
+                                    <div class="field"><label for="cs-t-<?= $fid ?>">Texto do aviso que o cliente vê</label><textarea id="cs-t-<?= $fid ?>" name="texto" maxlength="500" placeholder="ex.: Autorizo a HM Vendas a me enviar mensagens pelo WhatsApp sobre este empreendimento."><?= e((string) $f['wa_consentimento_texto']) ?></textarea></div>
+                                    <div class="form-alert" data-form-alerta hidden></div>
+                                    <button type="submit" class="btn btn-outline btn-sm">Salvar</button>
+                                </form>
+                            </details>
+                        </td>
                         <td>
                             <form data-api-form action="/api/integracoes.php" class="inline-pair" id="form-map-<?= $fid ?>">
                                 <input type="hidden" name="acao" value="form_mapear"><input type="hidden" name="id" value="<?= $fid ?>">

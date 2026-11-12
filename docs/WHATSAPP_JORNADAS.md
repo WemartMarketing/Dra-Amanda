@@ -4,7 +4,7 @@ Módulo nativo do WeMart Sales para manter o relacionamento com o lead
 mesmo quando nenhum corretor está online, usando **somente** a WhatsApp
 Business Platform (Cloud API oficial da Meta).
 
-> **Situação atual: Fases 1, 2 e 3 concluídas.** O envio, o recebimento e os
+> **Situação atual: Fases 1 a 4 concluídas.** O envio, o recebimento e os
 > status já estão programados e testados contra um **simulador** da Graph
 > API, mas **ainda não foram validados com uma conta real da Meta**.
 > Toda conta nova nasce em **modo de teste**: nada é enviado até alguém
@@ -33,7 +33,7 @@ Nenhum módulo anterior foi removido ou duplicado.
 | 1 | Banco, fila persistente, regras de envio/consentimento, horários das roletas, testes | **concluída** |
 | 2 | Webhook `webhook/whatsapp.php` (mensagens + status), cliente da Cloud API com **modo de teste**, sincronização de templates, tela de conexão | **concluída** (validação real pendente) |
 | 3 | Central de conversas (3 colunas no computador, tela simples no celular), botão **Conversar no WhatsApp** na ficha e nos cards | **concluída** |
-| 4 | Jornada "novo lead": boas-vindas por empreendimento, oferta e envio do book (PDF), fila quando a roleta está fechada | a fazer |
+| 4 | Jornada "novo lead": boas-vindas por empreendimento, oferta e envio do book (PDF), fila quando a roleta está fechada | **concluída** |
 | 5 | Follow-ups (esperar/condição), central de pendências do corretor ("o cliente respondeu?") | a fazer |
 | 6 | Integração com recuperação/redistribuição, tela de horário por dia, pausas e feriados das roletas | a fazer |
 | 7 | Editor visual de jornadas com simulação, campanhas/disparador, relatórios e exportação Excel | a fazer |
@@ -310,6 +310,105 @@ mídia), `api/conversas.php`, `api/whatsapp_midia.php`,
   - o Master liga um número desconhecido a um lead;
   - tudo conferido no iPhone e num Android de 360 px, sem rolagem lateral.
 
+## Fase 4 — Boas-vindas automáticas e book
+
+### O caminho do lead que chega às 23h40
+
+1. O Meta Lead Ads avisa e o lead é criado. A roleta tenta distribuir e,
+   com o plantão fechado, ele fica na **fila de espera**, como sempre. A
+   automação **não** distribui lead nem passa por cima da presença ou da
+   disponibilidade dos corretores.
+2. Se o formulário tem a pergunta de autorização configurada e o cliente
+   respondeu "Sim", a autorização é registrada com a evidência: pergunta,
+   resposta e texto do aviso. **Preencher o formulário sozinho não
+   autoriza nada.**
+3. A jornada **Boas-vindas a novo lead** envia, na hora, o template de
+   boas-vindas do empreendimento (ou o padrão da jornada), com os dados do
+   lead e os botões "Quero receber o book", "Falar com consultor" e "Agora
+   não". Se uma regra impedir (sem autorização, template não aprovado,
+   descadastro…), nada é enviado, e o motivo fica no histórico do lead e na
+   aba Jornadas.
+4. Quando o cliente toca:
+   - **"Quero receber o book"** → o PDF do empreendimento sai na hora. Sem
+     book cadastrado, o sistema responde que um consultor vai enviar e
+     avisa o corretor no histórico, sem inventar material;
+   - **"Falar com consultor"** → fica registrado para o corretor;
+   - **"Agora não"** → as mensagens automáticas desse lead param.
+5. Se o cliente escreve e o lead ainda está na fila, sem corretor, sai a
+   **resposta configurada** ("Um consultor vai te responder assim que o
+   plantão abrir"), no máximo uma vez a cada 12 h, sem preços nem
+   condições.
+6. Quando o plantão abre, a roleta distribui o lead normalmente e o
+   corretor encontra a conversa e todo o histórico.
+
+### Garantias
+
+- **Uma vez só:** cada lead entra uma única vez em cada jornada. Repetir o
+  aviso do Meta ou transferir o lead não recomeça as boas-vindas.
+- **Paradas automáticas:** a jornada para quando o cliente descadastra
+  ("PARAR"), quando o lead é encerrado no funil (perdido, sem interesse,
+  contrato) ou quando é excluído.
+- **Jornada pausada:** os leads que estavam nela ficam parados no passo em
+  que estavam e continuam quando ela é religada.
+- **Teto por jornada:** cada jornada tem um limite de mensagens por lead.
+- **Book e confirmação de recebimento** respondem a algo que o cliente
+  acabou de pedir. Por isso ficam fora do teto diário de mensagens
+  automáticas, mas só saem dentro das 24 h em que o cliente escreveu.
+- **Corrigido nesta fase:** na conferência feita na hora do envio, a
+  própria mensagem contava no teto dela mesma. Com o teto 2, a 2ª
+  mensagem legítima era barrada. Há testes de regressão para isso.
+
+### Onde configurar
+
+- **WhatsApp → Jornadas:** ligar e pausar, quais origens de lead entram (o
+  padrão é Meta Ads; listas importadas ficam de fora), a mensagem padrão,
+  os números, os empreendimentos sem mensagem ou sem book e os últimos
+  leads com o motivo de cada resultado.
+- **Página do empreendimento → "WhatsApp: boas-vindas e book":**
+  - **mensagem:** o template de boas-vindas (template com o nome do
+    corretor é recusado, porque a boas-vindas sai antes de existir
+    corretor), com a prévia da mensagem;
+  - **book:** o PDF de até 15 MB, que fica em `storage/books/`, bloqueado
+    para acesso direto.
+- **Integrações → cada formulário → "Autorização de WhatsApp":** o nome
+  da pergunta do formulário e o texto do aviso.
+- **WhatsApp → Conexão → "Resposta quando nenhum consultor puder
+  atender".**
+
+### Arquivos
+
+- `includes/jornadas.php`: o motor das jornadas.
+- `sql/migration_010_jornada_boas_vindas.sql`: a pergunta de autorização
+  por formulário.
+- `api/empreendimento_book.php`: abre o book cadastrado.
+- Alterados: `api/whatsapp.php`, `api/integracoes.php`,
+  `api/lead_salvar.php`, `includes/meta.php`, `pages/whatsapp.php`,
+  `pages/empreendimento.php` e `pages/integracoes.php`.
+
+### Testes (`tests/whatsapp_fase4_test.php`)
+
+- São 52 verificações e todas passam.
+- Cobrem:
+  - quais respostas do formulário contam como autorização;
+  - a jornada que nasce desligada;
+  - o lead sem corretor recebendo as boas-vindas;
+  - nada em dobro, inclusive na transferência;
+  - o envio sem autorização, que não sai e explica o motivo;
+  - a origem do lead e a mensagem padrão;
+  - o book com e sem PDF;
+  - a resposta automática que sai só uma vez e só sem corretor;
+  - os botões "Agora não" e "Falar com consultor";
+  - as paradas: descadastro, lead perdido, jornada pausada, limite de
+    mensagens;
+  - **o Meta Ads de ponta a ponta**, com o simulador local da Graph API.
+- Também foi feito o fluxo pela tela, com dados de demonstração:
+  - configurar a pergunta no formulário, a mensagem e o book do
+    empreendimento, e ligar a jornada;
+  - um lead do Meta chegando com o plantão fechado;
+  - o cliente pedindo o book e perguntando o valor, recebendo a resposta
+    automática sem preço;
+  - conferido também no celular.
+
 ## Dependências externas (Meta)
 
 Tudo abaixo depende de credenciais ou aprovação da Meta e **ainda não
@@ -330,9 +429,12 @@ telas mudam com frequência.
 4. **Templates** criados e **aprovados** no WhatsApp Manager: boas-vindas
    com botões de resposta rápida, lembrete, book etc. O sistema só usa
    template aprovado.
-5. Limites de envio e qualidade do número são definidos pela Meta. O
+5. **Pergunta de autorização nos formulários do Lead Ads** (ex.: "Aceito
+   receber contato pelo WhatsApp", Sim/Não). Sem ela, os leads do Meta
+   entram na jornada, mas a mensagem não sai, por falta de autorização.
+6. Limites de envio e qualidade do número são definidos pela Meta. O
    sistema vai registrar e respeitar esses limites, não contorná-los.
-6. **Embedded Signup** (a empresa conecta o próprio número com poucos
+7. **Embedded Signup** (a empresa conecta o próprio número com poucos
    cliques): a estrutura já prevê `origem_conexao = 'embedded_signup'`,
    mas depende de a WeMart ser habilitada pela Meta como provedora. Isso
    **não** está assumido.

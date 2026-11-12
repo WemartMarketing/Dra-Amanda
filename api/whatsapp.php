@@ -16,10 +16,17 @@
  *   template_salvar     { id, finalidade, var[nome]=campo, acao[i]=acao }
  *   teste_enviar        { telefone, template_id? | texto?, autorizo }
  *   evento_reprocessar  { id }
+ *   book_enviar         { empreendimento_id, arquivo (PDF) }
+ *   book_remover        { empreendimento_id }
+ *   boas_vindas_template{ empreendimento_id, template_id? }
+ *   jornada_status      { id, status: ativa|pausada }          (gerenciar_jornadas)
+ *   jornada_config      { id, origens[], template_id? }        (gerenciar_jornadas)
  */
 require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/whatsapp.php';
 require_once __DIR__ . '/../includes/automacao.php';
+require_once __DIR__ . '/../includes/jornadas.php';
+require_once __DIR__ . '/../includes/arquivos.php';
 
 $usuario = api_iniciar('whatsapp_configurar');
 $empresaId = (int) $usuario['empresa_ativa_id'];
@@ -272,6 +279,121 @@ switch ($acao) {
         }
         $s = wa_processar_evento($id);
         api_responder(['ok' => true, 'mensagem' => 'Reprocessado: ' . (wa_status_evento()[$s][0] ?? $s) . '.']);
+
+    case 'book_enviar':
+    case 'book_remover':
+    case 'boas_vindas_template':
+        $empId = (int) ($_POST['empreendimento_id'] ?? 0);
+        if (!api_registro_da_empresa('empreendimentos', $empId, $empresaId)) {
+            api_erro('Empreendimento não encontrado.', 404);
+        }
+        $stmt = $pdo->prepare('SELECT nome, book_arquivo FROM empreendimentos WHERE id = :id');
+        $stmt->execute(['id' => $empId]);
+        $emp = $stmt->fetch();
+        if ($acao === 'boas_vindas_template') {
+            $tid = (int) ($_POST['template_id'] ?? 0) ?: null;
+            if ($tid) {
+                $tpl = wa_template($empresaId, $tid);
+                if (!$tpl || $tpl['status'] !== 'aprovado') {
+                    api_erro('Escolha um template aprovado pela Meta.', 422);
+                }
+                $render = wa_regra_renderizar($tpl['corpo'], wa_template_variaveis($tpl), wa_dados_ficticios('x'));
+                if (!$render['ok']) {
+                    api_erro('Este template ainda tem variáveis sem dado ligado (aba Templates).', 422);
+                }
+                if (in_array('corretor.nome', wa_template_variaveis($tpl), true) || in_array('corretor.primeiro_nome', wa_template_variaveis($tpl), true)) {
+                    api_erro('A boas-vindas sai antes de existir corretor (ex.: 23h40): use um template sem o nome do corretor.', 422);
+                }
+            }
+            $pdo->prepare('UPDATE empreendimentos SET wa_template_boas_vindas_id = :t WHERE id = :id AND empresa_id = :e')->execute(['t' => $tid, 'id' => $empId, 'e' => $empresaId]);
+            auditoria_registrar($empresaId, $uid, 'whatsapp.boas_vindas_template', 'empreendimento', $empId, ['template_id' => $tid]);
+            api_responder(['ok' => true, 'mensagem' => $tid ? 'Mensagem de boas-vindas definida para ' . $emp['nome'] . '.' : 'Boas-vindas removida deste empreendimento.']);
+        }
+        $antigo = $emp['book_arquivo'] ? wa_arquivo_permitido($emp['book_arquivo']) : null;
+        if ($acao === 'book_remover') {
+            $pdo->prepare('UPDATE empreendimentos SET book_arquivo = NULL, book_nome = NULL, book_tamanho = NULL, book_atualizado_em = NOW() WHERE id = :id')->execute(['id' => $empId]);
+            if ($antigo && str_contains($antigo, '/storage/books/')) {
+                @unlink($antigo);
+            }
+            auditoria_registrar($empresaId, $uid, 'whatsapp.book_removido', 'empreendimento', $empId, []);
+            api_responder(['ok' => true, 'mensagem' => 'Book removido.']);
+        }
+        if (empty($_FILES['arquivo']) || $_FILES['arquivo']['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES['arquivo']['tmp_name'])) {
+            api_erro('Escolha o arquivo PDF do book.', 422);
+        }
+        $f = $_FILES['arquivo'];
+        if ($f['size'] > 15 * 1024 * 1024) {
+            api_erro('O book precisa ter até 15 MB (o WhatsApp abre mais rápido arquivos leves).', 422);
+        }
+        if ((new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']) !== 'application/pdf') {
+            api_erro('O book precisa ser um arquivo PDF.', 422);
+        }
+        $dir = __DIR__ . '/../storage/books';
+        if (!is_dir($dir) && !mkdir($dir, 0750, true)) {
+            api_erro('Pasta de books indisponível no servidor.', 500);
+        }
+        $nomeArq = bin2hex(random_bytes(16)) . '.pdf';
+        if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $nomeArq)) {
+            api_erro('Não foi possível salvar o arquivo.', 500);
+        }
+        @chmod($dir . '/' . $nomeArq, 0640);
+        $original = mb_substr(preg_replace('/[\x00-\x1F\x7F\/\\\\]+/u', '', basename((string) $f['name'])) ?: 'book.pdf', 0, 190);
+        $pdo->prepare('UPDATE empreendimentos SET book_arquivo = :a, book_nome = :n, book_tamanho = :t, book_atualizado_em = NOW() WHERE id = :id')
+            ->execute(['a' => 'storage/books/' . $nomeArq, 'n' => $original, 't' => (int) $f['size'], 'id' => $empId]);
+        if ($antigo && str_contains($antigo, '/storage/books/')) {
+            @unlink($antigo);
+        }
+        auditoria_registrar($empresaId, $uid, 'whatsapp.book_enviado', 'empreendimento', $empId, ['nome' => $original, 'bytes' => (int) $f['size']]);
+        api_responder(['ok' => true, 'mensagem' => 'Book salvo: é ele que o cliente recebe ao tocar em “Quero receber o book”.']);
+
+    case 'jornada_status':
+    case 'jornada_config':
+        if (!usuario_tem_permissao($usuario, 'gerenciar_jornadas')) {
+            api_erro('Sua função não pode alterar jornadas.', 403);
+        }
+        $j = jornada_carregar($empresaId, (int) ($_POST['id'] ?? 0));
+        if (!$j) {
+            api_erro('Jornada não encontrada.', 404);
+        }
+        if ($acao === 'jornada_status') {
+            $novo = ($_POST['status'] ?? '') === 'ativa' ? 'ativa' : 'pausada';
+            if ($novo === 'ativa' && !wa_conta_da_empresa($empresaId)) {
+                api_erro('Conecte o WhatsApp (ou ligue o modo de teste) antes de ativar a jornada.', 409);
+            }
+            $pdo->prepare('UPDATE jornadas SET status = :s, atualizado_em = NOW() WHERE id = :id')->execute(['s' => $novo, 'id' => $j['id']]);
+            if ($novo === 'ativa') {
+                // Leads que ficaram parados enquanto a jornada estava pausada continuam de onde pararam.
+                $stmt = $pdo->prepare("SELECT id, passo_chave FROM jornada_execucoes WHERE jornada_id = :j AND status = 'pausada'");
+                $stmt->execute(['j' => $j['id']]);
+                foreach ($stmt->fetchAll() as $x) {
+                    $pdo->prepare("UPDATE jornada_execucoes SET status = 'ativa' WHERE id = :id")->execute(['id' => $x['id']]);
+                    fila_agendar($empresaId, 'jornada_passo', ['execucao_id' => (int) $x['id'], 'passo' => $x['passo_chave']],
+                                 'jornada:' . $x['id'] . ':' . $x['passo_chave'] . ':retomada:' . time(), null, 'jornada_execucao', (int) $x['id']);
+                }
+            }
+            auditoria_registrar($empresaId, $uid, $novo === 'ativa' ? 'jornada.ativada' : 'jornada.pausada', 'jornada', (int) $j['id'], []);
+            api_responder(['ok' => true, 'mensagem' => $novo === 'ativa' ? 'Jornada ativada: os próximos leads já recebem as boas-vindas.' : 'Jornada pausada: nenhum lead novo entra e os que estavam nela ficam parados.']);
+        }
+        $origensValidas = array_keys(lead_origens());
+        $origens = array_values(array_intersect((array) ($_POST['origens'] ?? []), $origensValidas));
+        if (!$origens) {
+            api_erro('Escolha pelo menos uma origem de lead.', 422);
+        }
+        $cfg = $j['gatilho_config'];
+        $cfg['origens'] = $origens;
+        $pdo->prepare('UPDATE jornadas SET gatilho_config = :g, atualizado_em = NOW() WHERE id = :id')->execute(['g' => json_encode($cfg), 'id' => $j['id']]);
+        $tid = (int) ($_POST['template_id'] ?? 0) ?: null;
+        if ($tid && (!($tpl = wa_template($empresaId, $tid)) || $tpl['status'] !== 'aprovado')) {
+            api_erro('Escolha um template aprovado.', 422);
+        }
+        $passo = jornada_passo((int) $j['id'], 'boas_vindas');
+        if ($passo) {
+            $pc = $passo['config'];
+            $pc['template_id'] = $tid;
+            $pdo->prepare('UPDATE jornada_passos SET config = :c WHERE id = :id')->execute(['c' => json_encode($pc), 'id' => $passo['id']]);
+        }
+        auditoria_registrar($empresaId, $uid, 'jornada.configurada', 'jornada', (int) $j['id'], ['origens' => $origens, 'template_id' => $tid]);
+        api_responder(['ok' => true, 'mensagem' => 'Configuração da jornada salva.']);
 
     default:
         api_erro('Ação desconhecida.', 400);

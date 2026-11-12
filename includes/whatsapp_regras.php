@@ -189,6 +189,7 @@ function wa_regra_renderizar(string $corpo, array $mapa, array $dados): array
  *   'marketing_7d' => int, 'max_marketing_7d' => int,
  *   'no_horario_envio' => bool, 'proximo_horario' => ?DateTimeImmutable,
  *   'ignorar_horario' => bool,          // boas-vindas imediatas a um lead recém-chegado
+ *   'resposta_ao_cliente' => bool,      // resposta a um pedido do cliente (fora do teto, só com janela aberta)
  * ]
  *
  * @return array{pode: bool, motivo: string, codigo: string, adiar_para: ?DateTimeImmutable}
@@ -230,7 +231,10 @@ function wa_regra_pode_enviar(array $c): array
         }
     }
 
-    if ($automatica) {
+    // Resposta automática ao que o cliente ACABOU de pedir (ex.: tocou "Quero o book") não é
+    // insistência: fica fora do teto de frequência, mas só dentro da janela de 24 h.
+    $respostaAoCliente = !empty($c['resposta_ao_cliente']) && !empty($c['janela_aberta']);
+    if ($automatica && !$respostaAoCliente) {
         if ((int) ($c['automaticas_24h'] ?? 0) >= (int) ($c['max_automaticas_24h'] ?? 2)) {
             return $nao('limite_frequencia', 'Limite de mensagens automáticas para este contato nas últimas 24 horas.');
         }
@@ -365,15 +369,16 @@ function wa_descadastrar(int $empresaId, int $contatoId, string $motivo, string 
 }
 
 /** Quantas mensagens automáticas/de marketing saíram para o contato recentemente (teto de frequência). */
-function wa_contagem_recente(int $empresaId, int $contatoId): array
+function wa_contagem_recente(int $empresaId, int $contatoId, ?int $ignorarMensagemId = null): array
 {
     $stmt = db()->prepare("SELECT
             SUM(m.enviada_por IS NULL AND m.criado_em >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS automaticas_24h,
             SUM(m.categoria = 'marketing' AND m.criado_em >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS marketing_7d
         FROM whatsapp_mensagens m JOIN whatsapp_conversas cv ON cv.id = m.conversa_id
         WHERE cv.empresa_id = :e AND cv.contato_id = :c AND m.direcao = 'saida'
-          AND m.status NOT IN ('falhou','cancelada')");
-    $stmt->execute(['e' => $empresaId, 'c' => $contatoId]);
+          AND m.status NOT IN ('falhou','cancelada') AND m.id <> :ign");
+    // Na conferência feita NA HORA DO ENVIO, a própria mensagem não conta para o limite dela mesma.
+    $stmt->execute(['e' => $empresaId, 'c' => $contatoId, 'ign' => $ignorarMensagemId ?? 0]);
     $l = $stmt->fetch() ?: [];
     return ['automaticas_24h' => (int) ($l['automaticas_24h'] ?? 0), 'marketing_7d' => (int) ($l['marketing_7d'] ?? 0)];
 }
@@ -394,7 +399,7 @@ function wa_verificar_envio(int $empresaId, int $contatoId, array $opcoes): arra
     if ($template && (int) $template['empresa_id'] !== $empresaId) {
         return ['pode' => false, 'codigo' => 'template_invalido', 'motivo' => 'Template de outra empresa.', 'adiar_para' => null];
     }
-    $cont = wa_contagem_recente($empresaId, $contatoId);
+    $cont = wa_contagem_recente($empresaId, $contatoId, isset($opcoes['mensagem_id']) ? (int) $opcoes['mensagem_id'] : null);
     [$noHorario, $proximo] = wa_regra_horario_envio($cfg['envio_inicio'], $cfg['envio_fim'], $cfg['envio_dias']);
     $janela = wa_regra_janela_aberta($contato['ultima_entrada_em']);
     return wa_regra_pode_enviar([
@@ -416,5 +421,6 @@ function wa_verificar_envio(int $empresaId, int $contatoId, array $opcoes): arra
         'no_horario_envio' => $noHorario,
         'proximo_horario' => $proximo,
         'ignorar_horario' => !empty($opcoes['ignorar_horario']),
+        'resposta_ao_cliente' => !empty($opcoes['resposta_ao_cliente']),
     ]);
 }

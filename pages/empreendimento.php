@@ -7,6 +7,8 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/icons.php';
 require_once __DIR__ . '/../includes/estrutura.php';
+require_once __DIR__ . '/../includes/whatsapp.php';
+require_once __DIR__ . '/../includes/arquivos.php';
 
 $usuario = auth_require();
 if (!empty($usuario['eh_superadmin'])) {
@@ -140,6 +142,44 @@ require __DIR__ . '/../includes/layout_start.php';
 
     <?php if ($emp): ?>
         <aside class="emp-links">
+            <?php if (usuario_tem_permissao($usuario, 'whatsapp_configurar')):
+                $stmtT = db()->prepare("SELECT id, nome, idioma FROM whatsapp_templates WHERE empresa_id = :e AND status = 'aprovado' ORDER BY finalidade = 'boas_vindas' DESC, nome");
+                $stmtT->execute(['e' => $empresaId]);
+                $tplsAprovados = $stmtT->fetchAll();
+                $tplAtual = $emp['wa_template_boas_vindas_id'] ? wa_template($empresaId, (int) $emp['wa_template_boas_vindas_id']) : null;
+            ?>
+            <div class="card wa-emp">
+                <div class="card-head"><div><h2>WhatsApp: boas-vindas e book</h2><p>O que o lead deste empreendimento recebe assim que chega.</p></div><?= icon('whatsapp') ?></div>
+                <form data-api-form action="/api/whatsapp.php">
+                    <input type="hidden" name="acao" value="boas_vindas_template"><input type="hidden" name="empreendimento_id" value="<?= (int) $emp['id'] ?>">
+                    <div class="field"><label for="wa-bv">Mensagem de boas-vindas (template aprovado)</label>
+                        <select id="wa-bv" name="template_id">
+                            <option value="">— usar a mensagem padrão da jornada —</option>
+                            <?php foreach ($tplsAprovados as $t): ?><option value="<?= (int) $t['id'] ?>" <?= (int) $emp['wa_template_boas_vindas_id'] === (int) $t['id'] ? 'selected' : '' ?>><?= htmlspecialchars($t['nome'] . ' (' . $t['idioma'] . ')') ?></option><?php endforeach; ?>
+                        </select>
+                        <?php if (!$tplsAprovados): ?><small class="field-hint">Nenhum template aprovado ainda: sincronize em WhatsApp → Templates.</small><?php endif; ?>
+                    </div>
+                    <?php if ($tplAtual): ?><div class="wa-bolha wa-emp-previa"><?= nl2br(htmlspecialchars(wa_regra_renderizar($tplAtual['corpo'], json_decode((string) $tplAtual['variaveis'], true) ?: [], ['lead.nome' => 'Maria Exemplo', 'lead.primeiro_nome' => 'Maria', 'empresa.nome' => wa_dados_lead($empresaId, null)['empresa.nome'], 'empreendimento.nome' => $emp['nome'], 'empreendimento.bairro' => (string) $emp['bairro']])['texto'])) ?></div><?php endif; ?>
+                    <div class="form-alert" data-form-alerta hidden></div>
+                    <button type="submit" class="btn btn-outline btn-sm"><?= icon('check') ?>Salvar mensagem</button>
+                </form>
+                <div class="subhead" style="margin-top:16px;">Book digital (PDF)</div>
+                <?php if ($emp['book_arquivo']): ?>
+                    <div class="link-row"><?= icon('file') ?><span><a href="/api/empreendimento_book.php?id=<?= (int) $emp['id'] ?>" target="_blank" rel="noopener"><?= htmlspecialchars($emp['book_nome'] ?: 'book.pdf') ?></a></span><small><?= $emp['book_tamanho'] ? htmlspecialchars(tamanho_legivel((int) $emp['book_tamanho'])) : '' ?></small></div>
+                <?php else: ?>
+                    <p class="empty-note">Sem book: quem pedir recebe "um consultor vai te enviar o material".</p>
+                <?php endif; ?>
+                <form data-api-form action="/api/whatsapp.php" enctype="multipart/form-data">
+                    <input type="hidden" name="acao" value="book_enviar"><input type="hidden" name="empreendimento_id" value="<?= (int) $emp['id'] ?>">
+                    <div class="field"><label for="wa-book"><?= $emp['book_arquivo'] ? 'Trocar o book' : 'Enviar o book' ?></label><input type="file" id="wa-book" name="arquivo" accept="application/pdf" required data-limite="<?= 15 * 1024 * 1024 ?>"><small class="field-hint">PDF de até 15 MB. É exatamente este arquivo que o cliente recebe.</small></div>
+                    <div class="form-alert" data-form-alerta hidden></div>
+                    <div class="actions">
+                        <button type="submit" class="btn btn-outline btn-sm"><?= icon('upload') ?>Salvar book</button>
+                        <?php if ($emp['book_arquivo']): ?><button type="button" class="link-btn danger" data-api-acao="/api/whatsapp.php" data-acao="book_remover" data-empreendimento_id="<?= (int) $emp['id'] ?>" data-confirmar="Remover o book deste empreendimento?">Remover</button><?php endif; ?>
+                    </div>
+                </form>
+            </div>
+            <?php endif; ?>
             <div class="card">
                 <div class="card-head"><div><h2>Plantões</h2><p>Onde o empreendimento é atendido.</p></div></div>
                 <?php foreach ($plantoes as $p): ?>

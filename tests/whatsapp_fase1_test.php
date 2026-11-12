@@ -82,6 +82,8 @@ igual($d(['tipo' => 'livre', 'automatica' => false])['codigo'], 'janela_fechada'
 igual($d(['tipo' => 'livre', 'automatica' => false, 'janela_aberta' => true])['codigo'], 'ok', 'mensagem livre com janela aberta → pode');
 igual($d(['automaticas_24h' => 2])['codigo'], 'limite_frequencia', 'automação acima do teto de 24 h → bloqueia');
 igual($d(['automaticas_24h' => 5, 'automatica' => false])['codigo'], 'ok', 'teto de automação não limita o corretor');
+igual($d(['automaticas_24h' => 2, 'resposta_ao_cliente' => true, 'janela_aberta' => true])['codigo'], 'ok', 'resposta ao pedido do cliente (ex.: book) dentro das 24 h → fora do teto');
+igual($d(['automaticas_24h' => 2, 'resposta_ao_cliente' => true, 'janela_aberta' => false])['codigo'], 'limite_frequencia', '"resposta" sem o cliente ter escrito → vale o teto normal');
 $prox = $em('2026-11-13 08:00:00');
 $res = $d(['no_horario_envio' => false, 'proximo_horario' => $prox]);
 ok($res['codigo'] === 'fora_do_horario' && $res['adiar_para'] == $prox, 'follow-up fora do horário → adia para o próximo horário (não descarta)');

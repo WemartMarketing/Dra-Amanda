@@ -1510,3 +1510,20 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 }
 .chat-filtros { flex-wrap: wrap; overflow: visible; }
 @media (min-width: 881px) { body:has(.tabs) .chat { height: calc(100vh - 400px); } }
+
+/* ------------------------------------------------ Jornadas (Fase 4) */
+.jornada-fluxo { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; counter-reset: jf; }
+.jornada-fluxo li { position: relative; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fafbff; display: flex; flex-direction: column; gap: 3px; }
+.jornada-fluxo li:not(:last-child)::after { content: '→'; position: absolute; right: -12px; top: 50%; transform: translate(50%, -50%); color: var(--accent); font-weight: 800; }
+.jf-tipo { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; color: var(--accent); }
+.jornada-fluxo b { font-size: 14.5px; }
+.jornada-fluxo small { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.wa-emp .card-head svg { width: 22px; height: 22px; color: #16a34a; }
+.wa-emp-previa { margin: 0 0 12px; font-size: 13.5px; }
+@media (max-width: 1100px) {
+    .jornada-fluxo { grid-template-columns: 1fr; }
+    .jornada-fluxo li:not(:last-child)::after { content: '↓'; right: 50%; top: auto; bottom: -12px; transform: translate(50%, 50%); }
+}
+.int-consent { margin-top: 6px; font-size: 13px; max-width: 420px; }
+.int-consent summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+.int-consent form { margin-top: 8px; }

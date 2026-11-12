@@ -33,6 +33,10 @@ function meta_configurada(): bool
 function meta_graph_base(): string
 {
     $base = defined('META_GRAPH_BASE_URL') && META_GRAPH_BASE_URL ? META_GRAPH_BASE_URL : 'https://graph.facebook.com';
+    // Só nos testes automatizados (TESTES_PERMITIDOS): aponta para o simulador local da Graph API.
+    if (defined('TESTES_PERMITIDOS') && TESTES_PERMITIDOS === true && getenv('WEMART_GRAPH_BASE_URL')) {
+        $base = getenv('WEMART_GRAPH_BASE_URL');
+    }
     $versao = defined('META_GRAPH_VERSION') && META_GRAPH_VERSION ? META_GRAPH_VERSION : 'v21.0';
     return rtrim($base, '/') . '/' . trim($versao, '/');
 }
@@ -277,7 +281,7 @@ function meta_processar_evento(int $eventoId, bool $forcar = false): string
     $formId = preg_replace('/\D/', '', (string) ($r['data']['form_id'] ?? $ev['form_id']));
     $campanha = mb_substr(trim((string) ($r['data']['campaign_name'] ?? '')), 0, 120);
 
-    $stmt = $pdo->prepare('SELECT f.nome, f.empreendimento_id, f.ativo FROM meta_formularios f WHERE f.form_id = :f AND f.empresa_id = :e');
+    $stmt = $pdo->prepare('SELECT f.nome, f.empreendimento_id, f.ativo, f.wa_consentimento_campo, f.wa_consentimento_texto FROM meta_formularios f WHERE f.form_id = :f AND f.empresa_id = :e');
     $stmt->execute(['f' => $formId, 'e' => $empresaId]);
     $form = $stmt->fetch() ?: null;
     $empreendimentoId = $form && (int) $form['ativo'] && $form['empreendimento_id'] ? (int) $form['empreendimento_id'] : null;
@@ -325,6 +329,9 @@ function meta_processar_evento(int $eventoId, bool $forcar = false): string
     $concluir('processado', $leadId);
 
     roleta_distribuir_lead($leadId, 'meta_ads', null);
+    // Jornadas (WhatsApp): autorização do formulário + boas-vindas. Falha aqui nunca desfaz o lead.
+    require_once __DIR__ . '/jornadas.php';
+    jornada_lead_chegou($empresaId, $leadId, 'meta_ads', (array) ($r['data']['field_data'] ?? []), $form);
     return 'processado';
 }
 

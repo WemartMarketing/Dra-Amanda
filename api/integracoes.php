@@ -14,6 +14,7 @@
  *   form_mapear       { id, empreendimento_id?, ativo? }
  *   form_excluir      { id }
  *   evento_reprocessar{ id }
+ *   form_consentimento{ id, campo?, texto? }  pergunta do formulário que autoriza contato pelo WhatsApp
  * O token da página nunca volta para o navegador.
  */
 require_once __DIR__ . '/../includes/api.php';
@@ -200,6 +201,26 @@ switch ($acao) {
         $pdo->prepare('UPDATE meta_formularios SET empreendimento_id = :emp, ativo = :a WHERE id = :id')->execute(['emp' => $empId, 'a' => $ativo, 'id' => $form['id']]);
         auditoria_registrar($empresaId, $uid, 'meta.formulario_mapeado', 'meta_formulario', (int) $form['id'], ['empreendimento_id' => $empId, 'ativo' => $ativo]);
         api_responder(['ok' => true, 'mensagem' => 'Formulário atualizado.']);
+
+    case 'form_consentimento':
+        $stmt = $pdo->prepare('SELECT id FROM meta_formularios WHERE id = :id AND empresa_id = :e');
+        $stmt->execute(['id' => (int) ($_POST['id'] ?? 0), 'e' => $empresaId]);
+        $fid = (int) $stmt->fetchColumn();
+        if (!$fid) {
+            api_erro('Formulário não encontrado.', 404);
+        }
+        $campo = mb_strtolower(trim((string) ($_POST['campo'] ?? '')));
+        if ($campo !== '' && !preg_match('/^[\p{L}\p{N}_ ?.,:\-]{2,100}$/u', $campo)) {
+            api_erro('Informe o nome da pergunta exatamente como aparece no formulário do Meta.', 422);
+        }
+        $texto = api_texto($_POST['texto'] ?? null, 500);
+        if ($campo !== '' && !$texto) {
+            api_erro('Cole o texto do aviso de autorização que o cliente vê no formulário (fica guardado como evidência).', 422);
+        }
+        $pdo->prepare('UPDATE meta_formularios SET wa_consentimento_campo = :c, wa_consentimento_texto = :t WHERE id = :id')
+            ->execute(['c' => $campo !== '' ? $campo : null, 't' => $campo !== '' ? $texto : null, 'id' => $fid]);
+        auditoria_registrar($empresaId, $uid, 'meta.form_consentimento', 'meta_formulario', $fid, ['campo' => $campo]);
+        api_responder(['ok' => true, 'mensagem' => $campo !== '' ? 'Pronto: quem responder "Sim" nesta pergunta fica autorizado a receber WhatsApp.' : 'Autorização pelo formulário desligada.']);
 
     case 'evento_reprocessar':
         $stmt = $pdo->prepare('SELECT id, status FROM meta_eventos WHERE id = :id AND empresa_id = :e');

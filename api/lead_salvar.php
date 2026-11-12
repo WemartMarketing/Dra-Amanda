@@ -129,6 +129,8 @@ if (!empty($_POST['distribuir_roleta'])) {
     auditoria_registrar($empresaId, (int) $usuario['id'], 'lead.criado', 'lead', $novoId, ['distribuir_roleta' => true, 'origem' => $origem]);
 
     $res = roleta_distribuir_lead($novoId, 'manual', $usuario);
+    require_once __DIR__ . '/../includes/jornadas.php';
+    jornada_lead_chegou($empresaId, $novoId, (string) $origem);
     $visivel = rbac_pode_ver_lead($usuario, $novoId);
     if ($res['status'] === 'distribuido') {
         $msg = $visivel
@@ -172,4 +174,6 @@ if ($observacao) {
     lead_registrar_evento($novoId, (int) $usuario['id'], 'nota', $observacao);
 }
 auditoria_registrar($empresaId, (int) $usuario['id'], 'lead.criado', 'lead', $novoId, ['responsavel_id' => $responsavelId, 'origem' => $origem]);
+require_once __DIR__ . '/../includes/jornadas.php';
+jornada_lead_chegou($empresaId, $novoId, (string) $origem);
 api_responder(['ok' => true, 'id' => $novoId]);

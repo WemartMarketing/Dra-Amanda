@@ -9,13 +9,14 @@
  */
 require_once __DIR__ . '/automacao_fila.php';
 require_once __DIR__ . '/whatsapp.php';
+require_once __DIR__ . '/jornadas.php';
 
 /** @return array<string, callable(array): array> */
 function automacao_tratadores(): array
 {
     return [
         'wa_enviar' => 'wa_tarefa_enviar',          // Fase 2: envio de WhatsApp (real ou simulado)
-        // Fase 4: 'jornada_passo' => 'jornada_tarefa_passo', …
+        'jornada_passo' => 'jornada_tarefa_passo',  // Fase 4: passos das Jornadas Inteligentes
     ];
 }
 

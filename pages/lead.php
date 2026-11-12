@@ -163,7 +163,7 @@ require __DIR__ . '/../includes/layout_start.php';
     <div class="lead-actions" aria-label="Ações do lead">
         <?php if ($tel): ?>
             <a class="btn btn-primary" href="tel:<?= e($tel) ?>" data-registrar="ligacao" data-lead="<?= (int) $lead['id'] ?>"><?= icon('phone') ?>Ligar</a>
-            <?php if ($whats): ?><a class="btn btn-success" <?= wa_link_atributos($whats, (int) $lead['id']) ?>><?= icon('whatsapp') ?><?= $whats['interno'] ? '<span class="so-desktop">Conversar no&nbsp;</span>WhatsApp' : 'WhatsApp' ?></a><?php endif; ?>
+            <?php if ($whats): ?><a class="btn btn-success" <?= wa_link_atributos($whats, (int) $lead['id']) ?>><?= icon('whatsapp') ?><?= $whats['interno'] ? '<span><span class="so-desktop">Conversar no </span>WhatsApp</span>' : 'WhatsApp' ?></a><?php endif; ?>
         <?php endif; ?>
         <?php if ($podeEditar): ?>
             <button type="button" class="btn btn-outline btn-wide" data-open-modal="modal-registro" data-registro-tipo="contato"><?= icon('user') ?>Registrar contato</button>

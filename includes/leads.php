@@ -51,6 +51,7 @@ function lead_tipos_evento(): array
         'recuperacao'    => ['rotulo' => 'Recuperação',        'icon' => 'alert'],
         'importacao'     => ['rotulo' => 'Importação',         'icon' => 'list'],
         'integracao'     => ['rotulo' => 'Meta Ads',           'icon' => 'zap'],
+        'jornada'        => ['rotulo' => 'Automação',          'icon' => 'zap'],
     ];
 }
 

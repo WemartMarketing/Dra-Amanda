@@ -329,6 +329,12 @@ try {
         ->execute(['e' => $empA, 'c' => $conv['id']]);   // 2ª automática nas últimas 24 h
     $r = wa_enfileirar($empA, (int) $contato['id'], ['tipo' => 'template', 'template_id' => $tplId, 'dados' => $dados], ['ignorar_horario' => true]);
     igual($r['codigo'] ?? null, 'limite_frequencia', '3ª mensagem automática em 24 h → bloqueada pelo teto');
+    // Regressão: na hora do envio a própria mensagem não conta para o teto dela mesma.
+    $pdo->exec("DELETE m FROM whatsapp_mensagens m WHERE m.conversa_id = {$conv['id']} AND m.direcao = 'saida' AND m.enviada_por IS NULL AND m.wamid IS NULL");
+    $automaticas = wa_contagem_recente($empA, (int) $contato['id'])['automaticas_24h'];
+    $r = wa_enfileirar($empA, (int) $contato['id'], ['tipo' => 'template', 'template_id' => $tplId, 'dados' => $dados], ['ignorar_horario' => true]);
+    fila_executar_chave('wa_enviar:' . $r['mensagem_id'], automacao_tratadores());
+    ok($automaticas === 1 && valor("SELECT status FROM whatsapp_mensagens WHERE id = {$r['mensagem_id']}") === 'enviada', '2ª automática do dia (teto 2) sai: no envio ela não conta a si mesma');
     $r = wa_enfileirar($empA, (int) $contato['id'], ['tipo' => 'template', 'template_id' => $tplId, 'dados' => $dados], ['usuario_id' => 1]);
     ok($r['ok'], 'o corretor ainda pode enviar (o teto vale só para automação)');
 

@@ -14,6 +14,8 @@
 # que bloqueia o acesso direto são versionados)
 /storage/lead_arquivos/*
 !/storage/lead_arquivos/.gitkeep
+/storage/books/*
+!/storage/books/.gitkeep
 
 # Backups do banco (cron/backup.php) e temporários de importação: só no servidor
 /storage/backups/
