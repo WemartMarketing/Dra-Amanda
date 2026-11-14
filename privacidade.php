@@ -4,7 +4,7 @@
  * linkada no rodapé e no login. Converte o Markdown simples (títulos,
  * listas, parágrafos, negrito) — todo o texto é escapado.
  */
-require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/db.php'; // config + asset()
 require_once __DIR__ . '/includes/logo.php';
 
 $md = (string) @file_get_contents(__DIR__ . '/docs/LGPD.md');
@@ -37,7 +37,7 @@ if ($lista) { $html .= '</ul>'; }
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacidade e uso dos dados — <?= htmlspecialchars(APP_NAME) ?></title>
-<link rel="stylesheet" href="/assets/css/app.css">
+<link rel="stylesheet" href="<?= asset('/assets/css/app.css') ?>">
 <?= favicon_tags() ?>
 </head>
 <body>

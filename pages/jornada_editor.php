@@ -125,5 +125,5 @@ require __DIR__ . '/../includes/layout_start.php';
 </div>
 
 <script type="application/json" id="je-dados"><?= json_encode($dados, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?></script>
-<script src="/assets/js/jornada_editor.js" defer></script>
+<script src="<?= asset('/assets/js/jornada_editor.js') ?>" defer></script>
 <?php require __DIR__ . '/../includes/layout_end.php'; ?>

@@ -31,7 +31,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="/assets/js/app.js"></script>
-<script src="/assets/js/criativo.js" defer></script>
+<script src="<?= asset('/assets/js/app.js') ?>"></script>
+<script src="<?= asset('/assets/js/criativo.js') ?>" defer></script>
 </body>
 </html>

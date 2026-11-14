@@ -408,5 +408,5 @@ else:
     relui_tela_especializada(['rel' => $rel, 'usuario' => $usuario, 'f' => $f, 'pub' => $pub, 'op' => $op, 'cob' => $cob, 'url' => $url]);
 endif;
 ?>
-<script src="/assets/js/relatorios.js" defer></script>
+<script src="<?= asset('/assets/js/relatorios.js') ?>" defer></script>
 <?php require __DIR__ . '/../includes/layout_end.php'; ?>

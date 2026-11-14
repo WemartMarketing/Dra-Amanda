@@ -85,7 +85,7 @@ $avatarIniciais = mb_strtoupper(mb_substr($usuario['nome'], 0, 1) . mb_substr(st
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token()) ?>">
 <title><?= htmlspecialchars($pageTitle ?? APP_NAME) ?></title>
-<link rel="stylesheet" href="/assets/css/app.css">
+<link rel="stylesheet" href="<?= asset('/assets/css/app.css') ?>">
 <?= favicon_tags() ?>
 </head>
 <body class="pg-<?= htmlspecialchars($navAtivo ?? '') ?>">

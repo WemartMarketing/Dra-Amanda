@@ -133,5 +133,5 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
 <?php endif; ?>
 
-<script src="/assets/js/minha_roleta.js" defer></script>
+<script src="<?= asset('/assets/js/minha_roleta.js') ?>" defer></script>
 <?php require __DIR__ . '/../includes/layout_end.php'; ?>

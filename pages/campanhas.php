@@ -159,7 +159,7 @@ require __DIR__ . '/../includes/layout_start.php';
             <small class="field-hint">Criar não envia nada: na próxima tela você confirma.</small>
         </aside>
     </div>
-    <script src="/assets/js/campanhas.js" defer></script>
+    <script src="<?= asset('/assets/js/campanhas.js') ?>" defer></script>
 
 <?php else: [$rot, $pill] = $statusC[$camp['status']] ?? [$camp['status'], 'pill-muted']; $dados = $camp['dados']; ?>
     <a class="back-link" href="/pages/campanhas.php">← Todas as campanhas</a>

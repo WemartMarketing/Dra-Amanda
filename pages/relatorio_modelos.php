@@ -60,22 +60,36 @@ require __DIR__ . '/../includes/layout_start.php';
     <div class="rel-nota" role="note"><?= icon('info') ?><span>Sua função não pode gerar arquivos (permissão "Exportar relatórios"). Você pode abrir cada seção na tela.</span></div>
 <?php endif; ?>
 
-<div class="rel-central">
-    <?php foreach ($modelos as $i => $m): $mid = 'modal-modelo-' . $i; ?>
-        <section class="card rel-cat rel-modelo">
-            <div class="rel-cat-topo"><span class="kpi-icon"><?= icon($m['pronto'] ? 'file' : 'star') ?></span><h2><?= e($m['nome']) ?></h2>
-                <?php if (!$m['pronto']): ?><span class="pill pill-muted">meu</span><?php endif; ?></div>
-            <p class="muted"><?= e($m['desc']) ?></p>
-            <ol class="rel-modelo-secoes">
-                <?php foreach ($m['secoes'] as $s): ?>
-                    <li><a href="<?= e(relui_url($s[0], array_merge(['periodo' => $m['periodo']], $m['filtros'] ?? [], $s[1]))) ?>"><?= e($rotSecao($s)) ?></a></li>
-                <?php endforeach; ?>
-            </ol>
-            <div class="rel-acoes-linha rel-modelo-acoes">
-                <?php if (!$m['pronto']): ?><button type="button" class="link-btn danger" data-api-acao="/api/relatorio_modelo.php" data-acao="excluir" data-id="<?= (int) $m['id'] ?>" data-confirmar="Excluir o modelo &quot;<?= e($m['nome']) ?>&quot;?">Excluir</button><?php endif; ?>
-                <?php if ($podeExportar): ?><button type="button" class="btn btn-primary btn-sm" data-open-modal="<?= $mid ?>"><?= icon('download') ?>Gerar</button><?php endif; ?>
+<?php
+$icones = ['p:executivo_mensal' => 'chart', 'p:prestacao_contas' => 'file', 'p:solicitacao_verba' => 'target', 'p:empreendimento' => 'building',
+           'p:produtividade' => 'users', 'p:superintendencia' => 'shield', 'p:marketing' => 'anuncio', 'p:perdas' => 'alert'];
+$grupos = ['Modelos prontos' => array_filter($modelos, fn ($m) => $m['pronto']), 'Meus modelos' => array_filter($modelos, fn ($m) => !$m['pronto'])];
+?>
+<?php foreach ($grupos as $tituloGrupo => $lista): if ($tituloGrupo === 'Meus modelos' && !relmod_instalados()) continue; ?>
+    <h2 class="rel-mod-grupo"><?= e($tituloGrupo) ?> <span class="muted">(<?= count($lista) ?>)</span></h2>
+    <?php if (!$lista): ?>
+        <div class="rel-mod-vazio"><?= icon('star') ?><div><b>Nenhum modelo seu ainda.</b><span>Junte as seções que você usa toda semana e gere tudo de uma vez.</span></div>
+            <button type="button" class="btn btn-outline btn-sm" data-open-modal="modal-modelo-novo"><?= icon('plus') ?>Criar modelo</button></div>
+    <?php continue; endif; ?>
+    <div class="rel-mod-grade">
+    <?php foreach ($lista as $i => $m): $mid = 'modal-modelo-' . $i; $prim = $m['secoes'][0]; ?>
+        <article class="rel-mod">
+            <div class="rel-mod-topo">
+                <span class="rel-mod-icone"><?= icon($icones[$m['chave']] ?? 'star') ?></span>
+                <div><h3><?= e($m['nome']) ?></h3><span class="rel-mod-meta"><?= count($m['secoes']) ?> seç<?= count($m['secoes']) === 1 ? 'ão' : 'ões' ?> · <?= e(mb_strtolower(relatorio_periodos()[$m['periodo']] ?? '')) ?></span></div>
             </div>
-        </section>
+            <p class="rel-mod-desc"><?= e($m['desc']) ?></p>
+            <ul class="rel-mod-secoes" aria-label="Seções">
+                <?php foreach ($m['secoes'] as $k => $sec): ?>
+                    <li><a href="<?= e(relui_url($sec[0], array_merge(['periodo' => $m['periodo']], $m['filtros'] ?? [], $sec[1]))) ?>" title="Abrir esta seção na tela"><span><?= $k + 1 ?></span><?= e($rotSecao($sec)) ?></a></li>
+                <?php endforeach; ?>
+            </ul>
+            <div class="rel-mod-acoes">
+                <?php if (!$m['pronto']): ?><button type="button" class="link-btn danger" data-api-acao="/api/relatorio_modelo.php" data-acao="excluir" data-id="<?= (int) $m['id'] ?>" data-confirmar="Excluir o modelo &quot;<?= e($m['nome']) ?>&quot;?">Excluir</button><?php endif; ?>
+                <a class="btn btn-outline btn-sm" href="<?= e(relui_url($prim[0], array_merge(['periodo' => $m['periodo']], $m['filtros'] ?? [], $prim[1]))) ?>">Ver na tela</a>
+                <?php if ($podeExportar): ?><button type="button" class="btn btn-primary btn-sm" data-open-modal="<?= $mid ?>"><?= icon('download') ?>Gerar arquivo</button><?php endif; ?>
+            </div>
+        </article>
         <?php if ($podeExportar): ?>
             <div class="modal-overlay" id="<?= $mid ?>" hidden>
                 <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="<?= $mid ?>-t">
@@ -112,7 +126,8 @@ require __DIR__ . '/../includes/layout_start.php';
             </div>
         <?php endif; ?>
     <?php endforeach; ?>
-</div>
+    </div>
+<?php endforeach; ?>
 
 <?php if (relmod_instalados()): ?>
 <div class="modal-overlay" id="modal-modelo-novo" hidden>

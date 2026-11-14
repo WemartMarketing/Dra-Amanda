@@ -1908,3 +1908,26 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .rel-q-topo b { flex: 1; font-weight: 700; }
 .rel-q-valor { font-weight: 800; white-space: nowrap; }
 .rel-qualidade small { color: #6b758b; }
+
+/* Modelos de relatório */
+.rel-mod-grupo { font-size: 15px; font-weight: 800; margin: 26px 0 12px; color: var(--ink); }
+.rel-mod-grupo .muted { font-weight: 600; }
+.rel-mod-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.rel-mod { background: var(--surface, #fff); border-radius: var(--radius, 16px); box-shadow: var(--shadow); padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 12px; border: 1px solid transparent; transition: border-color .15s, transform .15s; }
+.rel-mod:hover { border-color: #dcd9ff; transform: translateY(-1px); }
+.rel-mod-topo { display: flex; gap: 12px; align-items: center; }
+.rel-mod-icone { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; background: #eeecff; color: var(--accent); }
+.rel-mod-icone svg { width: 20px; height: 20px; }
+.rel-mod-topo h3 { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.25; }
+.rel-mod-meta { font-size: 12px; color: #8893a4; }
+.rel-mod-desc { margin: 0; font-size: 13px; color: #68728a; line-height: 1.45; }
+.rel-mod-secoes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.rel-mod-secoes a { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #4b5570; background: #f4f5fa; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px 4px 4px; text-decoration: none; }
+.rel-mod-secoes a:hover { border-color: var(--accent); color: var(--accent); }
+.rel-mod-secoes a span { width: 18px; height: 18px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 10.5px; color: var(--accent); border: 1px solid #dcd9ff; }
+.rel-mod-acoes { margin-top: auto; display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding-top: 4px; border-top: 1px solid var(--line); padding-top: 12px; }
+.rel-mod-vazio { display: flex; gap: 12px; align-items: center; background: #fff; border: 1px dashed #cfd4e2; border-radius: 14px; padding: 14px 16px; color: #68728a; font-size: 13px; }
+.rel-mod-vazio > svg { width: 22px; height: 22px; color: var(--accent); flex: none; }
+.rel-mod-vazio div { flex: 1; display: flex; flex-direction: column; }
+.rel-mod-vazio b { color: var(--ink); }
+@media (max-width: 640px) { .rel-mod-grade { grid-template-columns: 1fr; } .rel-mod-vazio { flex-wrap: wrap; } }

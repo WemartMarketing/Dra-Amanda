@@ -55,3 +55,13 @@ function modulo_tabela_existe(string $tabela): bool
     }
     return $cache[$tabela];
 }
+
+/**
+ * URL de um arquivo estático com versão (data de modificação): depois de um
+ * `git pull` o navegador baixa o CSS/JS novo em vez de usar o do cache.
+ */
+function asset(string $caminho): string
+{
+    $arquivo = __DIR__ . '/..' . $caminho;
+    return $caminho . (is_file($arquivo) ? '?v=' . filemtime($arquivo) : '');
+}
