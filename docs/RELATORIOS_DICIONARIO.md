@@ -559,37 +559,37 @@ Leads, contato, visitas e contratos por campanha/conjunto/anúncio/criativo do M
 | Atualização | Tempo real (consulta direta ao banco). Criativos: sincronização a cada 15 min. |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
-### ⚪ Investimento publicitário (`investimento`)
+### 🟡 Investimento publicitário (`investimento`)
 
 Quanto foi investido em mídia, por período, plataforma, campanha e empreendimento.
 
 | Campo | Definição |
 |---|---|
-| Fórmula | SUM(valor) dos lançamentos do período. |
-| Fonte | Etapa 2/6: tabela de investimentos (lançamento manual identificado, importação de planilha, sincronização autorizada Meta/Google). |
+| Fórmula | SUM(valor × dias do lançamento dentro do período ÷ dias do lançamento) — rateio por dia. |
+| Fonte | marketing_investimentos (pages/investimentos.php: lançamento manual ou planilha CSV, por origem, período e empreendimento opcional). Motor: investimento_no_periodo(). |
 | Data usada | Data do gasto. |
 | Filtros | Empresa, período, plataforma, campanha, empreendimento. |
 | Deduplicação | Um lançamento por (fonte, campanha, dia); sincronização substitui o importado. |
-| Permissão | Só cargos com visão financeira (permissão nova "ver_investimento"). |
-| Dados ausentes / limitações | Hoje NÃO existe: mostrar "Investimento não disponível". Nunca estimar. |
-| Atualização | — |
-| Disponibilidade | Sem dados no sistema — não é calculado |
+| Permissão | Lançar: "Lançar investimento em anúncios". Ver custos: só quem vê a empresa toda e sem filtro de estrutura, corretor, roleta, plantão ou campanha (o investimento não é lançado nesse nível). |
+| Dados ausentes / limitações | Sem lançamento que cubra o recorte → "não disponível" (nunca zero, nunca estimado). Lançamento "todos os empreendimentos" não entra quando o relatório é filtrado por um empreendimento. Integração automática com Meta/Google: não implementada. |
+| Atualização | Na hora do lançamento. |
+| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
-### ⚪ Custo por lead / visita / contrato (`custos_por_resultado`)
+### 🟡 Custo por lead / visita / contrato (`custos_por_resultado`)
 
 CPL, custo por lead qualificado, por visita agendada, por visita realizada e por contrato.
 
 | Campo | Definição |
 |---|---|
-| Fórmula | investimento do recorte ÷ resultado do mesmo recorte (mesmo período, mesma campanha/empreendimento). |
-| Fonte | Investimento + indicadores do CRM. |
+| Fórmula | Investimento rateado das origens investidas ÷ leads (CPL), contatos efetivos, leads com visita realizada e leads com contrato VALIDADO dessas origens que entraram no período. |
+| Fonte | marketing_investimentos + mesma coorte de relatorio_origens(). Motor: relatorio_custos(). |
 | Data usada | Período do investimento. |
 | Filtros | Os do investimento. |
 | Deduplicação | Resultados com leads únicos. |
-| Permissão | Como "Investimento". |
-| Dados ausentes / limitações | Sem investimento confiável do recorte → "não disponível". Investimento parcial (só parte das campanhas) → indicador marcado como parcial. |
+| Permissão | Só quem vê a empresa toda, sem filtro de estrutura. |
+| Dados ausentes / limitações | Sem investimento lançado ou sem resultado → "—". |
 | Atualização | — |
-| Disponibilidade | Sem dados no sistema — não é calculado |
+| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
 ### ⚪ Retorno (ROI) (`roi`)
 
@@ -603,7 +603,7 @@ Só com receita e custos completos e metodologia explícita. VGV não é receita
 | Filtros | — |
 | Deduplicação | — |
 | Permissão | Como "Investimento". |
-| Dados ausentes / limitações | Não há receita no CRM. Não é calculado. |
+| Dados ausentes / limitações | Não é calculado: o sistema não tem receita (comissão/faturamento); VGV não é receita. Continua "não disponível" mesmo com investimento lançado. |
 | Atualização | — |
 | Disponibilidade | Sem dados no sistema — não é calculado |
 
@@ -974,7 +974,7 @@ Problemas que comprometem os relatórios (origem ausente, duplicados, datas inco
 | Campo | Definição |
 |---|---|
 | Fórmula | Verificações do painel de qualidade (ver ferramentas/auditoria_relatorios.php). |
-| Fonte | Todas as tabelas acima. |
+| Fonte | includes/relatorios/auditoria_dados.php — tela pages/qualidade_dados.php (com onde corrigir) e ferramentas/auditoria_relatorios.php. |
 | Data usada | Posição atual. |
 | Filtros | Empresa. |
 | Deduplicação | — |

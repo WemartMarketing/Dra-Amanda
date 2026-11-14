@@ -114,17 +114,35 @@ function relui_tela_origens(array $c): void
     $t['taxa_contato_efetivo'] = motor_taxa($t['contato_efetivo'], $t['distribuidos']);
     $t['taxa_visita'] = motor_taxa($t['com_visita'], $t['leads']);
     $t['taxa_contrato'] = motor_taxa($t['com_contrato'], $t['leads']);
-    $t['custo_por_lead'] = null;
+    require_once __DIR__ . '/../investimentos.php';
+    $custos = relatorio_custos($u, $f);
+    $t['investimento'] = $custos['investimento'];
+    $t['custo_por_lead'] = null; // o custo total só vale para as origens investidas (cartões acima)
+    $t['custo_por_contrato'] = null;
     $t['nome'] = 'Total';
     ?>
-    <div class="rel-nota" role="note"><?= icon('info') ?><span><b>Investimento não disponível:</b> o sistema ainda não recebe o valor investido em anúncios, então custo por lead, custo por venda e ROI aparecem como "—" (nunca estimados). Para a prévia de cada criativo do Meta Ads, use <a href="/pages/relatorio_anuncios.php">Leads por anúncio</a>.</span></div>
+    <?php if ($custos['disponivel']): ?>
+        <div class="kpi-grid kpi-grid-5 dash-kpis">
+            <?php
+            relui_kpi('Investimento no período', relui_valor($custos['investimento'], 'R$'), 'Soma dos lançamentos que cobrem o período, rateada por dia (só a parte dentro do período). ' . $custos['lancamentos'] . ' lançamento(s).', 'file');
+            relui_kpi('Custo por lead', relui_valor($custos['cpl'], 'R$'), 'Investimento ÷ leads das origens investidas que entraram no período.', 'user', ['', ''], relui_qtd($custos['resultados']['leads'], 'lead', 'leads'));
+            relui_kpi('Custo por contato efetivo', relui_valor($custos['custo_contato'], 'R$'), 'Investimento ÷ leads dessas origens com contato efetivo.', 'phone', ['', ''], relui_qtd($custos['resultados']['contato_efetivo'], 'lead', 'leads'));
+            relui_kpi('Custo por visita', relui_valor($custos['custo_visita'], 'R$'), 'Investimento ÷ leads dessas origens com visita realizada.', 'building', ['', ''], relui_qtd($custos['resultados']['com_visita'], 'lead', 'leads'));
+            relui_kpi('Custo por contrato', relui_valor($custos['custo_contrato'], 'R$'), 'Investimento ÷ leads dessas origens com contrato VALIDADO. ROI não é calculado: o sistema não tem receita (VGV não é receita).', 'check', ['', ''], relui_qtd($custos['resultados']['com_contrato'], 'contrato', 'contratos'));
+            ?>
+        </div>
+    <?php else: ?>
+        <div class="rel-nota" role="note"><?= icon('info') ?><span><b>Custos não disponíveis:</b> <?= e($custos['motivo']) ?> Custo por lead, por venda e ROI nunca são estimados.<?= usuario_tem_permissao($u, 'gerenciar_investimentos') ? ' <a href="/pages/investimentos.php">Lançar investimento</a>.' : '' ?></span></div>
+    <?php endif; ?>
+    <p class="muted rel-rodape">Para a prévia de cada criativo do Meta Ads, use <a href="/pages/relatorio_anuncios.php">Leads por anúncio</a>.</p>
     <div class="card dash-section">
         <div class="card-head"><div><h2>Leads do período por <?= e(mb_strtolower($ags[$por])) ?> <?= dash_ajuda('Leads que ENTRARAM no período e o que já aconteceu com eles até agora: chegaram a corretor, tiveram contato efetivo, visita realizada e contrato validado. Origem é de onde o cliente veio (aquisição), não o canal de atendimento.') ?></h2>
             <p>Agrupar por:</p></div></div>
         <?php relui_segmentos($ags, $por, fn ($k) => $c['url'](['agrupar' => $k]), 'Agrupar por'); ?>
         <?php relui_tabela('tabela-origens', ['nome' => [$ags[$por], 'texto'], 'leads' => ['Leads', ''], 'distribuidos' => ['Chegaram a corretor', ''], 'contato_efetivo' => ['Contato efetivo', ''],
             'taxa_contato_efetivo' => ['Taxa de contato efetivo', '%'], 'com_visita' => ['Com visita realizada', ''], 'taxa_visita' => ['% com visita', '%'],
-            'com_contrato' => ['Com contrato validado', ''], 'taxa_contrato' => ['% com contrato', '%'], 'custo_por_lead' => ['Custo por lead', 'R$']], $l, $l ? $t : null, null,
+            'com_contrato' => ['Com contrato validado', ''], 'taxa_contrato' => ['% com contrato', '%'], 'investimento' => ['Investimento', 'R$'],
+            'custo_por_lead' => ['Custo por lead', 'R$'], 'custo_por_contrato' => ['Custo por contrato', 'R$']], $l, $l ? $t : null, null,
             $por !== 'canal' && !modulo_tabela_existe('lead_origens') ? 'Origens detalhadas e UTMs requerem a migração 013.' : 'Nenhum lead entrou no período.'); ?>
         <?php if (str_starts_with($por, 'utm_')): ?><p class="muted rel-rodape">"(sem UTM)": leads cadastrados sem parâmetros de campanha (o cadastro manual, o Meta Ads e as importações normalmente não têm UTM).</p><?php endif; ?>
     </div>

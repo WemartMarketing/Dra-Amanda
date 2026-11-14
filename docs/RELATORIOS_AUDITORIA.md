@@ -126,7 +126,7 @@ Perdas e Redistribuições (por motivo, estrutura anterior, destino, tempo).
   gerados em tarefa controlada (fila do cron) e baixados depois, com link
   temporário protegido.
 
-### Etapa 6 — Inteligência e qualidade
+### Etapa 6 — Inteligência e qualidade ✅ concluída (ver `docs/RELATORIOS_ETAPA6.md`)
 Modelos prontos (Executivo Mensal, Prestação de Contas, Solicitação de Verba,
 Empreendimento, Produtividade, Superintendência, Marketing, Remarketing, Perdas)
 e modelos personalizados salvos; Painel de Qualidade dos Dados (a auditoria

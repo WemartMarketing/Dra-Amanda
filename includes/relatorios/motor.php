@@ -336,6 +336,9 @@ function relatorio_cobertura_historico(array $usuario, array $f): array
     }
     $e = (int) $usuario['empresa_ativa_id'];
     $desde = motor_um('SELECT MIN(atribuido_em) FROM lead_atribuicoes WHERE empresa_id = :e AND reconstruido = 0', ['e' => $e]);
+    if (!empty($f['erro']) || $f['vazio']) {
+        return ['instalado' => true, 'ao_vivo_desde' => $desde ?: null, 'reconstruidas' => 0, 'total' => 0];
+    }
     [$w, $p] = motor_where_atribuicoes($usuario, $f);
     $stmt = db()->prepare("SELECT COUNT(*) AS total, SUM(a.reconstruido) AS rec FROM lead_atribuicoes a JOIN leads l ON l.id = a.lead_id
                            WHERE {$w} AND a.atribuido_em BETWEEN :ini AND :fim");
@@ -382,11 +385,19 @@ function relatorio_leads(array $usuario, array $f, ?array $periodo = null): arra
     // Tempo até o 1º atendimento: na PRIMEIRA atribuição de cada lead (mediana, em minutos).
     $tempos = [];
     if ($h) {
-        $stmt = db()->prepare("SELECT TIMESTAMPDIFF(MINUTE, a.atribuido_em, a.primeiro_atendimento_em) FROM leads
-            JOIN lead_atribuicoes a ON a.id = (SELECT x.id FROM lead_atribuicoes x WHERE x.lead_id = leads.id AND x.forma <> 'mudanca_equipe' ORDER BY x.atribuido_em, x.id LIMIT 1)
-            WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim AND a.primeiro_atendimento_em IS NOT NULL");
-        $stmt->execute($p);
-        $tempos = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        // 1ª entrega de cada lead do período: leitura ordenada (lead, data) pelo índice idx_latr_lead_data.
+        $sqlT = "SELECT a.lead_id, TIMESTAMPDIFF(MINUTE, a.atribuido_em, a.primeiro_atendimento_em) AS m FROM leads
+            JOIN lead_atribuicoes a ON a.lead_id = leads.id AND a.forma <> 'mudanca_equipe'
+            WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim ORDER BY a.lead_id, a.atribuido_em, a.id";
+        $ultimo = null;
+        foreach (motor_iterar($sqlT, $p) as $t) {
+            if ($t['lead_id'] !== $ultimo) {
+                $ultimo = $t['lead_id'];
+                if ($t['m'] !== null) {
+                    $tempos[] = (int) $t['m'];
+                }
+            }
+        }
     }
     $notaH = $h ? '' : 'Histórico estruturado não instalado (migração 013): usando o dono atual.';
     return [
@@ -739,7 +750,7 @@ function relatorio_visitas(array $usuario, array $f): array
 {
     $vazio = $f['vazio'] || !empty($f['erro']);
     [$w, $p] = motor_where_leads($usuario, $f);
-    $p += ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim']];
+    $p += ['ini' => $f['periodo']['ini'] ?? '', 'fim' => $f['periodo']['fim'] ?? ''];
     $conf = modulo_tabela_existe('lead_atribuicoes') ? "COALESCE(SUM(COALESCE(ag.confirmada_em BETWEEN :ini4 AND :fim4, 0)), 0)" : 'NULL';
     $stmt = db()->prepare("SELECT
             COALESCE(SUM(ag.criado_em BETWEEN :ini AND :fim AND ag.reagendado_de IS NULL), 0) AS agendadas,
@@ -838,38 +849,65 @@ function relatorio_funil(array $usuario, array $f): array
         return ['transicoes' => 0, 'avancos' => 0, 'retrocessos' => 0, 'por_origem' => [], 'tempo_etapa_horas' => []];
     }
     [$w, $p] = motor_where_leads($usuario, $f);
-    $stmt = db()->prepare("SELECT h.lead_id, h.de_categoria, h.para_categoria, h.origem, h.ocorrido_em FROM lead_etapa_historico h JOIN leads ON leads.id = h.lead_id
-        WHERE {$w} AND h.ocorrido_em BETWEEN :ini AND :fim ORDER BY h.lead_id, h.ocorrido_em, h.id");
+    // Transições agrupadas no banco (alto volume: nada linha a linha no PHP).
+    $stmt = db()->prepare("SELECT h.de_categoria, h.para_categoria, h.origem, COUNT(*) AS n FROM lead_etapa_historico h JOIN leads ON leads.id = h.lead_id
+        WHERE {$w} AND h.ocorrido_em BETWEEN :ini AND :fim GROUP BY h.de_categoria, h.para_categoria, h.origem");
     $stmt->execute($p + ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim']]);
     $ordem = array_flip(lead_etapas_funil());
     $res = ['transicoes' => 0, 'avancos' => 0, 'retrocessos' => 0, 'por_origem' => ['usuario' => 0, 'jornada' => 0, 'sistema' => 0]];
     foreach ($stmt->fetchAll() as $t) {
-        $res['transicoes']++;
-        $res['por_origem'][$t['origem']]++;
+        $n = (int) $t['n'];
+        $res['transicoes'] += $n;
+        $res['por_origem'][$t['origem']] = ($res['por_origem'][$t['origem']] ?? 0) + $n;
         if (isset($ordem[$t['de_categoria']], $ordem[$t['para_categoria']])) {
             if ($ordem[$t['para_categoria']] > $ordem[$t['de_categoria']]) {
-                $res['avancos']++;
+                $res['avancos'] += $n;
             } elseif ($ordem[$t['para_categoria']] < $ordem[$t['de_categoria']]) {
-                $res['retrocessos']++;
+                $res['retrocessos'] += $n;
             }
         }
     }
-    // Permanência: entrada numa categoria (transição anterior) até a saída (transição seguinte, no período).
-    $stmt = db()->prepare("SELECT h.lead_id, h.para_categoria, h.ocorrido_em,
-            (SELECT MIN(n.ocorrido_em) FROM lead_etapa_historico n WHERE n.lead_id = h.lead_id AND (n.ocorrido_em > h.ocorrido_em OR (n.ocorrido_em = h.ocorrido_em AND n.id > h.id))) AS saiu
-        FROM lead_etapa_historico h JOIN leads ON leads.id = h.lead_id WHERE {$w} AND h.ocorrido_em <= :fim");
-    $stmt->execute($p + ['fim' => $f['periodo']['fim']]);
+    // Permanência: da entrada numa categoria até a transição seguinte do mesmo lead,
+    // para as saídas DENTRO do período. Leitura em ordem (lead, data) pelo índice,
+    // aos poucos; só categoria e segundos ficam na memória.
+    $sql = "SELECT h.lead_id, h.para_categoria AS cat, UNIX_TIMESTAMP(h.ocorrido_em) AS ts FROM lead_etapa_historico h JOIN leads ON leads.id = h.lead_id
+            WHERE {$w} AND h.ocorrido_em <= :fim ORDER BY h.lead_id, h.ocorrido_em, h.id";
+    $ini = strtotime($f['periodo']['ini']);
+    $fim = strtotime($f['periodo']['fim']);
     $dur = [];
-    foreach ($stmt->fetchAll() as $r) {
-        if ($r['saiu'] && $r['saiu'] >= $f['periodo']['ini'] && $r['saiu'] <= $f['periodo']['fim']) {
-            $dur[$r['para_categoria']][] = (strtotime($r['saiu']) - strtotime($r['ocorrido_em'])) / 3600;
+    $ant = null;
+    foreach (motor_iterar($sql, $p + ['fim' => $f['periodo']['fim']]) as $r) {
+        if ($ant && $ant['lead_id'] === $r['lead_id'] && $r['ts'] >= $ini && $r['ts'] <= $fim) {
+            $dur[$ant['cat']][] = (int) $r['ts'] - (int) $ant['ts'];
         }
+        $ant = $r;
     }
     $res['tempo_etapa_horas'] = [];
     foreach ($dur as $cat => $v) {
-        $res['tempo_etapa_horas'][$cat] = ['mediana' => round(motor_mediana($v), 1), 'permanencias' => count($v)];
+        $res['tempo_etapa_horas'][$cat] = ['mediana' => round(motor_mediana($v) / 3600, 1), 'permanencias' => count($v)];
     }
     return $res;
+}
+
+/**
+ * Percorre o resultado sem carregar tudo na memória (consulta não
+ * "bufferizada"). Não faça outra consulta dentro do laço.
+ */
+function motor_iterar(string $sql, array $params): Generator
+{
+    $pdo = db();
+    $antes = $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+    $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            yield $r;
+        }
+        $stmt->closeCursor();
+    } finally {
+        $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $antes);
+    }
 }
 
 // ===================================================================== Visão executiva

@@ -42,6 +42,7 @@ $cat = [
     'plantoes' => [[relui_relatorios()['plantoes'][0], relui_relatorios()['plantoes'][1], $r('plantoes'), true]],
     'marketing' => [
         ['Leads por anúncio', 'Campanha, conjunto e anúncio do Meta Ads, com a prévia do criativo.', '/pages/relatorio_anuncios.php', true],
+        ['Investimento em anúncios', 'Lançamentos por origem e período (manual ou planilha), base dos custos por resultado.', '/pages/investimentos.php', $tem('gerenciar_investimentos')],
         [relui_relatorios()['origens'][0], relui_relatorios()['origens'][1], $r('origens'), true],
     ],
     'whatsapp' => [['Automação e remarketing', 'Mensagens, respostas e resultados das jornadas e campanhas.', '/pages/relatorio_automacao.php',
@@ -53,7 +54,7 @@ $cat = [
     ],
     'auditoria' => [
         ['Auditoria', 'Quem fez o quê, inclusive exportações.', '/pages/auditoria.php', $tem('visualizar_auditoria')],
-        ['Qualidade dos dados', 'Origem não detalhada, atribuições sem estrutura, contratos sem registro…', null, $tem('visualizar_auditoria')],
+        ['Qualidade dos dados', 'Origem não detalhada, atribuições sem estrutura, contratos sem registro…', '/pages/qualidade_dados.php', $tem('visualizar_auditoria') || $tem('administrar_usuarios')],
     ],
 ];
 $icones = ['executiva' => 'chart', 'leads' => 'list', 'corretores' => 'users', 'empreendimentos' => 'building', 'plantoes' => 'map',
@@ -67,6 +68,10 @@ require __DIR__ . '/../includes/layout_start.php';
         <div class="eyebrow">Central de Relatórios · <?= e(rbac_rotulo_escopo($usuario['escopo'])) ?></div>
         <h1>Relatórios</h1>
         <p>Escolha o relatório, ajuste os filtros e veja o resultado. Cada número segue o dicionário de indicadores e respeita o que a sua função pode ver.</p>
+    </div>
+    <div class="actions">
+        <a class="btn btn-primary" href="/pages/relatorio_modelos.php"><?= icon('file') ?>Modelos de relatório</a>
+        <?php if ($tem('visualizar_auditoria') || $tem('administrar_usuarios')): ?><a class="btn btn-outline" href="/pages/qualidade_dados.php"><?= icon('shield') ?>Qualidade dos dados</a><?php endif; ?>
     </div>
 </div>
 

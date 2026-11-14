@@ -168,6 +168,12 @@ function relexp_executiva(array $u, array $f, array $pub, array $op, array &$d):
               ['contratos_pela_etapa', 'Sinal do Kanban: movidos para "Contrato assinado" (não é venda)', '']] as [$k, $n, $dk]) {
         $d['indicadores'][] = relexp_ind($n, $I[$k], $dk);
     }
+    require_once __DIR__ . '/../investimentos.php';
+    $c = relatorio_custos($u, $f);
+    $nota = $c['disponivel'] ? 'Origens com investimento lançado; rateado por dia.' : 'Não disponível: ' . $c['motivo'];
+    $d['indicadores'][] = relexp_simples('Investimento em anúncios no período', $c['investimento'], 'R$', $nota, 'investimento');
+    $d['indicadores'][] = relexp_simples('Custo por lead (origens investidas)', $c['cpl'], 'R$', $nota, 'custos_por_resultado');
+    $d['indicadores'][] = relexp_simples('Custo por contrato (origens investidas)', $c['custo_contrato'], 'R$', $nota);
     $pe = relatorio_perdas($u, $f);
     $d['indicadores'][] = relexp_ind('Perdidos por inatividade', $pe['perdidos_inatividade'], 'perdidos_inatividade');
     $d['indicadores'][] = relexp_ind('Tempo até a redistribuição (mediana)', $pe['tempo_redistribuicao'], 'tempo_redistribuicao');
@@ -341,11 +347,18 @@ function relexp_origens(array $u, array $f, array $pub, array $op, array &$d): v
     $t['taxa_visita'] = motor_taxa($t['com_visita'], $t['leads']);
     $t['taxa_contrato'] = motor_taxa($t['com_contrato'], $t['leads']);
     $t['nome'] = 'Total';
+    require_once __DIR__ . '/../investimentos.php';
+    $c = relatorio_custos($u, $f);
+    $nota = $c['disponivel'] ? '' : 'Não disponível: ' . $c['motivo'];
     $d['indicadores'] = [relexp_simples('Leads do período', $t['leads'] ?? 0, '', '', 'leads_origem'), relexp_simples('Com contrato validado', $t['com_contrato'], ''),
-        relexp_simples('Custo por lead', null, 'R$', 'Não disponível: o investimento em anúncios não é registrado no sistema.', 'custos_por_resultado')];
+        relexp_simples('Investimento no período (rateado por dia)', $c['investimento'], 'R$', $nota ?: $c['lancamentos'] . ' lançamento(s).', 'investimento'),
+        relexp_simples('Custo por lead', $c['cpl'], 'R$', $nota, 'custos_por_resultado'), relexp_simples('Custo por contato efetivo', $c['custo_contato'], 'R$', $nota),
+        relexp_simples('Custo por visita', $c['custo_visita'], 'R$', $nota), relexp_simples('Custo por contrato', $c['custo_contrato'], 'R$', $nota),
+        relexp_simples('ROI', null, '', 'Não calculado: o sistema não tem receita (VGV não é receita).', 'roi')];
     $d['tabelas'][] = ['titulo' => 'Leads do período por ' . $ags[$por], 'colunas' => ['nome' => [$ags[$por], 'texto'], 'leads' => ['Leads', 'int'], 'distribuidos' => ['Chegaram a corretor', 'int'],
         'contato_efetivo' => ['Contato efetivo', 'int'], 'taxa_contato_efetivo' => ['Taxa de contato efetivo (%)', 'dec1'], 'com_visita' => ['Com visita realizada', 'int'],
-        'taxa_visita' => ['% com visita', 'dec1'], 'com_contrato' => ['Com contrato validado', 'int'], 'taxa_contrato' => ['% com contrato', 'dec1'], 'custo_por_lead' => ['Custo por lead (R$)', 'moeda']],
+        'taxa_visita' => ['% com visita', 'dec1'], 'com_contrato' => ['Com contrato validado', 'int'], 'taxa_contrato' => ['% com contrato', 'dec1'],
+        'investimento' => ['Investimento (R$)', 'moeda'], 'custo_por_lead' => ['Custo por lead (R$)', 'moeda'], 'custo_por_contrato' => ['Custo por contrato (R$)', 'moeda']],
         'linhas' => $l, 'totais' => $l ? $t : null];
 }
 
@@ -442,10 +455,9 @@ function relexp_dados_linhas(array $usuario, array $get): Generator
         LEFT JOIN usuarios u ON u.id = leads.responsavel_id
         LEFT JOIN equipes eq ON eq.id = leads.equipe_id
         WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim ORDER BY leads.criado_em, leads.id LIMIT " . exportacao_limite();
-    $stmt = db()->prepare($sql);
-    $stmt->execute($p + ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim']]);
-    while ($r = $stmt->fetch()) {
-        $r['canal'] = lead_origens()[$r['canal']] ?? $r['canal'];
+    $canais = lead_origens();
+    foreach (motor_iterar($sql, $p + ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim']]) as $r) {
+        $r['canal'] = $canais[$r['canal']] ?? $r['canal'];
         yield $r;
     }
 }

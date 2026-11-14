@@ -477,6 +477,17 @@ function relatorio_indicadores_etapa2(array $i): array
         'fonte' => 'agenda_compromissos + lead_contratos (status validado). Motor: relatorio_visitas_por().', 'disponibilidade' => 'disponivel'];
     $aj['destino_redistribuidos'] = ['fonte' => 'lead_atribuicoes: próxima atribuição depois da perda, com a estrutura de quem recebeu. Motor: relatorio_perdas_destino().'];
     $aj['tempo_redistribuicao']['fonte'] .= ' Por estrutura: relatorio_perdas_por().';
+    // Etapa 6: investimento lançado (manual ou planilha) e custos por resultado.
+    $aj['investimento'] = ['formula' => 'SUM(valor × dias do lançamento dentro do período ÷ dias do lançamento) — rateio por dia.',
+        'fonte' => 'marketing_investimentos (pages/investimentos.php: lançamento manual ou planilha CSV, por origem, período e empreendimento opcional). Motor: investimento_no_periodo().',
+        'ausentes' => 'Sem lançamento que cubra o recorte → "não disponível" (nunca zero, nunca estimado). Lançamento "todos os empreendimentos" não entra quando o relatório é filtrado por um empreendimento. Integração automática com Meta/Google: não implementada.',
+        'permissao' => 'Lançar: "Lançar investimento em anúncios". Ver custos: só quem vê a empresa toda e sem filtro de estrutura, corretor, roleta, plantão ou campanha (o investimento não é lançado nesse nível).',
+        'atualizacao' => 'Na hora do lançamento.', 'disponibilidade' => 'parcial'];
+    $aj['custos_por_resultado'] = ['formula' => 'Investimento rateado das origens investidas ÷ leads (CPL), contatos efetivos, leads com visita realizada e leads com contrato VALIDADO dessas origens que entraram no período.',
+        'fonte' => 'marketing_investimentos + mesma coorte de relatorio_origens(). Motor: relatorio_custos().', 'ausentes' => 'Sem investimento lançado ou sem resultado → "—".',
+        'permissao' => 'Só quem vê a empresa toda, sem filtro de estrutura.', 'disponibilidade' => 'parcial'];
+    $aj['roi']['ausentes'] = 'Não é calculado: o sistema não tem receita (comissão/faturamento); VGV não é receita. Continua "não disponível" mesmo com investimento lançado.';
+    $aj['qualidade_dados'] = ['fonte' => 'includes/relatorios/auditoria_dados.php — tela pages/qualidade_dados.php (com onde corrigir) e ferramentas/auditoria_relatorios.php.'];
     foreach ($aj as $k => $campos) {
         if (isset($i[$k])) {
             $i[$k] = array_merge($i[$k], $campos);

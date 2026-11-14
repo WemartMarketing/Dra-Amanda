@@ -41,24 +41,35 @@ function relpdf_valor($v, string $tipo): string
 /** Gera o PDF em $destino; retorna o número de páginas. */
 function relpdf_gerar(array $d, string $destino): int
 {
+    return relpdf_documento([$d], $d['titulo'], $destino);
+}
+
+/**
+ * Um PDF com uma ou mais seções (modelos de relatório: cada seção é um
+ * relatório da Central, na mesma ordem). Capa com os dados da primeira
+ * seção; notas e definições reunidas no fim, sem repetir.
+ */
+function relpdf_documento(array $secoes, string $tituloDoc, string $destino): int
+{
+    $d = $secoes[0];
     $pdf = new PdfSimples();
     $M = 40;
     $W = $pdf->largura - 2 * $M;
     $base = $pdf->altura - 50; // limite inferior do conteúdo
     $y = 0;
-    $pdf->rodape = function (PdfSimples $p, int $pag, int $tot) use ($d, $M) {
+    $pdf->rodape = function (PdfSimples $p, int $pag, int $tot) use ($d, $M, $tituloDoc) {
         $p->linha($M, $p->altura - 34, $p->largura - $M, $p->altura - 34);
         $p->fonte(false, 7);
-        $p->texto($M, $p->altura - 22, $p->caber('WeMart Sales · ' . $d['empresa'] . ' · ' . $d['titulo'] . ' · gerado em ' . $d['gerado_em'], 420), RELPDF_CINZA);
+        $p->texto($M, $p->altura - 22, $p->caber('WeMart Sales · ' . $d['empresa'] . ' · ' . $tituloDoc . ' · gerado em ' . $d['gerado_em'], 420), RELPDF_CINZA);
         $p->texto($p->largura - $M, $p->altura - 22, 'Página ' . $pag . ' de ' . $tot, RELPDF_CINZA, 'D');
     };
-    $nova = function () use ($pdf, &$y, $M, $W, $d) {
+    $nova = function () use ($pdf, &$y, $M, $W, $d, $tituloDoc) {
         $pdf->novaPagina();
         $pdf->retangulo(0, 0, $pdf->largura, 6, RELPDF_ACENTO);
         $pdf->fonte(true, 8);
         $pdf->texto($M, 24, 'WeMart Sales', RELPDF_ACENTO);
         $pdf->fonte(false, 8);
-        $pdf->texto($M + $W, 24, $pdf->caber($d['titulo'] . ' · ' . $d['periodo'], $W - 80), RELPDF_CINZA, 'D');
+        $pdf->texto($M + $W, 24, $pdf->caber($tituloDoc . ' · ' . $d['periodo'], $W - 80), RELPDF_CINZA, 'D');
         $y = 44;
     };
     $espaco = function (float $h) use (&$y, $base, $nova) {
@@ -73,7 +84,7 @@ function relpdf_gerar(array $d, string $destino): int
     $pdf->fonte(true, 11);
     $pdf->texto($M, 30, 'WeMart Sales', [255, 255, 255]);
     $pdf->fonte(true, 20);
-    $pdf->texto($M, 58, $pdf->caber($d['titulo'], $W), [255, 255, 255]);
+    $pdf->texto($M, 58, $pdf->caber($tituloDoc, $W), [255, 255, 255]);
     $pdf->fonte(false, 10);
     $pdf->texto($M, 78, $pdf->caber($d['empresa'] . ' · ' . $d['periodo'], $W), [230, 228, 255]);
     $y = 114;
@@ -84,6 +95,9 @@ function relpdf_gerar(array $d, string $destino): int
     }
     $meta[] = ['Filtros', $d['filtros'] ? implode(' · ', array_map(fn ($x) => $x[0] . ': ' . $x[1], $d['filtros'])) : 'Nenhum — tudo o que o usuário pode ver'];
     $meta[] = ['Gerado em', $d['gerado_em'] . ' · fuso ' . $d['fuso'] . ' · por ' . $d['usuario']];
+    if (count($secoes) > 1) {
+        $meta[] = ['Seções', implode(' · ', array_map(fn ($x, $i) => ($i + 1) . '. ' . $x['titulo'], $secoes, array_keys($secoes)))];
+    }
     foreach ($meta as [$r, $v]) {
         $pdf->fonte(true, 8.5);
         $pdf->texto($M, $y, $r, RELPDF_CINZA);
@@ -95,6 +109,16 @@ function relpdf_gerar(array $d, string $destino): int
     }
     $y += 8;
 
+    foreach ($secoes as $si => $d) {
+    if (count($secoes) > 1) {
+        if ($si > 0) {
+            $nova();
+        }
+        $pdf->retangulo($M, $y, 4, 22, RELPDF_ACENTO);
+        $pdf->fonte(true, 15);
+        $pdf->texto($M + 12, $y + 16, $pdf->caber(($si + 1) . '. ' . $d['titulo'], $W - 12));
+        $y += 34;
+    }
     // ------------------------------------------------ indicadores
     if ($d['indicadores']) {
         $col = 3;
@@ -276,10 +300,22 @@ function relpdf_gerar(array $d, string $destino): int
         $y += 14;
     }
 
-    // ------------------------------------------------ notas e definições
-    $blocos = [['Notas', $d['notas']]];
-    if ($d['nivel'] !== 'resumido' && $d['definicoes']) {
-        $blocos[] = ['Definições (dicionário de indicadores)', array_map(fn ($x) => $x[0] . ': ' . $x[1] . ' Cálculo: ' . $x[2], $d['definicoes'])];
+    } // fim das seções
+
+    // ------------------------------------------------ notas e definições (de todas as seções, sem repetir)
+    $notas = [];
+    $defs = [];
+    foreach ($secoes as $x) {
+        foreach ($x['notas'] as $n) {
+            $notas[$n] = (count($secoes) > 1 && !str_starts_with($n, 'Sem base') ? $x['titulo'] . ': ' : '') . $n;
+        }
+        foreach ($x['definicoes'] as $df) {
+            $defs[$df[0]] = $df[0] . ': ' . $df[1] . ' Cálculo: ' . $df[2];
+        }
+    }
+    $blocos = [['Notas', array_values($notas)]];
+    if ($d['nivel'] !== 'resumido' && $defs) {
+        $blocos[] = ['Definições (dicionário de indicadores)', array_values($defs)];
     }
     foreach ($blocos as [$tit, $itens]) {
         if (!$itens) {

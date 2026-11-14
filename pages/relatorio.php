@@ -128,6 +128,22 @@ if ($rel === 'executiva'):
                 <div><dt>Feitas por jornadas</dt><dd><?= dash_num($funil['por_origem']['jornada'] ?? 0) ?></dd></div>
             </dl>
         </div>
+        <?php require_once __DIR__ . '/../includes/investimentos.php'; $cus = relatorio_custos($usuario, $f); ?>
+        <div class="card">
+            <div class="card-head"><div><h2>Investimento e custos <?= dash_ajuda('Investimento em anúncios lançado para o período (rateado por dia) e custos por resultado das origens investidas. Sem lançamento, nada é estimado. ROI não é calculado: o sistema não tem receita.') ?></h2></div>
+                <a class="link-btn" href="<?= e(relui_url('origens', array_intersect_key($pub, array_flip(['periodo', 'ini', 'fim', 'empreendimento', 'origem', 'canal'])))) ?>">Por origem</a></div>
+            <?php if ($cus['disponivel']): ?>
+                <dl class="rel-lista">
+                    <div><dt>Investimento no período</dt><dd><?= e(relui_valor($cus['investimento'], 'R$')) ?></dd></div>
+                    <div><dt>Custo por lead</dt><dd><?= e(relui_valor($cus['cpl'], 'R$')) ?></dd></div>
+                    <div><dt>Custo por contato efetivo</dt><dd><?= e(relui_valor($cus['custo_contato'], 'R$')) ?></dd></div>
+                    <div><dt>Custo por visita</dt><dd><?= e(relui_valor($cus['custo_visita'], 'R$')) ?></dd></div>
+                    <div><dt>Custo por contrato</dt><dd><?= e(relui_valor($cus['custo_contrato'], 'R$')) ?></dd></div>
+                </dl>
+            <?php else: ?>
+                <p class="empty-note">Não disponível. <?= e($cus['motivo']) ?></p>
+            <?php endif; ?>
+        </div>
         <div class="card">
             <div class="card-head"><div><h2>Perdas por inatividade <?= dash_ajuda('Leads retirados do corretor pela recuperação automática por falta de feedback, pela estrutura de quem perdeu.') ?></h2></div>
                 <a class="link-btn" href="/pages/relatorios.php">Detalhar</a></div>

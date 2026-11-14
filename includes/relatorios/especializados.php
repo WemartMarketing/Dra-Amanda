@@ -32,44 +32,44 @@ function relatorio_funil_detalhe(array $usuario, array $f): array
     }
     [$w, $p] = motor_where_leads($usuario, $f);
     $per = ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim']];
-    $stmt = db()->prepare("SELECT leads.id, leads.etapa, fe.id AS etapa_id, fe.nome AS etapa_nome, fe.ordem, fe.cor
-        FROM leads LEFT JOIN funil_etapas fe ON fe.id = leads.etapa_id WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim");
-    $stmt->execute($p + $per);
-    $coorte = $stmt->fetchAll();
     $res = relatorio_funil($usuario, $f) + $vazio;
-    $res['coorte'] = count($coorte);
-
-    $pos = [];
-    foreach ($coorte as $l) {
-        $k = (string) ($l['etapa_id'] ?? '0');
-        $pos[$k] = $pos[$k] ?? ['etapa_id' => $l['etapa_id'] ? (int) $l['etapa_id'] : null, 'nome' => $l['etapa_nome'] ?? lead_etapa_rotulo((string) $l['etapa']),
-                                'categoria' => $l['etapa'], 'ordem' => (int) ($l['ordem'] ?? 999), 'cor' => $l['cor'] ?? '#8c96aa', 'total' => 0];
-        $pos[$k]['total']++;
+    // Onde estão hoje (agrupado no banco).
+    $stmt = db()->prepare("SELECT fe.id AS etapa_id, fe.nome, leads.etapa AS categoria, COALESCE(fe.ordem, 999) AS ordem, COALESCE(fe.cor, '#8c96aa') AS cor, COUNT(*) AS total
+        FROM leads LEFT JOIN funil_etapas fe ON fe.id = leads.etapa_id WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim
+        GROUP BY fe.id, fe.nome, leads.etapa, fe.ordem, fe.cor ORDER BY ordem, fe.id");
+    $stmt->execute($p + $per);
+    foreach ($stmt->fetchAll() as $l) {
+        $res['posicao'][] = ['etapa_id' => $l['etapa_id'] ? (int) $l['etapa_id'] : null, 'nome' => $l['nome'] ?? lead_etapa_rotulo((string) $l['categoria']),
+                             'categoria' => $l['categoria'], 'ordem' => (int) $l['ordem'], 'cor' => $l['cor'], 'total' => (int) $l['total']];
     }
-    usort($pos, fn ($a, $b) => $a['ordem'] <=> $b['ordem']);
-    $res['posicao'] = array_values($pos);
+    $res['coorte'] = array_sum(array_column($res['posicao'], 'total'));
 
-    // Alcance pela ordem linear das categorias.
-    $ordem = array_flip(lead_etapas_funil());
-    $max = [];
-    foreach ($coorte as $l) {
-        $max[(int) $l['id']] = $ordem[$l['etapa']] ?? 0; // "sem interesse"/"perdido": passou ao menos pela entrada
-    }
-    if ($coorte && historico_instalado()) {
-        $stmt = db()->prepare("SELECT h.lead_id, h.para_categoria FROM lead_etapa_historico h JOIN leads ON leads.id = h.lead_id
-            WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim");
-        $stmt->execute($p + $per);
-        foreach ($stmt->fetchAll() as $h) {
-            $o = $ordem[$h['para_categoria']] ?? -1;
-            $max[(int) $h['lead_id']] = max($max[(int) $h['lead_id']] ?? -1, $o);
+    // Alcance pela ordem linear das categorias: fase mais adiantada de cada lead
+    // (etapa atual ou passagem registrada), calculada no banco.
+    $caso = function (string $col) {
+        $c = 'CASE ' . $col;
+        foreach (lead_etapas_funil() as $i => $cat) {
+            $c .= " WHEN '" . $cat . "' THEN " . $i;
         }
+        return $c . ' ELSE 0 END';
+    };
+    $hist = historico_instalado()
+        ? 'COALESCE((SELECT MAX(' . $caso('h.para_categoria') . ') FROM lead_etapa_historico h WHERE h.lead_id = leads.id), 0)' : '0';
+    $stmt = db()->prepare("SELECT m, COUNT(*) AS n FROM (SELECT GREATEST(" . $caso('leads.etapa') . ", {$hist}) AS m FROM leads
+        WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim) x GROUP BY m");
+    $stmt->execute($p + $per);
+    $porNivel = array_map('intval', array_column($stmt->fetchAll(), 'n', 'm'));
+    $acum = 0;
+    $alc = [];
+    foreach (array_reverse(lead_etapas_funil(), true) as $i => $cat) {
+        $acum += $porNivel[$i] ?? 0;
+        $alc[$i] = $acum;
     }
     foreach (lead_etapas_funil() as $i => $cat) {
-        $n = count(array_filter($max, fn ($m) => $m >= $i));
+        $n = $alc[$i];
         $res['alcance'][] = ['categoria' => $cat, 'rotulo' => lead_etapa_rotulo($cat), 'total' => $n,
-                             'pct_coorte' => motor_taxa($n, count($coorte)), 'pct_anterior' => $i === 0 ? null : motor_taxa($n, $res['alcance'][$i - 1]['total'] ?? 0)];
+                             'pct_coorte' => motor_taxa($n, $res['coorte']), 'pct_anterior' => $i === 0 ? null : motor_taxa($n, $alc[$i - 1])];
     }
-    // "Sem interesse" e "Perdido" ficam fora da linha (não são fases do funil linear).
     $res['alcance'][0]['nota'] = 'Todos os leads do período começam aqui.';
 
     if (historico_instalado()) {
@@ -223,13 +223,14 @@ function relatorio_origens(array $usuario, array $f, string $por): array
     ][$por];
     $contrato = modulo_tabela_existe('lead_contratos')
         ? "SUM(EXISTS (SELECT 1 FROM lead_contratos c WHERE c.lead_id = leads.id AND c.status = 'validado'))" : 'NULL';
-    $stmt = db()->prepare("SELECT {$grupo} AS nome, COUNT(*) AS leads,
+    $gid = ['origem' => $temOrig ? 'o.id' : 'NULL', 'canal' => 'leads.origem'][$por] ?? 'NULL';
+    $stmt = db()->prepare("SELECT {$grupo} AS nome, {$gid} AS gid, COUNT(*) AS leads,
             " . ($h ? 'SUM(EXISTS (SELECT 1 FROM lead_atribuicoes x WHERE x.lead_id = leads.id))' : 'SUM(leads.responsavel_id IS NOT NULL)') . " AS distribuidos,
             " . ($h ? 'SUM(leads.primeiro_contato_efetivo_em IS NOT NULL)' : 'NULL') . " AS contato_efetivo,
             SUM(EXISTS (SELECT 1 FROM agenda_compromissos ag WHERE ag.lead_id = leads.id AND ag.tipo = 'visita' AND ag.status = 'realizado')) AS com_visita,
             {$contrato} AS com_contrato
         FROM leads " . ($temOrig ? 'LEFT JOIN lead_origens o ON o.id = leads.origem_detalhe_id' : '') . "
-        WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim GROUP BY 1 ORDER BY leads DESC, nome");
+        WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim GROUP BY 1, 2 ORDER BY leads DESC, nome");
     $stmt->execute($p + ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim']]);
     $linhas = [];
     foreach ($stmt->fetchAll() as $r) {
@@ -242,8 +243,28 @@ function relatorio_origens(array $usuario, array $f, string $por): array
         $r['taxa_contato_efetivo'] = $r['contato_efetivo'] === null ? null : motor_taxa($r['contato_efetivo'], $r['distribuidos']);
         $r['taxa_visita'] = motor_taxa($r['com_visita'], $r['leads']);
         $r['taxa_contrato'] = $r['com_contrato'] === null ? null : motor_taxa($r['com_contrato'], $r['leads']);
-        $r['custo_por_lead'] = null; // sem investimento registrado: não disponível
+        $r['investimento'] = null;
+        $r['custo_por_lead'] = null;      // sem investimento lançado: não disponível (nunca estimado)
+        $r['custo_por_contrato'] = null;
         $linhas[] = $r;
+    }
+    // Custos por linha: só quando há investimento lançado para aquela origem (ou grupo) e o recorte permite.
+    require_once __DIR__ . '/../investimentos.php';
+    if ($linhas && in_array($por, ['origem', 'canal'], true) && investimento_custos_permitidos($usuario, $f)[0]) {
+        foreach ($linhas as &$r) {
+            if ($r['gid'] === null) {
+                continue;
+            }
+            $ids = $por === 'origem' ? [(int) $r['gid']]
+                : array_map('intval', db()->query('SELECT id FROM lead_origens WHERE empresa_id = ' . (int) $usuario['empresa_ativa_id'] . ' AND canal = ' . db()->quote($r['gid']))->fetchAll(PDO::FETCH_COLUMN));
+            $inv = investimento_no_periodo((int) $usuario['empresa_ativa_id'], $f['periodo']['ini'], $f['periodo']['fim'], $ids, $f['dim']['empreendimento'] ?? null);
+            if ($inv['valor'] !== null) {
+                $r['investimento'] = $inv['valor'];
+                $r['custo_por_lead'] = $r['leads'] ? round($inv['valor'] / $r['leads'], 2) : null;
+                $r['custo_por_contrato'] = $r['com_contrato'] ? round($inv['valor'] / $r['com_contrato'], 2) : null;
+            }
+        }
+        unset($r);
     }
     return $linhas;
 }

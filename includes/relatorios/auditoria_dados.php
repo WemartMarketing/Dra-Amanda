@@ -90,10 +90,13 @@ function relatorio_auditoria_dados(int $empresaId): array
         AND NOT EXISTS (SELECT 1 FROM lead_transferencias t WHERE t.lead_id = l.id AND t.para_usuario_id = l.responsavel_id)
         AND NOT EXISTS (SELECT 1 FROM auditoria a WHERE a.entidade = 'lead' AND a.entidade_id = l.id AND a.acao = 'lead.criado')
         AND NOT EXISTS (SELECT 1 FROM lead_eventos ev WHERE ev.lead_id = l.id AND ev.tipo IN ('atribuicao','importacao'))");
-    $s['Atribuição e histórico do corretor'][] = relaud_item('Leads com corretor sem registro de como chegaram a ele', $semOrigemAtrib, $semOrigemAtrib ? 'alerta' : 'ok',
-        'Para esses, "leads recebidos pelo corretor" só pode usar a carteira atual (limitação declarada).', $comResp);
-    $s['Atribuição e histórico do corretor'][] = relaud_item('Leads trocados de corretor (perderam a data do 1º atendimento do anterior)',
-        (int) $um('SELECT COUNT(DISTINCT lead_id) FROM lead_transferencias WHERE empresa_id = :e'), 'info', 'O 1º atendimento é zerado na troca: o histórico por corretor nasce na Etapa 2.');
+    $h013 = $tem('lead_atribuicoes');
+    if (!$h013) { // com a migração 013 isto é medido em "Histórico estruturado" (atribuições sem forma identificada)
+        $s['Atribuição e histórico do corretor'][] = relaud_item('Leads com corretor sem registro de como chegaram a ele', $semOrigemAtrib, $semOrigemAtrib ? 'alerta' : 'ok',
+            'Para esses, "leads recebidos pelo corretor" só pode usar a carteira atual (limitação declarada).', $comResp);
+    }
+    $s['Atribuição e histórico do corretor'][] = relaud_item('Leads trocados de corretor', (int) $um('SELECT COUNT(DISTINCT lead_id) FROM lead_transferencias WHERE empresa_id = :e'), 'info',
+        $h013 ? 'O atendimento de cada corretor fica guardado por atribuição (migração 013); trocas anteriores só têm o reconstruído.' : 'O 1º atendimento do corretor anterior se perde na troca (migração 013 pendente).');
 
     // ---------------------------------------------------------------- Atendimento
     $comContato = (int) $um('SELECT COUNT(*) FROM leads WHERE empresa_id = :e AND excluido_em IS NULL AND responsavel_id IS NOT NULL AND primeiro_contato_em IS NOT NULL');
@@ -116,12 +119,14 @@ function relatorio_auditoria_dados(int $empresaId): array
     $s['Funil (Kanban)'][] = relaud_item('Mudanças de etapa só em texto (histórico do lead)', (int) $um("SELECT COUNT(*) FROM lead_eventos ev JOIN leads l ON l.id = ev.lead_id WHERE l.empresa_id = :e AND ev.tipo = 'mudanca_etapa'"));
     $semHist = (int) $um("SELECT COUNT(*) FROM leads l JOIN funil_etapas fe ON fe.id = l.etapa_id
         WHERE l.empresa_id = :e AND l.excluido_em IS NULL AND fe.ordem > (SELECT MIN(f2.ordem) FROM funil_etapas f2 WHERE f2.empresa_id = l.empresa_id AND f2.ativa = 1)
-          AND NOT EXISTS (SELECT 1 FROM auditoria a WHERE a.acao = 'lead.etapa_alterada' AND a.entidade = 'lead' AND a.entidade_id = l.id)");
+          AND NOT EXISTS (SELECT 1 FROM auditoria a WHERE a.acao = 'lead.etapa_alterada' AND a.entidade = 'lead' AND a.entidade_id = l.id)"
+          . ($tem('lead_etapa_historico') ? ' AND NOT EXISTS (SELECT 1 FROM lead_etapa_historico h WHERE h.lead_id = l.id)' : ''));
     $s['Funil (Kanban)'][] = relaud_item('Leads fora da 1ª etapa sem nenhuma transição estruturada', $semHist, $semHist ? 'alerta' : 'ok',
         'Para esses não dá para dizer QUANDO avançaram: entram só na "posição atual".');
-    $s['Funil (Kanban)'][] = relaud_item('Mudanças de etapa feitas por jornada (sem registro estruturado)',
-        (int) $um("SELECT COUNT(*) FROM lead_eventos ev JOIN leads l ON l.id = ev.lead_id WHERE l.empresa_id = :e AND ev.tipo = 'jornada' AND ev.descricao LIKE '%lead movido para%'"),
-        'info', 'Passam a ser estruturadas na Etapa 2.');
+    $s['Funil (Kanban)'][] = relaud_item($tem('lead_etapa_historico') ? 'Mudanças de etapa por jornada registradas só em texto (antes da migração 013)' : 'Mudanças de etapa feitas por jornada (sem registro estruturado)',
+        (int) $um("SELECT COUNT(*) FROM lead_eventos ev JOIN leads l ON l.id = ev.lead_id WHERE l.empresa_id = :e AND ev.tipo = 'jornada' AND ev.descricao LIKE '%lead movido para%'"
+            . ($tem('lead_etapa_historico') ? " AND ev.criado_em < COALESCE((SELECT MIN(h.ocorrido_em) FROM lead_etapa_historico h WHERE h.empresa_id = l.empresa_id AND h.reconstruido = 0), '9999-12-31')" : '')),
+        'info', $tem('lead_etapa_historico') ? 'Desde a migração 013 elas são registradas com origem "jornada"; estas antigas não são reconstruídas.' : 'Rode a migração 013 para registrá-las.');
     $stmt = $pdo->prepare('SELECT fe.nome, COUNT(l.id) FROM funil_etapas fe LEFT JOIN leads l ON l.etapa_id = fe.id AND l.excluido_em IS NULL
                            WHERE fe.empresa_id = :e GROUP BY fe.id, fe.nome, fe.ordem ORDER BY fe.ordem');
     $stmt->execute(['e' => $empresaId]);
@@ -139,7 +144,12 @@ function relatorio_auditoria_dados(int $empresaId): array
     $saiu = (int) $um("SELECT COUNT(DISTINCT a.entidade_id) FROM auditoria a JOIN leads l ON l.id = a.entidade_id
         WHERE a.empresa_id = :e AND a.acao = 'lead.etapa_alterada' AND a.detalhes_json LIKE '%\"para\":\"contrato_assinado\"%' AND l.etapa <> 'contrato_assinado'");
     $s['Contratos e visitas'][] = relaud_item('Leads que entraram em "contrato" e depois saíram da etapa', $saiu, $saiu ? 'alerta' : 'ok', 'Hoje o contrato deles "some" do período — a Etapa 2 preserva.');
-    $s['Contratos e visitas'][] = relaud_item('Contratos com valor (VGV) registrado', 'não existe', 'alerta', 'O CRM não tem cadastro formal de contrato nem valor.');
+    if ($tem('lead_contratos')) {
+        $s['Contratos e visitas'][] = relaud_item('Contratos validados com valor (VGV) informado', (int) $um("SELECT COUNT(*) FROM lead_contratos WHERE empresa_id = :e AND status = 'validado' AND valor_vgv IS NOT NULL"), 'info',
+            (int) $um("SELECT COUNT(*) FROM lead_contratos WHERE empresa_id = :e AND status = 'validado'") . ' contrato(s) validado(s) no total.');
+    } else {
+        $s['Contratos e visitas'][] = relaud_item('Contratos com valor (VGV) registrado', 'não existe', 'alerta', 'O CRM não tem cadastro formal de contrato nem valor (migração 013 pendente).');
+    }
     $stmt = $pdo->prepare("SELECT status, COUNT(*) FROM agenda_compromissos WHERE empresa_id = :e AND tipo = 'visita' GROUP BY status");
     $stmt->execute(['e' => $empresaId]);
     foreach ($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $st => $n) {
@@ -147,14 +157,20 @@ function relatorio_auditoria_dados(int $empresaId): array
     }
     $vencidas = (int) $um("SELECT COUNT(*) FROM agenda_compromissos WHERE empresa_id = :e AND tipo = 'visita' AND status = 'agendado' AND inicio < DATE_SUB(NOW(), INTERVAL 1 DAY)");
     $s['Contratos e visitas'][] = relaud_item('Visitas que já passaram e continuam "agendadas" (sem situação)', $vencidas, $vencidas ? 'alerta' : 'ok', 'Não entram como realizadas nem ausentes.');
-    $s['Contratos e visitas'][] = relaud_item('Visitas confirmadas com o cliente', 'não existe', 'info', 'A agenda não tem o status "confirmada".');
+    if ($tem('lead_atribuicoes')) {
+        $s['Contratos e visitas'][] = relaud_item('Visitas confirmadas com o cliente', (int) $um('SELECT COUNT(*) FROM agenda_compromissos WHERE empresa_id = :e AND confirmada_em IS NOT NULL'), 'info', 'Registradas pelo botão "Cliente confirmou" (desde a migração 013).');
+    } else {
+        $s['Contratos e visitas'][] = relaud_item('Visitas confirmadas com o cliente', 'não existe', 'info', 'A agenda não tem o status "confirmada" (migração 013 pendente).');
+    }
 
     // ---------------------------------------------------------------- Roletas
     $s['Plantões e roletas'][] = relaud_item('Sessões de presença registradas', (int) $um('SELECT COUNT(*) FROM roleta_sessoes WHERE empresa_id = :e'));
     $s['Plantões e roletas'][] = relaud_item('Leads na fila agora', (int) $um('SELECT COUNT(*) FROM roleta_fila WHERE empresa_id = :e AND resolvido_em IS NULL'));
     $s['Plantões e roletas'][] = relaud_item('Passagens pela fila guardadas', (int) $um('SELECT COUNT(*) FROM roleta_fila WHERE empresa_id = :e'), 'info',
         'A fila guarda só a última passagem de cada lead.');
-    $s['Plantões e roletas'][] = relaud_item('Horário das roletas com versões (histórico)', 'não existe', 'info', 'Mudar o horário muda o passado; "dentro/fora do horário" precisa ser gravado na chegada do lead.');
+    $s['Plantões e roletas'][] = $tem('lead_atribuicoes')
+        ? relaud_item('Leads com "roleta aberta na chegada" registrado', (int) $um('SELECT COUNT(*) FROM leads WHERE empresa_id = :e AND chegada_roleta_aberta IS NOT NULL'), 'info', 'Gravado na chegada desde a migração 013; antes disso não é reconstruído (o horário não tem versões).')
+        : relaud_item('Horário das roletas com versões (histórico)', 'não existe', 'info', 'Mudar o horário muda o passado; "dentro/fora do horário" precisa ser gravado na chegada do lead (migração 013).');
 
     // ---------------------------------------------------------------- Marketing
     $meta = (int) $um("SELECT COUNT(*) FROM leads WHERE empresa_id = :e AND excluido_em IS NULL AND origem = 'meta_ads'");
@@ -182,7 +198,22 @@ function relatorio_auditoria_dados(int $empresaId): array
     } else {
         $s['Marketing'][] = relaud_item('UTMs (origem de site/landing page)', 'não existe', 'alerta', 'O cadastro não guarda utm_source/utm_campaign (migração 013 pendente).');
     }
-    $s['Marketing'][] = relaud_item('Investimento publicitário', 'não existe', 'alerta', 'Sem lançamentos nem integração: CPL e custos ficam "não disponível".');
+    if ($tem('marketing_investimentos')) {
+        $nInv = (int) $um('SELECT COUNT(*) FROM marketing_investimentos WHERE empresa_id = :e AND excluido_em IS NULL');
+        $s['Marketing'][] = relaud_item('Lançamentos de investimento', $nInv, $nInv ? 'ok' : 'alerta', $nInv ? '' : 'Sem lançamentos: custo por lead e por venda ficam "não disponível".');
+        // Origens pagas com leads nos últimos 90 dias e sem investimento lançado no período.
+        $stmt = $pdo->prepare("SELECT o.nome, COUNT(l.id) AS n FROM leads l JOIN lead_origens o ON o.id = l.origem_detalhe_id
+            WHERE l.empresa_id = :e AND l.excluido_em IS NULL AND l.criado_em >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) AND o.nome IN ('Meta Ads', 'Google Ads')
+              AND NOT EXISTS (SELECT 1 FROM marketing_investimentos mi WHERE mi.empresa_id = l.empresa_id AND mi.origem_detalhe_id = o.id AND mi.excluido_em IS NULL
+                              AND mi.data_fim >= DATE_SUB(CURDATE(), INTERVAL 90 DAY))
+            GROUP BY o.nome");
+        $stmt->execute(['e' => $empresaId]);
+        foreach ($stmt->fetchAll() as $r) {
+            $s['Marketing'][] = relaud_item('Leads de ' . $r['nome'] . ' (90 dias) sem investimento lançado', (int) $r['n'], 'alerta', 'O custo dessa origem não pode ser calculado.');
+        }
+    } else {
+        $s['Marketing'][] = relaud_item('Investimento publicitário', 'migração 016 pendente', 'alerta', 'Sem lançamentos: CPL e custos ficam "não disponível".');
+    }
     $s['Marketing'][] = relaud_item('Google Ads', 'não integrado', 'info');
 
     // ---------------------------------------------------------------- WhatsApp

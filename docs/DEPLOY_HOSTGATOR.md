@@ -98,6 +98,7 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 19 | `sql/migration_013_relatorios_historico.sql` | Central de Relatórios — histórico estruturado, contratos, origens/UTM. **Depois dela:** `php -q ferramentas/retroalimentar_historico.php` (ver `docs/RELATORIOS_ETAPA2.md`) |
 | 20 | `sql/migration_014_relatorios_favoritos.sql` | Central de Relatórios — filtros favoritos por usuário (ver `docs/RELATORIOS_ETAPA3.md`) |
 | 21 | `sql/migration_015_relatorios_exportacoes.sql` | Central de Relatórios — exportações grandes em segundo plano (cron) com link temporário (ver `docs/RELATORIOS_ETAPA5.md`) |
+| 22 | `sql/migration_016_relatorios_investimentos_modelos.sql` | Central de Relatórios — investimento em anúncios, modelos personalizados, permissão e índices de desempenho (ver `docs/RELATORIOS_ETAPA6.md`) |
 
 - Atualizando um servidor que já funciona: rode, na ordem, só os arquivos
   que ainda não rodou. Ex.: quem já rodou até o 17 roda apenas o **18**.

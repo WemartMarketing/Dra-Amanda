@@ -30,9 +30,10 @@ ok(!array_filter($ind, fn ($i) => !isset(relatorio_categorias()[$i['categoria']]
 ok(!array_filter($ind, fn ($i) => !isset(relatorio_disponibilidades()[$i['disponibilidade']])), 'toda disponibilidade é válida');
 $cobertas = array_unique(array_column($ind, 'categoria'));
 igual(count(array_diff(array_keys(relatorio_categorias()), $cobertas)), 0, 'as 10 categorias da Central têm indicadores');
-foreach (['investimento', 'roi', 'custos_por_resultado'] as $k) {
-    ok(($ind[$k]['disponibilidade'] ?? '') === 'indisponivel', "\"{$ind[$k]['nome']}\" marcado como não disponível (não se inventa número)");
-}
+ok($ind['roi']['disponibilidade'] === 'indisponivel' && str_contains($ind['roi']['ausentes'], 'receita'), 'ROI: não disponível (sem receita no sistema)');
+// Etapa 6: investimento lançado → parcial, nunca estimado.
+ok($ind['investimento']['disponibilidade'] === 'parcial' && str_contains($ind['investimento']['ausentes'], 'nunca'), 'investimento: só o lançado, nunca estimado');
+ok($ind['custos_por_resultado']['disponibilidade'] === 'parcial', 'custos por resultado: só com investimento lançado');
 // Etapa 2: passaram a ter fonte, mas com limite declarado.
 ok($ind['vgv']['disponibilidade'] === 'parcial' && str_contains($ind['vgv']['ausentes'], 'não disponível'), 'VGV: só com valor informado; sem valor → "não disponível"');
 ok($ind['visitas_confirmadas']['disponibilidade'] === 'parcial' && str_contains($ind['visitas_confirmadas']['ausentes'], 'migração 013'), 'visitas confirmadas: só a partir da migração 013');
@@ -100,14 +101,16 @@ try {
     ok(str_contains($achar('Leads', 'Leads únicos (telefone/e-mail)')['nota'], 'Cadastros a mais para a mesma pessoa: 1'), '1 cadastro a mais identificado');
     igual($achar('Leads', 'Leads sem telefone válido nem e-mail')['valor'], 1, 'lead sem contato = 1');
     igual($achar('Leads', 'Origem: manual')['nivel'], 'alerta', 'origem genérica "manual" sinalizada');
-    igual($achar('Atribuição e histórico do corretor', 'Leads com corretor sem registro de como chegaram a ele')['valor'], 2, 'com corretor sem registro de atribuição = 2 (L4 e L6; L5 veio pela roleta)');
+    $semAtr = $achar('Atribuição e histórico do corretor', 'Leads com corretor sem registro de como chegaram a ele') ?? $achar('Histórico estruturado (Etapa 2)', 'Leads com dono e sem atribuição aberta');
+    igual($semAtr['valor'] ?? null, modulo_tabela_existe('lead_atribuicoes') ? 3 : 2, 'leads com dono sem registro de como chegaram (com a 013: sem atribuição aberta)');
     igual($achar('Atendimento', '1º atendimento antes da atribuição (data incoerente)')['valor'], 1, 'data incoerente = 1 (L4)');
     igual($achar('Contratos e visitas', 'Contratos sem data de assinatura')['valor'], 1, 'contrato sem data = 1 (L5)');
     igual($achar('Contratos e visitas', 'Leads que entraram em "contrato" e depois saíram da etapa')['valor'], 1, 'entrou em contrato e saiu = 1 (L6)');
     igual($achar('Contratos e visitas', 'Visitas que já passaram e continuam "agendadas" (sem situação)')['valor'], 1, 'visita vencida sem situação = 1');
     igual($achar('Funil (Kanban)', 'Mudanças de etapa com origem/destino estruturados')['valor'], 2, 'transições estruturadas = 2');
     igual($achar('Funil (Kanban)', 'Leads fora da 1ª etapa sem nenhuma transição estruturada')['valor'], 1, 'fora da 1ª etapa sem histórico = 1 (L4)');
-    igual($achar('Marketing', 'Investimento publicitário')['valor'], 'não existe', 'investimento declarado como inexistente');
+    $inv = $achar('Marketing', 'Lançamentos de investimento') ?? $achar('Marketing', 'Investimento publicitário');
+    ok($inv && ($inv['valor'] === 0 || $inv['valor'] === 'migração 016 pendente') && $inv['nivel'] === 'alerta', 'sem investimento lançado → alerta (custos "não disponível")');
     $json = json_encode($a, JSON_UNESCAPED_UNICODE);
     ok(!str_contains($json, 'Fulano') && !str_contains($json, '98888') && !str_contains($json, '@'), 'a auditoria não expõe nomes, telefones nem e-mails');
 
