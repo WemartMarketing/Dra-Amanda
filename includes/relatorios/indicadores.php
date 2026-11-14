@@ -417,6 +417,58 @@ function relatorio_indicadores(): array
         'descricao' => 'Problemas que comprometem os relatórios (origem ausente, duplicados, datas incoerentes, visitas sem situação, falhas de integração).',
         'formula' => 'Verificações do painel de qualidade (ver ferramentas/auditoria_relatorios.php).', 'fonte' => 'Todas as tabelas acima.', 'data_base' => 'Posição atual.',
         'filtros' => 'Empresa.', 'deduplicacao' => '—', 'permissao' => 'Master da empresa / administradores.', 'ausentes' => '—', 'atualizacao' => $realtime, 'disponibilidade' => 'disponivel'];
+    return relatorio_indicadores_etapa2($i);
+}
+
+/**
+ * Etapa 2 (migração 013 + includes/relatorios/motor.php): o que passou a ter
+ * fonte estruturada. Mantém as definições da Etapa 1 e atualiza fonte,
+ * limitações e disponibilidade de cada indicador que o motor já calcula.
+ * Período anterior à implantação: só o que a retroalimentação reconstruiu a
+ * partir de registros (marcado como "reconstruído").
+ */
+function relatorio_indicadores_etapa2(array $i): array
+{
+    $hist = ' Antes da implantação: só o reconstruído de registros existentes (ferramentas/retroalimentar_historico.php), marcado como "reconstruído".';
+    $aj = [
+        'leads_distribuidos' => ['fonte' => 'lead_atribuicoes (qualquer atribuição registrada). Motor: relatorio_leads().',
+            'ausentes' => 'Lead que voltou para a fila continua contando como distribuído (já teve corretor).' . $hist, 'disponibilidade' => 'disponivel'],
+        'leads_com_atuacao' => ['fonte' => 'lead_atribuicoes.primeiro_atendimento_em de QUALQUER atribuição do lead (não se perde na troca de corretor). Motor: relatorio_leads().',
+            'ausentes' => 'O campo antigo leads.primeiro_contato_em continua sendo zerado na troca (regra da recuperação); os relatórios usam o histórico.' . $hist, 'disponibilidade' => 'disponivel'],
+        'contatos_efetivos' => ['fonte' => 'leads.primeiro_contato_efetivo_em e lead_atribuicoes.primeiro_contato_efetivo_em/contato_efetivo_via (whatsapp, pendencia, etapa, visita), gravados no momento. Motor: relatorio_leads().',
+            'ausentes' => 'Sem evidência registrada o lead fica "sem contato efetivo", nunca contatado por suposição.' . $hist, 'disponibilidade' => 'disponivel'],
+        'taxa_primeiro_contato' => ['fonte' => 'lead_atribuicoes. Motor: relatorio_leads() e, por corretor, relatorio_corretores().', 'disponibilidade' => 'disponivel'],
+        'taxa_contato_efetivo' => ['fonte' => 'lead_atribuicoes / leads.primeiro_contato_efetivo_em. Motor: relatorio_leads() e relatorio_corretores().', 'disponibilidade' => 'disponivel'],
+        'tempo_primeiro_contato' => ['fonte' => 'Coorte: 1ª atribuição do lead (atribuido_em → primeiro_atendimento_em). Por corretor: cada atribuição dele. Motor: relatorio_leads(), relatorio_corretores().',
+            'deduplicacao' => 'Coorte: um tempo por lead (1ª atribuição). Corretor: um tempo por atribuição recebida.', 'disponibilidade' => 'disponivel'],
+        'recebidos_corretor' => ['fonte' => 'lead_atribuicoes (cada entrega gravada no momento, com equipe/gerente/superintendência da data; forma: cadastro, roleta, transferência, oferta ativa, redistribuição). Motor: relatorio_corretores().',
+            'ausentes' => 'NÃO usa a carteira atual: o lead transferido continua contado para quem o recebeu. Mudança de equipe do corretor não conta como recebimento.' . $hist,
+            'permissao' => 'Pela estrutura gravada NA DATA da atribuição (o gestor continua vendo o histórico da sua equipe). Só números agregados.', 'disponibilidade' => 'disponivel'],
+        'perdidos_corretor' => ['fonte' => 'lead_atribuicoes.motivo_encerramento (inatividade, transferencia, mudanca_equipe, excluido) + lead_transferencias. Motor: relatorio_corretores(), relatorio_perdas().'],
+        'tempo_redistribuicao' => ['fonte' => 'lead_atribuicoes: encerrada_em (inatividade) → atribuido_em da próxima atribuição. Motor: relatorio_perdas().', 'disponibilidade' => 'disponivel'],
+        'transferencias_motivo' => ['formula' => 'COUNT(lead_transferencias) por motivo: administrativa, inatividade (redistribuição), mudança de equipe, roleta, voluntária, oferta ativa.'],
+        'visitas_confirmadas' => ['formula' => 'COUNT(visitas com confirmada_em no período).', 'fonte' => 'agenda_compromissos.confirmada_em / confirmada_por (botão "Cliente confirmou"). Motor: relatorio_visitas().',
+            'ausentes' => 'Só existe a partir da migração 013: antes dela nenhuma visita aparece como confirmada (não se reconstrói).', 'atualizacao' => 'Tempo real.', 'disponibilidade' => 'parcial'],
+        'contratos_assinados' => ['formula' => 'Venda formal: COUNT(lead_contratos status=validado, assinado_em no período). Separado, como sinal: leads movidos para "Contrato assinado" (lead_etapa_historico). Nunca somados.',
+            'fonte' => 'lead_contratos (registrar → validar → distrato), com corretor e estrutura da data da assinatura. Motor: relatorio_contratos().',
+            'ausentes' => 'Contratos anteriores ao registro formal não existem como venda validada: aparecem só como sinal da etapa.', 'disponibilidade' => 'parcial'],
+        'vgv' => ['formula' => 'SUM(valor_vgv) dos contratos VALIDADOS com data de assinatura no período.', 'fonte' => 'lead_contratos.valor_vgv (opcional). Motor: relatorio_contratos().',
+            'ausentes' => 'O valor é opcional: o relatório informa "X de Y contratos com valor". Sem nenhum valor → "VGV não disponível". VGV não é receita nem lucro.', 'disponibilidade' => 'parcial'],
+        'funil_movimentacao' => ['fonte' => 'lead_etapa_historico (usuário, jornada e sistema separados pela origem). Motor: relatorio_funil().',
+            'ausentes' => 'Antes da migração 013, mudanças feitas por jornada só existem em texto e não são reconstruídas.' . $hist, 'disponibilidade' => 'disponivel'],
+        'tempo_etapa' => ['fonte' => 'lead_etapa_historico (entrada → próxima transição). Motor: relatorio_funil().', 'disponibilidade' => 'disponivel'],
+        'aguardando_distribuicao' => ['fonte' => 'roleta_fila (situação atual) + roleta_fila_historico (todas as passagens, desde a migração 013).'],
+        'espera_distribuicao' => ['fonte' => 'roleta_fila_historico (cada passagem: entrou_em → saiu_em, resultado).'],
+        'leads_fora_horario' => ['formula' => 'COUNT(leads com chegada_roleta_aberta = 0) — gravado na PRIMEIRA chegada do lead à roleta.', 'fonte' => 'leads.chegada_roleta_aberta / chegada_roleta_id. Motor: relatorio_leads().',
+            'ausentes' => 'Só existe para leads que chegaram depois da migração 013 (o horário antigo não tem versões e não é reconstruído).', 'disponibilidade' => 'parcial'],
+        'leads_origem' => ['formula' => 'COUNT(leads) por origem detalhada (configurável por empresa) e por grupo.', 'fonte' => 'leads.origem_detalhe_id → lead_origens (Meta Ads, Google Ads, WhatsApp, Telefone, Site...) + UTMs (utm_source/medium/campaign/content/term). Motor: relatorio_leads_por_origem().',
+            'ausentes' => 'Leads antigos de "Manual"/"Outro" ficam como "Cadastro manual (não detalhado)" / "Outros" — não dá para saber se vieram do Google, do site ou do telefone.', 'disponibilidade' => 'parcial'],
+    ];
+    foreach ($aj as $k => $campos) {
+        if (isset($i[$k])) {
+            $i[$k] = array_merge($i[$k], $campos);
+        }
+    }
     return $i;
 }
 

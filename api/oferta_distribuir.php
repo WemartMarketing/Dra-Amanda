@@ -82,6 +82,8 @@ if ($acao === 'roleta') {
         }
         $i++;
         $saiFila->execute(['l' => $leadId]);
+        historico_fila_saiu($leadId, 'oferta_ativa');
+        historico_abrir_atribuicao($leadId, $uid, 'oferta_ativa');
         lead_registrar_evento($leadId, (int) $usuario['id'], 'atribuicao', 'Oferta ativa "' . $lista['nome'] . '": atribuído a ' . $c['nome'] . ' por ' . $usuario['nome'] . ' (divisão igual)');
         $distribuidos++;
         $porCorretor[$uid] = ($porCorretor[$uid] ?? 0) + 1;

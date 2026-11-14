@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/lead_componentes.php';
+require_once __DIR__ . '/../includes/origens.php';
 
 $usuario = auth_require();
 $crumb = 'Etapas do funil';
@@ -17,6 +18,7 @@ $stmt->execute(['e' => $empresaId]);
 $qtdPorEtapa = array_map('intval', array_column($stmt->fetchAll(), 'qtd', 'etapa_id'));
 $categorias = funil_categorias();
 $ativas = array_values(array_filter($etapas, fn ($e) => (int) $e['ativa']));
+$origens = origens_listar($empresaId, false);
 
 $pageTitle = 'Etapas do funil — ' . APP_NAME;
 require __DIR__ . '/../includes/layout_start.php';
@@ -113,6 +115,54 @@ require __DIR__ . '/../includes/layout_start.php';
         <?php endforeach; ?>
     </div>
 </div>
+
+<?php if ($origens): ?>
+<div class="card" id="origens">
+    <div class="card-head">
+        <div><h2>Origens dos leads</h2><p>De onde o cliente veio (aquisição) — usada nos relatórios de marketing. O <b>grupo</b> mantém a compatibilidade com os relatórios antigos e não muda depois que a origem tem leads. As marcadas como <b>sistema</b> são usadas pelo Meta Ads, pela importação e como padrão, e não podem ser alteradas.</p></div>
+        <button type="button" class="btn btn-outline btn-sm" data-open-modal="modal-origem-0"><?= icon('plus') ?>Nova origem</button>
+    </div>
+    <div class="etapa-lista">
+        <?php foreach ($origens as $o): $oid = (int) $o['id']; ?>
+            <div class="etapa-row<?= (int) $o['ativa'] ? '' : ' is-inactive' ?>">
+                <div class="etapa-info">
+                    <strong><?= e($o['nome']) ?></strong>
+                    <span>Grupo: <?= e(lead_origens()[$o['canal']] ?? $o['canal']) ?> · <?= (int) $o['qtd_leads'] ?> lead<?= (int) $o['qtd_leads'] === 1 ? '' : 's' ?></span>
+                </div>
+                <div class="etapa-flags">
+                    <?php if ((int) $o['sistema']): ?><span class="pill pill-muted">Sistema</span>
+                    <?php elseif (!(int) $o['ativa']): ?><span class="pill pill-muted">Inativa</span>
+                    <?php else: ?><span class="pill pill-green">Ativa</span><?php endif; ?>
+                </div>
+                <div class="etapa-acoes">
+                    <?php if (!(int) $o['sistema']): ?><button type="button" class="btn btn-outline btn-sm" data-open-modal="modal-origem-<?= $oid ?>"><?= icon('edit') ?>Editar</button><?php endif; ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php foreach (array_merge([['id' => 0, 'nome' => '', 'canal' => 'outro', 'ativa' => 1, 'sistema' => 0, 'qtd_leads' => 0]], $origens) as $o): if ((int) $o['sistema']) continue; $oid = (int) $o['id']; ?>
+<div class="modal-overlay" id="modal-origem-<?= $oid ?>" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="titulo-origem-<?= $oid ?>">
+        <button type="button" class="overlay-close" data-close-modal="modal-origem-<?= $oid ?>" aria-label="Fechar">&times;</button>
+        <h2 id="titulo-origem-<?= $oid ?>"><?= $oid ? 'Editar origem' : 'Nova origem' ?></h2>
+        <form data-api-form action="/api/origem_salvar.php" data-recarregar>
+            <?php if ($oid): ?><input type="hidden" name="id" value="<?= $oid ?>"><?php endif; ?>
+            <div class="field"><label for="origem-nome-<?= $oid ?>">Nome</label><input type="text" id="origem-nome-<?= $oid ?>" name="nome" required maxlength="80" value="<?= e($o['nome']) ?>" placeholder="Ex.: Feirão de imóveis"></div>
+            <div class="field"><label for="origem-canal-<?= $oid ?>">Grupo (para os relatórios)</label>
+                <select id="origem-canal-<?= $oid ?>" name="canal" <?= (int) $o['qtd_leads'] > 0 ? 'disabled' : '' ?>>
+                    <?php foreach (lead_origens() as $v => $r): ?><option value="<?= $v ?>" <?= $o['canal'] === $v ? 'selected' : '' ?>><?= e($r) ?></option><?php endforeach; ?>
+                </select>
+                <?php if ((int) $o['qtd_leads'] > 0): ?><input type="hidden" name="canal" value="<?= e($o['canal']) ?>"><small class="muted">Esta origem já tem leads: o grupo fica fixo.</small><?php endif; ?>
+            </div>
+            <label class="checkbox-row"><input type="checkbox" name="ativa" value="1" <?= (int) $o['ativa'] ? 'checked' : '' ?>> Disponível no cadastro de leads</label>
+            <div class="form-alert" data-form-alerta hidden></div>
+            <button type="submit" class="btn btn-primary"><?= icon('check') ?>Salvar</button>
+        </form>
+    </div>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
 
 <div class="modal-overlay" id="modal-nova-etapa" hidden>
     <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="titulo-nova-etapa">

@@ -15,6 +15,7 @@
 require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/funil.php';
 require_once __DIR__ . '/../includes/transferencia.php';
+require_once __DIR__ . '/../includes/origens.php';
 
 $id = (int) ($_POST['id'] ?? 0);
 $usuario = api_iniciar($id ? 'editar_leads' : 'criar_leads');
@@ -86,6 +87,32 @@ $dados = [
 // Campanha só muda quando o formulário a envia (outros formulários não a apagam).
 if (!$atual || array_key_exists('campanha', $_POST)) {
     $dados['campanha'] = api_texto($_POST['campanha'] ?? null, 120);
+}
+
+// Origem detalhada (migração 013): a origem escolhida define o canal (leads.origem).
+// Sem detalhe, o canal recebe a origem padrão dele ("Cadastro manual (não detalhado)"...).
+if (origens_instaladas()) {
+    if (array_key_exists('origem_detalhe_id', $_POST)) {
+        $detalheId = (int) $_POST['origem_detalhe_id'];
+        if ($detalheId) {
+            $det = origem_carregar($empresaId, $detalheId);
+            if (!$det) {
+                api_erro('Origem não encontrada.', 404);
+            }
+            $dados['origem'] = $det['canal'];
+            $dados['origem_detalhe_id'] = $detalheId;
+        } else {
+            $dados['origem'] = 'manual';
+            $dados['origem_detalhe_id'] = origem_id_do_canal($empresaId, 'manual');
+        }
+    } elseif (!$atual || $atual['origem'] !== $origem) {
+        $dados['origem_detalhe_id'] = origem_id_do_canal($empresaId, $origem);
+    }
+    foreach (origens_campos_utm() as $campo => $max) {
+        if (!$atual || array_key_exists($campo, $_POST)) {
+            $dados[$campo] = api_texto($_POST[$campo] ?? null, $max);
+        }
+    }
 }
 
 if ($atual) {
@@ -165,6 +192,7 @@ db()->prepare('INSERT INTO leads (empresa_id, equipe_id, responsavel_id, etapa_i
         'etapa_id' => $etapa['id'], 'etapa' => $etapa['categoria'],
     ]);
 $novoId = (int) db()->lastInsertId();
+historico_abrir_atribuicao($novoId, $responsavelId, 'cadastro');
 
 $stmt = db()->prepare('SELECT nome FROM usuarios WHERE id = :id');
 $stmt->execute(['id' => $responsavelId]);

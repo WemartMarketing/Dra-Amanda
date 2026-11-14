@@ -4,6 +4,8 @@ require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/lead_componentes.php';
 require_once __DIR__ . '/../includes/arquivos.php';
+require_once __DIR__ . '/../includes/origens.php';
+require_once __DIR__ . '/../includes/contratos_ui.php';
 
 $usuario = auth_require();
 $empresaId = (int) $usuario['empresa_ativa_id'];
@@ -52,9 +54,7 @@ if (!$leadId) {
                     </select>
                 </div>
                 <div class="field"><label for="n-origem">Origem</label>
-                    <select id="n-origem" name="origem">
-                        <?php foreach (lead_origens() as $valor => $rotulo): ?><option value="<?= $valor ?>"><?= $rotulo ?></option><?php endforeach; ?>
-                    </select>
+                    <?php render_select_origem($empresaId, 'n-origem'); ?>
                 </div>
                 <div class="field"><label for="n-prio">Prioridade</label>
                     <select id="n-prio" name="prioridade">
@@ -73,6 +73,7 @@ if (!$leadId) {
                 <?php endif; ?>
             </div>
             <div class="field"><label for="n-obs">Observação</label><textarea id="n-obs" name="observacao" maxlength="500" placeholder="Ex.: Cliente prefere contato à tarde."></textarea></div>
+            <?php render_campos_utm(null, 'n'); ?>
             <?php if ($podeRoleta && $empComRoleta): ?>
                 <label class="check-roleta" data-opcao-roleta hidden>
                     <input type="checkbox" name="distribuir_roleta" value="1" data-distribuir-roleta>
@@ -136,6 +137,9 @@ $destinos = $podeTransferir ? array_values(array_filter(rbac_usuarios_atribuivei
 $whats = wa_link_conversar($usuario, $lead);
 $tel = lead_telefone_normalizado($lead['telefone']);
 $atrasado = lead_esta_atrasado($lead + ['compromisso_vencido' => (bool) array_filter($pendentes, fn ($c) => strtotime($c['inicio']) < time())]);
+$contratos = contratos_instalados() ? contratos_do_lead($empresaId, $leadId) : null;
+$podeValidarContrato = usuario_tem_permissao($usuario, 'validar_contratos');
+$origemDetalhe = !empty($lead['origem_detalhe_id']) ? origem_carregar($empresaId, (int) $lead['origem_detalhe_id']) : null;
 // Anúncio que gerou o lead (Meta Ads) — mesma permissão da ficha.
 $criativo = null;
 if (modulo_tabela_existe('meta_anuncios')) {
@@ -209,6 +213,7 @@ require __DIR__ . '/../includes/layout_start.php';
 <!-- ============================================================ Resumo -->
 <section class="tab-panel" data-painel="resumo" <?= $abaAtiva === 'resumo' ? '' : 'hidden' ?>>
     <?php if ($criativo) render_criativo_card($criativo); ?>
+    <?php if ($contratos !== null && ($contratos || in_array($lead['etapa'], ['visita_realizada', 'contrato_assinado'], true) || $podeValidarContrato)) render_contratos_card($lead, $contratos, $podeEditar, $podeValidarContrato); ?>
     <div class="grid-2">
         <div class="card">
             <div class="card-head"><div><h2>Dados do lead</h2></div><?php if ($podeEditar): ?><button type="button" class="btn btn-outline btn-sm" data-open-modal="modal-editar-lead"><?= icon('edit') ?>Editar</button><?php endif; ?></div>
@@ -216,7 +221,7 @@ require __DIR__ . '/../includes/layout_start.php';
                 <div><dt>Telefone</dt><dd><?= e(lead_formatar_telefone($lead['telefone'])) ?></dd></div>
                 <div><dt>E-mail</dt><dd><?= e($lead['email'] ?: '—') ?></dd></div>
                 <div><dt>Empreendimento</dt><dd><?= e($lead['empreendimento_nome'] ?? '—') ?></dd></div>
-                <div><dt>Origem</dt><dd><?= e(lead_origens()[$lead['origem']] ?? $lead['origem']) ?></dd></div>
+                <div><dt>Origem</dt><dd><?= e(($origemDetalhe['nome'] ?? null) ?: (lead_origens()[$lead['origem']] ?? $lead['origem'])) ?><?php if (!empty($lead['utm_source']) || !empty($lead['utm_campaign'])): ?><small class="muted"> · UTM <?= e(trim(($lead['utm_source'] ?? '') . ' / ' . ($lead['utm_campaign'] ?? ''), ' /')) ?></small><?php endif; ?></dd></div>
                 <div><dt>Interesse</dt><dd><?= e($lead['interesse'] ?: '—') ?></dd></div>
                 <div><dt>Campanha</dt><dd><?= e($lead['campanha'] ?: '—') ?></dd></div>
                 <div><dt>Renda familiar</dt><dd><?= $lead['renda_informada'] ? 'R$ ' . number_format((float) $lead['renda_informada'], 0, ',', '.') : '—' ?></dd></div>
@@ -422,7 +427,7 @@ require __DIR__ . '/../includes/layout_start.php';
                         </select>
                     </div>
                     <div class="field"><label for="ed-origem">Origem</label>
-                        <select id="ed-origem" name="origem"><?php foreach (lead_origens() as $v => $r): ?><option value="<?= $v ?>" <?= $lead['origem'] === $v ? 'selected' : '' ?>><?= $r ?></option><?php endforeach; ?></select>
+                        <?php render_select_origem($empresaId, 'ed-origem', $lead); ?>
                     </div>
                     <div class="field"><label for="ed-prio">Prioridade</label>
                         <select id="ed-prio" name="prioridade"><?php foreach (lead_prioridades() as $v => $r): ?><option value="<?= $v ?>" <?= $lead['prioridade'] === $v ? 'selected' : '' ?>><?= $r ?></option><?php endforeach; ?></select>
@@ -431,6 +436,7 @@ require __DIR__ . '/../includes/layout_start.php';
                     <div class="field"><label for="ed-camp">Campanha</label><input type="text" id="ed-camp" name="campanha" maxlength="120" placeholder="Ex.: Lançamento março" value="<?= e($lead['campanha'] ?? '') ?>"></div>
                     <div class="field"><label for="ed-renda">Renda familiar</label><input type="text" id="ed-renda" name="renda_informada" inputmode="decimal" value="<?= $lead['renda_informada'] ? e(number_format((float) $lead['renda_informada'], 2, ',', '.')) : '' ?>"></div>
                 </div>
+                <?php render_campos_utm($lead, 'ed'); ?>
                 <div class="form-alert" data-form-alerta hidden></div>
                 <button type="submit" class="btn btn-primary"><?= icon('check') ?>Salvar alterações</button>
             </form>

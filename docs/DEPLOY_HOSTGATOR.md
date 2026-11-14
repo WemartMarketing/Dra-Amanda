@@ -95,6 +95,7 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 16 | `sql/migration_010_jornada_boas_vindas.sql` | Jornadas — Fase 4 (autorização de WhatsApp pelo formulário do Meta) |
 | 17 | `sql/migration_011_meta_criativos.sql` | Origem do lead: campanha, anúncio e criativo do Meta Ads (ver `docs/META_CRIATIVOS.md`) |
 | 18 | `sql/migration_012_plantoes_navegacao.sql` | Plantões de vendas: CEP, foto, horário, corretores autorizados, rotas (ver `docs/PLANTOES.md`) |
+| 19 | `sql/migration_013_relatorios_historico.sql` | Central de Relatórios — histórico estruturado, contratos, origens/UTM. **Depois dela:** `php -q ferramentas/retroalimentar_historico.php` (ver `docs/RELATORIOS_ETAPA2.md`) |
 
 - Atualizando um servidor que já funciona: rode, na ordem, só os arquivos
   que ainda não rodou. Ex.: quem já rodou até o 17 roda apenas o **18**.

@@ -1787,3 +1787,18 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .plantao-hero-info .tip-box svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; }
 .plantao-cep input { max-width: 200px; }
 @media (max-width: 520px) { .plantao-cep input { max-width: none; } }
+
+/* Contratos (ficha do lead) e UTM */
+.contrato-card { margin-bottom: 20px; }
+.contrato-linha { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line, #eceff5); flex-wrap: wrap; }
+.contrato-info { flex: 1 1 280px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.contrato-info span { font-size: 13px; }
+.contrato-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.utm-box { margin: 6px 0 14px; }
+.utm-box summary { cursor: pointer; font-size: 13px; color: var(--muted, #68728a); padding: 6px 0; }
+.utm-box .form-grid { margin-top: 10px; }
+#origens { margin-top: 20px; }
+.contrato-card .card-head, #origens .card-head { flex-wrap: wrap; gap: 12px; }
+@media (max-width: 640px) {
+    .contrato-card .card-head > .btn, #origens .card-head > .btn { width: 100%; justify-content: center; }
+}

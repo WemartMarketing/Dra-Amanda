@@ -72,7 +72,7 @@ poderão ser mostrados com histórico e a partir de quando.
 
 ## 4. Plano de implementação (após aprovação de cada etapa)
 
-### Etapa 2 — Motor de relatórios e histórico estruturado
+### Etapa 2 — Motor de relatórios e histórico estruturado ✅ concluída (ver `docs/RELATORIOS_ETAPA2.md`)
 Migração 013 (não destrutiva):
 - `lead_atribuicoes`: cada vez que um lead chega a um corretor (roleta, cadastro,
   transferência, oferta, redistribuição), com estrutura na data, forma de

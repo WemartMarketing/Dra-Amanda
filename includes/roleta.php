@@ -482,6 +482,12 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
             $pdo->prepare('INSERT INTO roleta_distribuicoes (empresa_id, roleta_id, lead_id, usuario_id, origem, executado_por) VALUES (:e, :r, :l, :u, :o, :x)')
                 ->execute(['e' => $empresaId, 'r' => $roletaId, 'l' => $leadId, 'u' => $uid, 'o' => $origem, 'x' => $executorId]);
             $pdo->prepare('UPDATE roleta_fila SET resolvido_em = NOW() WHERE lead_id = :l AND resolvido_em IS NULL')->execute(['l' => $leadId]);
+            historico_fila_saiu($leadId, 'distribuido');
+            historico_abrir_atribuicao($leadId, $uid, $origem === 'recuperacao' ? 'redistribuicao' : 'roleta',
+                ['roleta_id' => $roletaId, 'motivo_anterior' => 'reatribuicao']);
+            if (in_array($origem, ['manual', 'meta_ads', 'importacao'], true)) {
+                historico_chegada_roleta($leadId, $roletaId, true);
+            }
             transferencia_completar_recuperacao($leadId, $uid);
             lead_registrar_evento($leadId, $executorId, 'atribuicao', 'Recebido pela roleta ' . $roleta['nome'] . ' — atribuído a ' . $escolhido['nome']);
             auditoria_registrar($empresaId, $executorId, 'roleta.lead_distribuido', 'lead', $leadId, ['roleta_id' => $roletaId, 'usuario_id' => $uid, 'origem' => $origem]);
@@ -507,6 +513,19 @@ function roleta_distribuir_lead(int $leadId, string $origem = 'manual', ?array $
                        evitar_usuario_id = IF(resolvido_em IS NULL, evitar_usuario_id, NULL),
                        resolvido_em = NULL')
         ->execute(['e' => $empresaId, 'r' => $candidatas[0] ?? null, 'l' => $leadId, 'o' => $origemFila, 'm' => $motivoFila]);
+    historico_fila_entrou($empresaId, $leadId, $candidatas[0] ?? null, $origemFila);
+    if (in_array($origem, ['manual', 'meta_ads', 'importacao'], true)) {
+        // Chegou e ninguém recebeu: a roleta estava aberta (no horário) mas sem corretor apto, ou fechada?
+        $abertaId = null;
+        foreach ($candidatas as $cid) {
+            $rc = roleta_carregar($empresaId, $cid);
+            if ($rc && $rc['ativa'] && roleta_no_horario($rc)[0]) {
+                $abertaId = $cid;
+                break;
+            }
+        }
+        historico_chegada_roleta($leadId, $abertaId ?? ($candidatas[0] ?? null), $abertaId !== null);
+    }
     if (!$naFila || $naFila['resolvido_em'] !== null) {
         lead_registrar_evento($leadId, $executorId, 'sistema', 'Aguardando corretor disponível — ' . mb_strtolower($motivoFila) . '.');
         auditoria_registrar($empresaId, $executorId, 'roleta.lead_em_fila', 'lead', $leadId, ['motivo' => $motivoFila]);
@@ -549,6 +568,7 @@ function roleta_processar_fila(?int $empresaId = null, ?int $roletaId = null, in
         } elseif ($res['status'] === 'ja_atribuido' || $res['status'] === 'nao_encontrado') {
             // Atribuído por outro caminho (transferência manual) ou excluído: sai da fila.
             db()->prepare('UPDATE roleta_fila SET resolvido_em = NOW() WHERE lead_id = :l AND resolvido_em IS NULL')->execute(['l' => $leadId]);
+            historico_fila_saiu($leadId, $res['status'] === 'ja_atribuido' ? 'atribuido_manual' : 'excluido');
         }
     }
     return ['tentados' => $tentados, 'distribuidos' => $distribuidos];

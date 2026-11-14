@@ -5,6 +5,8 @@
  * includes/funil.php.
  */
 
+require_once __DIR__ . '/historico.php';
+
 /** Ordem linear das categorias do funil usada pelo funil de conversão dos Relatórios. */
 function lead_etapas_funil(): array
 {
@@ -78,6 +80,7 @@ function lead_registrar_feedback(int $leadId): void
     db()->prepare('UPDATE leads SET ultimo_feedback_em = NOW(),
             primeiro_contato_em = CASE WHEN primeiro_contato_em IS NULL AND responsavel_id IS NOT NULL THEN NOW() ELSE primeiro_contato_em END
         WHERE id = :id')->execute(['id' => $leadId]);
+    historico_registrar_atuacao($leadId);
 }
 
 /**

@@ -82,10 +82,14 @@ function lead_transferir(array $lead, int $destinoUsuarioId, string $motivo, ?ar
         'para_usuario' => $destinoUsuarioId, 'para_equipe' => $para['equipe_id'], 'para_gerente' => $para['gerente_id'], 'para_super' => $para['superintendencia_id'],
         'motivo' => $motivo, 'observacao' => $observacao, 'executado_por' => $executorId,
     ]);
+    $transferenciaId = (int) db()->lastInsertId();
+    $forma = ['mudanca_equipe' => 'mudanca_equipe', 'inatividade' => 'redistribuicao', 'roleta' => 'roleta', 'oferta_ativa' => 'oferta_ativa'][$motivo] ?? 'transferencia';
+    historico_abrir_atribuicao((int) $lead['id'], $destinoUsuarioId, $forma, ['transferencia_id' => $transferenciaId]);
 
     // Lead que esperava na fila da roleta e foi atribuído à mão sai da fila.
     db()->prepare('UPDATE roleta_fila SET resolvido_em = NOW() WHERE lead_id = :lead AND resolvido_em IS NULL')
         ->execute(['lead' => $lead['id']]);
+    historico_fila_saiu((int) $lead['id'], 'atribuido_manual');
 
     // Compromissos ainda pendentes seguem o novo responsável.
     db()->prepare("UPDATE agenda_compromissos SET usuario_id = :novo WHERE lead_id = :lead AND status = 'agendado'")

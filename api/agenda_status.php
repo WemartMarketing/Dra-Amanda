@@ -1,7 +1,7 @@
 <?php
 /**
  * POST /api/agenda_status.php  { id, acao, novo_inicio?, observacao?, mover_etapa? }
- *   acao: realizado | cliente_ausente | cancelar | reagendar
+ *   acao: realizado | cliente_ausente | cancelar | reagendar | confirmar (visita: o cliente confirmou presença)
  * Só compromissos dentro de rbac_agenda_scope(). Reagendar cria um novo
  * compromisso (reagendado_de = original) e marca o original como
  * "reagendado". Visita realizada pode levar o lead para a etapa de
@@ -43,6 +43,9 @@ switch ($acao) {
             if ($status === 'realizado' || $status === 'cliente_ausente') {
                 lead_registrar_feedback($leadId);
             }
+            if ($status === 'realizado' && $compromisso['tipo'] === 'visita') {
+                historico_registrar_contato_efetivo($leadId, 'visita');
+            }
             if ($status === 'realizado' && $compromisso['tipo'] === 'visita' && !empty($_POST['mover_etapa']) && usuario_tem_permissao($usuario, 'editar_leads')) {
                 $etapa = funil_etapa_por_categoria($empresaId, 'visita_realizada');
                 if ($etapa && lead_mudar_etapa($lead, (int) $etapa['id'], $usuario, 'visita realizada')) {
@@ -67,6 +70,24 @@ switch ($acao) {
             }
         }
         $mensagem = $tipoRotulo . ' ' . agenda_flexao($compromisso['tipo'], 'reagendad') . ' para ' . date('d/m \à\s H\hi', strtotime($novoInicio)) . '.';
+        break;
+
+    case 'confirmar':
+        // O cliente confirmou que vem (só visitas; não conclui o compromisso).
+        if ($compromisso['tipo'] !== 'visita' || !array_key_exists('confirmada_em', $compromisso)) {
+            $pdo->rollBack();
+            api_erro('Só visitas podem ser confirmadas.', 422);
+        }
+        if ($compromisso['confirmada_em']) {
+            $pdo->rollBack();
+            api_erro('Esta visita já foi confirmada.', 409);
+        }
+        $pdo->prepare('UPDATE agenda_compromissos SET confirmada_em = NOW(), confirmada_por = :u WHERE id = :id AND confirmada_em IS NULL')
+            ->execute(['u' => $usuario['id'], 'id' => $compromisso['id']]);
+        if ($lead) {
+            lead_registrar_evento($leadId, (int) $usuario['id'], 'agenda', 'Cliente confirmou a visita de ' . date('d/m H\hi', strtotime($compromisso['inicio'])) . ($observacao ? ' — ' . $observacao : ''));
+        }
+        $mensagem = 'Visita confirmada com o cliente.';
         break;
 
     default:

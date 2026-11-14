@@ -409,6 +409,10 @@ function importacao_executar(array $usuario, array $linhas, array $mapa, string 
         }
         $pdo->prepare('UPDATE oferta_listas SET linhas_lidas = :l, importados = :i, duplicados = :d, invalidos = :v WHERE id = :id')
             ->execute(['l' => $rel['lidas'], 'i' => $rel['importados'], 'd' => $rel['duplicados'], 'v' => $rel['invalidos'], 'id' => $listaId]);
+        require_once __DIR__ . '/origens.php';
+        if ($origemId = origem_id_do_canal($empresaId, 'importacao')) {
+            $pdo->prepare('UPDATE leads SET origem_detalhe_id = :o WHERE oferta_lista_id = :lista AND origem_detalhe_id IS NULL')->execute(['o' => $origemId, 'lista' => $listaId]);
+        }
         auditoria_registrar($empresaId, $uid, 'oferta.lista_importada', 'oferta_lista', $listaId, [
             'arquivo' => $arquivoNome, 'lidas' => $rel['lidas'], 'importados' => $rel['importados'], 'duplicados' => $rel['duplicados'], 'invalidos' => $rel['invalidos'],
         ]);

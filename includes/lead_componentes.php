@@ -209,6 +209,10 @@ function render_compromisso(array $c, bool $mostrarResponsavel, bool $mostrarLea
         <?php if ($c['status'] === 'agendado'): ?>
             <div class="agenda-actions">
                 <?php if ($vencido): ?><span class="pill pill-red">Atrasado</span><?php endif; ?>
+                <?php if ($c['tipo'] === 'visita' && array_key_exists('confirmada_em', $c)): ?>
+                    <?php if ($c['confirmada_em']): ?><span class="pill pill-green" title="Confirmada em <?= date('d/m H\hi', strtotime($c['confirmada_em'])) ?>">Confirmada</span>
+                    <?php else: ?><button type="button" class="btn btn-sm btn-outline" data-agenda-acao="confirmar" data-id="<?= (int) $c['id'] ?>">Cliente confirmou</button><?php endif; ?>
+                <?php endif; ?>
                 <button type="button" class="btn btn-sm btn-success" data-agenda-acao="realizado" data-id="<?= (int) $c['id'] ?>" data-tipo="<?= e($c['tipo']) ?>" data-com-lead="<?= $c['lead_id'] ? '1' : '0' ?>"><?= icon('check') ?>Realizado</button>
                 <?php if ($c['tipo'] !== 'tarefa'): ?>
                     <button type="button" class="btn btn-sm btn-outline" data-agenda-acao="cliente_ausente" data-id="<?= (int) $c['id'] ?>">Cliente ausente</button>

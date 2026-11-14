@@ -30,10 +30,13 @@ ok(!array_filter($ind, fn ($i) => !isset(relatorio_categorias()[$i['categoria']]
 ok(!array_filter($ind, fn ($i) => !isset(relatorio_disponibilidades()[$i['disponibilidade']])), 'toda disponibilidade é válida');
 $cobertas = array_unique(array_column($ind, 'categoria'));
 igual(count(array_diff(array_keys(relatorio_categorias()), $cobertas)), 0, 'as 10 categorias da Central têm indicadores');
-foreach (['investimento', 'roi', 'vgv', 'custos_por_resultado', 'visitas_confirmadas'] as $k) {
+foreach (['investimento', 'roi', 'custos_por_resultado'] as $k) {
     ok(($ind[$k]['disponibilidade'] ?? '') === 'indisponivel', "\"{$ind[$k]['nome']}\" marcado como não disponível (não se inventa número)");
 }
-ok(str_contains($ind['recebidos_corretor']['ausentes'], 'carteira atual') && $ind['recebidos_corretor']['disponibilidade'] === 'etapa2', 'recebidos pelo corretor: não usa a carteira atual; depende do histórico da Etapa 2');
+// Etapa 2: passaram a ter fonte, mas com limite declarado.
+ok($ind['vgv']['disponibilidade'] === 'parcial' && str_contains($ind['vgv']['ausentes'], 'não disponível'), 'VGV: só com valor informado; sem valor → "não disponível"');
+ok($ind['visitas_confirmadas']['disponibilidade'] === 'parcial' && str_contains($ind['visitas_confirmadas']['ausentes'], 'migração 013'), 'visitas confirmadas: só a partir da migração 013');
+ok(str_contains($ind['recebidos_corretor']['ausentes'], 'carteira atual') && $ind['recebidos_corretor']['disponibilidade'] === 'disponivel', 'recebidos pelo corretor: histórico de atribuições, não a carteira atual');
 ok(str_contains(relatorio_regras_gerais()['contato_valido'], 'mensagem automática'), 'definição de contato efetivo exclui mensagem automática');
 ok(str_contains($ind['wa_impactados']['deduplicacao'], 'UMA vez'), 'leads impactados contam uma vez, não por mensagem');
 $doc = (string) @file_get_contents(__DIR__ . '/../docs/RELATORIOS_DICIONARIO.md');

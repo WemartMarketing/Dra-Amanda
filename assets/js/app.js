@@ -692,6 +692,7 @@ function wmToast(msg, persistir) {
             fd.append('acao', acao);
             if (acao === 'cancelar' && !confirm('Cancelar este compromisso?')) return;
             if (acao === 'cliente_ausente' && !confirm('Registrar que o cliente não compareceu?')) return;
+            if (acao === 'confirmar' && !confirm('Registrar que o cliente confirmou presença nesta visita?')) return;
             if (acao === 'realizado' && btn.dataset.tipo === 'visita' && btn.dataset.comLead === '1') {
                 if (confirm('Visita realizada! Mover o lead para "Visita realizada"?')) fd.append('mover_etapa', '1');
             }

@@ -112,6 +112,7 @@ function pendencia_responder(array $usuario, int $id, string $resposta, string $
         }
         lead_registrar_evento($leadId, $uid, 'contato', 'Cliente respondeu (confirmado pelo corretor): ' . $obs);
         lead_registrar_feedback($leadId);
+        historico_registrar_contato_efetivo($leadId, 'pendencia');
         if ($etapaId) {
             $stmt = $pdo->prepare('SELECT * FROM leads WHERE id = :l');
             $stmt->execute(['l' => $leadId]);

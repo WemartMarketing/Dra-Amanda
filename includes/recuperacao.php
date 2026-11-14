@@ -184,6 +184,8 @@ function recuperacao_perder_lead(int $leadId, array $regra): ?string
                        ON DUPLICATE KEY UPDATE origem = 'recuperacao', evitar_usuario_id = VALUES(evitar_usuario_id),
                            motivo = VALUES(motivo), tentativas = 0, entrou_em = NOW(), resolvido_em = NULL")
             ->execute(['e' => $empresaId, 'l' => $leadId, 'ev' => $anterior]);
+        historico_encerrar_atribuicao($leadId, 'inatividade');
+        historico_fila_entrou($empresaId, $leadId, null, 'recuperacao');
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {

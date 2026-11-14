@@ -507,9 +507,13 @@ function jornada_tarefa_passo(array $tarefa): array
             if (!$et || !(int) $et['ativa'] || in_array($et['categoria'], funil_categorias_encerradas(), true)) {
                 jornada_log($empresaId, $execId, $chave, 'pulado', 'Etapa inexistente, inativa ou de encerramento.');
             } else {
+                $stmt = $pdo->prepare('SELECT f.id, f.categoria FROM leads l JOIN funil_etapas f ON f.id = l.etapa_id WHERE l.id = :l');
+                $stmt->execute(['l' => $x['lead_id']]);
+                $etAnterior = $stmt->fetch();
                 $upd = $pdo->prepare('UPDATE leads SET etapa_id = :et, etapa = :cat WHERE id = :l AND empresa_id = :e AND (etapa_id IS NULL OR etapa_id <> :et2)');
                 $upd->execute(['et' => $et['id'], 'cat' => $et['categoria'], 'l' => $x['lead_id'], 'e' => $empresaId, 'et2' => $et['id']]);
                 if ($upd->rowCount()) {
+                    historico_registrar_etapa($empresaId, (int) $x['lead_id'], $etAnterior ?: null, $et, null, 'jornada');
                     jornada_evento_lead((int) $x['lead_id'], 'Jornada "' . $jornada['nome'] . '": lead movido para "' . $et['nome'] . '"');
                 }
                 jornada_log($empresaId, $execId, $chave, 'etapa', $et['nome']);

@@ -144,9 +144,10 @@ function lead_mudar_etapa(array $lead, int $etapaId, array $usuario, string $com
         'empresa_id' => $empresaId,
     ]);
 
+    $usuarioId = isset($usuario['id']) ? (int) $usuario['id'] : null;
+    historico_registrar_etapa($empresaId, (int) $lead['id'], $anterior, $nova, $usuarioId, $usuarioId ? 'usuario' : 'sistema');
     lead_registrar_feedback((int) $lead['id']);
 
-    $usuarioId = isset($usuario['id']) ? (int) $usuario['id'] : null;
     $descricao = 'Etapa alterada de "' . ($anterior['nome'] ?? lead_etapa_rotulo((string) ($lead['etapa'] ?? ''))) . '" para "' . $nova['nome'] . '"';
     if ($complemento !== '') {
         $descricao .= ' — ' . $complemento;

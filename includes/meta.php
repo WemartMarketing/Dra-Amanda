@@ -326,6 +326,10 @@ function meta_processar_evento(int $eventoId, bool $forcar = false): string
         return $falhar('Erro ao gravar o lead no banco.');
     }
     $leadId = (int) $pdo->lastInsertId();
+    require_once __DIR__ . '/origens.php';
+    if ($origemId = origem_id_do_canal($empresaId, 'meta_ads')) {
+        $pdo->prepare('UPDATE leads SET origem_detalhe_id = :o WHERE id = :l')->execute(['o' => $origemId, 'l' => $leadId]);
+    }
     // Anúncio que gerou o lead (ids e nomes; o criativo é buscado depois, pela rotina).
     try {
         require_once __DIR__ . '/meta_criativos.php';

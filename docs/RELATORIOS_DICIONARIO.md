@@ -103,21 +103,21 @@ Cadastros que chegaram de novo para um cliente que já existia na empresa (não 
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
-### 🟡 Leads distribuídos (`leads_distribuidos`)
+### 🟢 Leads distribuídos (`leads_distribuidos`)
 
 Leads recebidos no período que foram entregues a algum corretor (em qualquer momento).
 
 | Campo | Definição |
 |---|---|
 | Fórmula | Leads recebidos com pelo menos uma atribuição registrada (roleta, cadastro com responsável, transferência, oferta ativa). |
-| Fonte | Hoje: leads.responsavel_id (dono atual) + roleta_distribuicoes. Etapa 2: lead_atribuicoes. |
+| Fonte | lead_atribuicoes (qualquer atribuição registrada). Motor: relatorio_leads(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Lead conta uma vez, mesmo com várias atribuições. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | Hoje um lead recuperado que ainda está na fila aparece como "não distribuído" embora já tenha tido dono. Corrigido com lead_atribuicoes (Etapa 2). |
+| Dados ausentes / limitações | Lead que voltou para a fila continua contando como distribuído (já teve corretor). Antes da implantação: só o reconstruído de registros existentes (ferramentas/retroalimentar_historico.php), marcado como "reconstruído". |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟢 Aguardando distribuição (`aguardando_distribuicao`)
 
@@ -126,7 +126,7 @@ Leads sem corretor neste momento, esperando na fila da roleta.
 | Campo | Definição |
 |---|---|
 | Fórmula | COUNT(roleta_fila sem resolvido_em) com lead ativo e sem responsável. |
-| Fonte | roleta_fila, leads |
+| Fonte | roleta_fila (situação atual) + roleta_fila_historico (todas as passagens, desde a migração 013). |
 | Data usada | Posição atual (agora) — não depende do período. |
 | Filtros | Empresa, empreendimento, roleta. |
 | Deduplicação | Um registro de fila por lead (chave única). |
@@ -135,37 +135,37 @@ Leads sem corretor neste momento, esperando na fila da roleta.
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com histórico confiável |
 
-### 🟡 Leads trabalhados (com atuação) (`leads_com_atuacao`)
+### 🟢 Leads trabalhados (com atuação) (`leads_com_atuacao`)
 
 Leads em que o corretor registrou pelo menos uma atuação válida.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | Leads com primeiro feedback válido registrado. Definição de atuação: ATUAÇÃO (feedback válido, regra da recuperação) = ação do corretor que comprova trabalho no lead: registrar atendimento, mudar etapa, resolver visita/retorno, responder pendência (inclusive "Não respondeu"), mensagem REAL pelo WhatsApp. Atuação ≠ contato efetivo: tentativa sem resposta é atuação, mas não é contato. |
-| Fonte | Hoje: leads.primeiro_contato_em (do dono ATUAL). Etapa 2: por atribuição em lead_atribuicoes. |
+| Fonte | lead_atribuicoes.primeiro_atendimento_em de QUALQUER atribuição do lead (não se perde na troca de corretor). Motor: relatorio_leads(). |
 | Data usada | Data de entrada do lead (leads.criado_em). (coorte). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Lead conta uma vez. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | LIMITAÇÃO ATUAL: primeiro_contato_em é zerado quando o lead muda de corretor — a atuação do corretor anterior se perde. A partir da Etapa 2 fica gravada por atribuição. |
+| Dados ausentes / limitações | O campo antigo leads.primeiro_contato_em continua sendo zerado na troca (regra da recuperação); os relatórios usam o histórico. Antes da implantação: só o reconstruído de registros existentes (ferramentas/retroalimentar_historico.php), marcado como "reconstruído". |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
-### 🟡 Leads com contato efetivo (`contatos_efetivos`)
+### 🟢 Leads com contato efetivo (`contatos_efetivos`)
 
 Leads em que houve evidência de que o cliente foi alcançado por uma pessoa.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | Leads com pelo menos um evento de contato efetivo. CONTATO EFETIVO = evidência de que o cliente foi alcançado por uma pessoa: (a) o cliente escreveu no WhatsApp oficial; (b) o corretor confirmou "Sim, o cliente respondeu" na central de pendências; (c) o corretor registrou atendimento com texto e moveu o lead para "Primeiro contato" ou etapa posterior; (d) visita realizada. NÃO são contato efetivo: mensagem automática, clique em Ligar/WhatsApp, "Não respondeu", observação, mudança de etapa feita por jornada automática. |
-| Fonte | whatsapp_mensagens (entrada), corretor_pendencias (resposta=respondeu), auditoria lead.etapa_alterada (para categoria ≥ primeiro_contato, por usuário), agenda_compromissos (visita realizada). |
+| Fonte | leads.primeiro_contato_efetivo_em e lead_atribuicoes.primeiro_contato_efetivo_em/contato_efetivo_via (whatsapp, pendencia, etapa, visita), gravados no momento. Motor: relatorio_leads(). |
 | Data usada | Data de entrada do lead (leads.criado_em). (coorte) ou data do evento (visão de movimentação). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Lead conta uma vez; vários contatos não somam. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | Mudanças de etapa anteriores à auditoria estruturada (Etapa 3 do projeto) não têm usuário/categoria: esses leads ficam como "sem evidência", nunca como contatados por suposição. |
+| Dados ausentes / limitações | Sem evidência registrada o lead fica "sem contato efetivo", nunca contatado por suposição. Antes da implantação: só o reconstruído de registros existentes (ferramentas/retroalimentar_historico.php), marcado como "reconstruído". |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟢 Tentativas de contato (`tentativas_contato`)
 
@@ -215,53 +215,53 @@ Leads hoje em etapas abertas de trabalho (categorias Primeiro contato e Em atend
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com histórico confiável |
 
-### 🟡 Tempo até o primeiro atendimento (`tempo_primeiro_contato`)
+### 🟢 Tempo até o primeiro atendimento (`tempo_primeiro_contato`)
 
 Tempo entre o lead chegar ao corretor e a primeira atuação válida dele.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | Média e MEDIANA de (primeiro_contato_em − atribuido_em), só leads com as duas datas. A mediana é o número principal (resistente a casos extremos). |
-| Fonte | Hoje: leads (dono atual). Etapa 2: lead_atribuicoes (cada corretor que recebeu). |
+| Fonte | Coorte: 1ª atribuição do lead (atribuido_em → primeiro_atendimento_em). Por corretor: cada atribuição dele. Motor: relatorio_leads(), relatorio_corretores(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
-| Deduplicação | Um tempo por lead (por atribuição na Etapa 2). |
+| Deduplicação | Coorte: um tempo por lead (1ª atribuição). Corretor: um tempo por atribuição recebida. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
 | Dados ausentes / limitações | Leads sem atuação ficam FORA da média (aparecem em "sem atendimento"). Mesmo limite de primeiro_contato_em ser zerado na troca de corretor. |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
-### 🟡 Taxa de primeiro atendimento (`taxa_primeiro_contato`)
+### 🟢 Taxa de primeiro atendimento (`taxa_primeiro_contato`)
 
 Percentual dos leads distribuídos que tiveram atuação válida.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | leads únicos com primeiro feedback válido ÷ leads distribuídos elegíveis no período × 100. Elegível = distribuído há mais de N horas. |
-| Fonte | leads (Etapa 2: lead_atribuicoes) |
+| Fonte | lead_atribuicoes. Motor: relatorio_leads() e, por corretor, relatorio_corretores(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Leads únicos. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
 | Dados ausentes / limitações | Sem leads elegíveis → "—" (não 0%). |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
-### 🟡 Taxa de contato efetivo (`taxa_contato_efetivo`)
+### 🟢 Taxa de contato efetivo (`taxa_contato_efetivo`)
 
 Percentual dos leads distribuídos em que o cliente foi efetivamente alcançado.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | leads com contato efetivo ÷ leads distribuídos elegíveis × 100. |
-| Fonte | Ver "Leads com contato efetivo". |
+| Fonte | lead_atribuicoes / leads.primeiro_contato_efetivo_em. Motor: relatorio_leads() e relatorio_corretores(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Leads únicos. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
 | Dados ausentes / limitações | Sem base → "—". |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟡 Funil — posição atual (`funil_posicao`)
 
@@ -279,37 +279,37 @@ Quantos leads estão em cada etapa AGORA (ou numa data de corte).
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
-### 🟡 Funil — movimentações no período (`funil_movimentacao`)
+### 🟢 Funil — movimentações no período (`funil_movimentacao`)
 
 Entradas, saídas, avanços e retrocessos entre etapas durante o período (não confundir com a posição atual).
 
 | Campo | Definição |
 |---|---|
 | Fórmula | COUNT(transições) por etapa de origem/destino; avanço = destino com ordem maior; retrocesso = menor. |
-| Fonte | auditoria lead.etapa_alterada (de_etapa_id, para_etapa_id); Etapa 2: lead_etapa_historico (inclui mudanças feitas por jornadas, que hoje só ficam em texto). |
+| Fonte | lead_etapa_historico (usuário, jornada e sistema separados pela origem). Motor: relatorio_funil(). |
 | Data usada | Data da transição. |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Cada transição conta; "leads que passaram pela etapa" conta o lead uma vez. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | Transições feitas por jornada automática não estão na auditoria (ficam em lead_eventos tipo jornada) — corrigido na Etapa 2. |
+| Dados ausentes / limitações | Antes da migração 013, mudanças feitas por jornada só existem em texto e não são reconstruídas. Antes da implantação: só o reconstruído de registros existentes (ferramentas/retroalimentar_historico.php), marcado como "reconstruído". |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
-### 🔵 Tempo médio em cada etapa (`tempo_etapa`)
+### 🟢 Tempo médio em cada etapa (`tempo_etapa`)
 
 Quanto tempo os leads ficaram em cada etapa antes de sair.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | Mediana de (saída − entrada) por etapa, só para permanências completas no período. |
-| Fonte | lead_etapa_historico (Etapa 2). |
+| Fonte | lead_etapa_historico (entrada → próxima transição). Motor: relatorio_funil(). |
 | Data usada | Data de saída da etapa. |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Cada permanência conta. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
 | Dados ausentes / limitações | A entrada na primeira etapa é a criação do lead. Permanências iniciadas antes do histórico estruturado não são calculadas. |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Depende do histórico estruturado da Etapa 2 (vale a partir da implantação) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟢 Leads parados (`leads_parados`)
 
@@ -329,21 +329,21 @@ Leads em etapas abertas sem nenhuma atuação há mais de X dias (padrão: o pra
 
 ## Corretores e Equipes
 
-### 🔵 Leads recebidos pelo corretor (histórico) (`recebidos_corretor`)
+### 🟢 Leads recebidos pelo corretor (histórico) (`recebidos_corretor`)
 
 Quantos leads o corretor RECEBEU no período, mesmo que depois tenham saído da carteira dele.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | COUNT(atribuições ao corretor no período): roleta, cadastro com responsável, transferência recebida, oferta ativa, redistribuição. |
-| Fonte | Hoje: roleta_distribuicoes + lead_transferencias (para_usuario_id) + auditoria lead.criado (responsável). Etapa 2: lead_atribuicoes (tabela única, com retroalimentação dessas fontes). |
+| Fonte | lead_atribuicoes (cada entrega gravada no momento, com equipe/gerente/superintendência da data; forma: cadastro, roleta, transferência, oferta ativa, redistribuição). Motor: relatorio_corretores(). |
 | Data usada | Data da atribuição. |
 | Filtros | Empresa, período, corretor, equipe/gerente/superintendência NA DATA da atribuição, empreendimento, origem, forma de recebimento. |
 | Deduplicação | Lead recebido duas vezes pelo mesmo corretor no período conta 1 em "leads únicos recebidos" e 2 em "recebimentos". |
-| Permissão | Corretor: só os próprios números. Gestor: corretores da sua estrutura NA DATA da atribuição (números agregados; o cadastro só se o lead ainda estiver no seu recorte). |
-| Dados ausentes / limitações | NÃO usar a carteira atual (o Dashboard atual faz isso e será corrigido). Leads distribuídos pela oferta ativa antes da Etapa 2 só têm evento em texto: entram via lead_eventos tipo atribuição, marcados como "reconstruído". |
+| Permissão | Pela estrutura gravada NA DATA da atribuição (o gestor continua vendo o histórico da sua equipe). Só números agregados. |
+| Dados ausentes / limitações | NÃO usa a carteira atual: o lead transferido continua contado para quem o recebeu. Mudança de equipe do corretor não conta como recebimento. Antes da implantação: só o reconstruído de registros existentes (ferramentas/retroalimentar_historico.php), marcado como "reconstruído". |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Depende do histórico estruturado da Etapa 2 (vale a partir da implantação) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟢 Carteira atual do corretor (`carteira_atual`)
 
@@ -368,7 +368,7 @@ Leads que saíram da carteira do corretor no período, separados por motivo.
 | Campo | Definição |
 |---|---|
 | Fórmula | COUNT(lead_transferencias) com de_usuario_id = corretor, por motivo (inatividade, administrativa, mudança de equipe, roleta). |
-| Fonte | lead_transferencias |
+| Fonte | lead_atribuicoes.motivo_encerramento (inatividade, transferencia, mudanca_equipe, excluido) + lead_transferencias. Motor: relatorio_corretores(), relatorio_perdas(). |
 | Data usada | Data da transferência. |
 | Filtros | Empresa, período, corretor/estrutura ANTERIOR, empreendimento, motivo. |
 | Deduplicação | Cada transferência conta. |
@@ -484,7 +484,7 @@ Quanto tempo o lead esperou um corretor disponível.
 | Campo | Definição |
 |---|---|
 | Fórmula | Mediana de (resolvido_em − entrou_em) da fila; leads entregues direto contam 0. |
-| Fonte | roleta_fila, roleta_distribuicoes |
+| Fonte | roleta_fila_historico (cada passagem: entrou_em → saiu_em, resultado). |
 | Data usada | entrou_em. |
 | Filtros | Empresa, período, roleta, empreendimento. |
 | Deduplicação | Uma espera por passagem pela fila. |
@@ -509,21 +509,21 @@ Quanto tempo cada corretor ficou disponível na roleta (presença real), diferen
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com histórico confiável |
 
-### 🔵 Leads recebidos dentro/fora do horário (`leads_fora_horario`)
+### 🟡 Leads recebidos dentro/fora do horário (`leads_fora_horario`)
 
 Se o lead chegou com a roleta aberta ou fechada.
 
 | Campo | Definição |
 |---|---|
-| Fórmula | Para cada lead, avaliar o expediente da roleta no momento da chegada. |
-| Fonte | leads, roleta_horarios, roleta_excecoes |
+| Fórmula | COUNT(leads com chegada_roleta_aberta = 0) — gravado na PRIMEIRA chegada do lead à roleta. |
+| Fonte | leads.chegada_roleta_aberta / chegada_roleta_id. Motor: relatorio_leads(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, roleta, empreendimento. |
 | Deduplicação | Lead conta uma vez. |
 | Permissão | Escopos acima de corretor. |
-| Dados ausentes / limitações | O horário das roletas não tem versões: mudanças de horário reescrevem o passado. Etapa 2: guardar "roleta aberta?" no momento da chegada. |
+| Dados ausentes / limitações | Só existe para leads que chegaram depois da migração 013 (o horário antigo não tem versões e não é reconstruído). |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Depende do histórico estruturado da Etapa 2 (vale a partir da implantação) |
+| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
 ## Marketing e Campanhas
 
@@ -533,13 +533,13 @@ De onde veio o cliente (origem ORIGINAL). Canal de atendimento (ex.: WhatsApp de
 
 | Campo | Definição |
 |---|---|
-| Fórmula | COUNT(leads) por origem. |
-| Fonte | leads.origem (hoje: Meta Ads, Manual, Importação, Indicação, Outro). Etapa 2: tabela de origens configuráveis por empresa + UTMs. |
+| Fórmula | COUNT(leads) por origem detalhada (configurável por empresa) e por grupo. |
+| Fonte | leads.origem_detalhe_id → lead_origens (Meta Ads, Google Ads, WhatsApp, Telefone, Site...) + UTMs (utm_source/medium/campaign/content/term). Motor: relatorio_leads_por_origem(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Lead conta uma vez. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | Google Ads, Site, Landing page, Telefone etc. hoje caem em "Manual"/"Outro" — não há como separar retroativamente; ficam como "origem não detalhada". |
+| Dados ausentes / limitações | Leads antigos de "Manual"/"Outro" ficam como "Cadastro manual (não detalhado)" / "Outros" — não dá para saber se vieram do Google, do site ou do telefone. |
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
@@ -771,21 +771,21 @@ Desfechos das visitas no período.
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com histórico confiável |
 
-### ⚪ Visitas confirmadas (`visitas_confirmadas`)
+### 🟡 Visitas confirmadas (`visitas_confirmadas`)
 
 Visitas confirmadas com o cliente antes da data.
 
 | Campo | Definição |
 |---|---|
-| Fórmula | Requer o status "confirmada" na agenda. |
-| Fonte | — (não existe hoje). |
+| Fórmula | COUNT(visitas com confirmada_em no período). |
+| Fonte | agenda_compromissos.confirmada_em / confirmada_por (botão "Cliente confirmou"). Motor: relatorio_visitas(). |
 | Data usada | — |
 | Filtros | — |
 | Deduplicação | — |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | A agenda não tem confirmação. Proposta da Etapa 2: status/campo "confirmada_em". Até lá: "não disponível". |
-| Atualização | — |
-| Disponibilidade | Sem dados no sistema — não é calculado |
+| Dados ausentes / limitações | Só existe a partir da migração 013: antes dela nenhuma visita aparece como confirmada (não se reconstrói). |
+| Atualização | Tempo real. |
+| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
 ### 🟢 Taxa de comparecimento (`taxa_comparecimento`)
 
@@ -809,13 +809,13 @@ Vendas concluídas no período.
 
 | Campo | Definição |
 |---|---|
-| Fórmula | Hoje: leads que entraram na etapa de categoria "contrato assinado" no período (pela auditoria de etapas). Etapa 2: registros formais em lead_contratos (fonte oficial quando existir). |
-| Fonte | auditoria lead.etapa_alterada (para=contrato_assinado) e leads.contrato_assinado_em; Etapa 2: lead_contratos. |
+| Fórmula | Venda formal: COUNT(lead_contratos status=validado, assinado_em no período). Separado, como sinal: leads movidos para "Contrato assinado" (lead_etapa_historico). Nunca somados. |
+| Fonte | lead_contratos (registrar → validar → distrato), com corretor e estrutura da data da assinatura. Motor: relatorio_contratos(). |
 | Data usada | Data da assinatura (data da mudança de etapa até existir o registro formal). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. Corretor responsável na data da assinatura. |
 | Deduplicação | Um contrato por lead por entrada na etapa; idas e voltas no Kanban não duplicam. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | LIMITAÇÃO ATUAL: contrato_assinado_em é apagado se o lead sair da etapa. Mover no Kanban não é validação formal: a tela indica "contrato pela etapa do Kanban" até a empresa usar o registro de contrato. |
+| Dados ausentes / limitações | Contratos anteriores ao registro formal não existem como venda validada: aparecem só como sinal da etapa. |
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
@@ -851,21 +851,21 @@ Dos leads com visita realizada, quantos assinaram contrato.
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
-### ⚪ VGV dos contratos (`vgv`)
+### 🟡 VGV dos contratos (`vgv`)
 
 Valor Geral de Vendas dos contratos assinados (não é receita nem lucro).
 
 | Campo | Definição |
 |---|---|
-| Fórmula | SUM(valor do contrato) dos contratos com data no período. |
-| Fonte | Etapa 2: lead_contratos.valor_vgv. |
+| Fórmula | SUM(valor_vgv) dos contratos VALIDADOS com data de assinatura no período. |
+| Fonte | lead_contratos.valor_vgv (opcional). Motor: relatorio_contratos(). |
 | Data usada | Data da assinatura. |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Um valor por contrato. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | Hoje não existe valor de contrato no CRM: "VGV não disponível". |
+| Dados ausentes / limitações | O valor é opcional: o relatório informa "X de Y contratos com valor". Sem nenhum valor → "VGV não disponível". VGV não é receita nem lucro. |
 | Atualização | — |
-| Disponibilidade | Sem dados no sistema — não é calculado |
+| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
 ## Perdas e Redistribuições
 
@@ -901,21 +901,21 @@ Das perdas por inatividade, quantas já foram entregues a outro corretor.
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com histórico confiável |
 
-### 🟡 Tempo até a redistribuição (`tempo_redistribuicao`)
+### 🟢 Tempo até a redistribuição (`tempo_redistribuicao`)
 
 Quanto tempo o lead perdido esperou até ter novo corretor.
 
 | Campo | Definição |
 |---|---|
 | Fórmula | Mediana de (próxima atribuição − data da perda). |
-| Fonte | lead_transferencias + roleta_distribuicoes (origem recuperacao) / lead_atribuicoes |
+| Fonte | lead_atribuicoes: encerrada_em (inatividade) → atribuido_em da próxima atribuição. Motor: relatorio_perdas(). |
 | Data usada | Data da perda. |
 | Filtros | Como "Perdidos por inatividade". |
 | Deduplicação | Uma medida por perda. |
 | Permissão | Indicadores históricos de perdas/transferências usam a estrutura ANTERIOR do lead (rbac_transferencias_scope): o gestor anterior vê só números agregados, nunca o cadastro do lead transferido. |
 | Dados ausentes / limitações | Perdas ainda na fila ficam fora (contadas em "aguardando"). |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟡 Transferências por motivo (`transferencias_motivo`)
 
@@ -923,7 +923,7 @@ Todas as trocas de responsável, separadas por motivo — não são todas perdas
 
 | Campo | Definição |
 |---|---|
-| Fórmula | COUNT(lead_transferencias) por motivo: administrativa, inatividade (redistribuição), mudança de equipe, roleta. Etapa 2 acrescenta: voluntária (corretor devolveu) e oferta ativa. |
+| Fórmula | COUNT(lead_transferencias) por motivo: administrativa, inatividade (redistribuição), mudança de equipe, roleta, voluntária, oferta ativa. |
 | Fonte | lead_transferencias |
 | Data usada | Data da transferência. |
 | Filtros | Empresa, período, estrutura anterior/nova, empreendimento. |

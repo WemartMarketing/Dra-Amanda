@@ -810,6 +810,11 @@ function wa_evento_mensagem(int $empresaId, int $contaId, array $m, ?string $nom
     }
     $mensagemId = (int) $pdo->lastInsertId();
 
+    // Cliente escreveu: contato efetivo (reação e aviso do sistema não contam).
+    if ($leadId && !in_array($tipo, ['reacao', 'sistema'], true)) {
+        historico_registrar_contato_efetivo($leadId, 'whatsapp', $ts);
+    }
+
     // Reação a uma mensagem não abre a janela de 24 h nem conta como não lida.
     if ($tipo !== 'reacao') {
         $pdo->prepare('UPDATE whatsapp_contatos SET ultima_entrada_em = GREATEST(COALESCE(ultima_entrada_em, :ts1), :ts2), atualizado_em = NOW() WHERE id = :id')

@@ -173,7 +173,15 @@ function relatorio_auditoria_dados(int $empresaId): array
     $semCamp = (int) $um("SELECT COUNT(*) FROM leads WHERE empresa_id = :e AND excluido_em IS NULL AND origem = 'meta_ads' AND (campanha IS NULL OR campanha = '')");
     $s['Marketing'][] = relaud_item('Leads do Meta sem nome de campanha', $semCamp, $semCamp ? 'alerta' : 'ok');
     $s['Marketing'][] = relaud_item('Erros nos avisos do Meta (webhook)', (int) $um("SELECT COUNT(*) FROM meta_eventos WHERE empresa_id = :e AND status = 'erro'"));
-    $s['Marketing'][] = relaud_item('UTMs (origem de site/landing page)', 'não existe', 'alerta', 'O cadastro não guarda utm_source/utm_campaign.');
+    if ($tem('lead_origens')) {
+        $comUtm = (int) $um("SELECT COUNT(*) FROM leads WHERE empresa_id = :e AND excluido_em IS NULL AND (utm_source IS NOT NULL OR utm_campaign IS NOT NULL)");
+        $s['Marketing'][] = relaud_item('Leads com UTM informada', $comUtm, 'info', 'Campos UTM existem a partir da migração 013.');
+        $naoDet = (int) $um("SELECT COUNT(*) FROM leads l JOIN lead_origens o ON o.id = l.origem_detalhe_id WHERE l.empresa_id = :e AND l.excluido_em IS NULL AND o.nome IN ('Cadastro manual (não detalhado)', 'Outros')");
+        $totL = (int) $um('SELECT COUNT(*) FROM leads WHERE empresa_id = :e AND excluido_em IS NULL');
+        $s['Marketing'][] = relaud_item('Leads com origem não detalhada', $naoDet, $naoDet ? 'alerta' : 'ok', relaud_pct($naoDet, $totL) . ' dos leads: "Cadastro manual (não detalhado)" ou "Outros".', $totL);
+    } else {
+        $s['Marketing'][] = relaud_item('UTMs (origem de site/landing page)', 'não existe', 'alerta', 'O cadastro não guarda utm_source/utm_campaign (migração 013 pendente).');
+    }
     $s['Marketing'][] = relaud_item('Investimento publicitário', 'não existe', 'alerta', 'Sem lançamentos nem integração: CPL e custos ficam "não disponível".');
     $s['Marketing'][] = relaud_item('Google Ads', 'não integrado', 'info');
 
@@ -192,6 +200,32 @@ function relatorio_auditoria_dados(int $empresaId): array
         $s['WhatsApp e remarketing'][] = relaud_item('Tarifas de mensagem cadastradas', $semTarifa ? 'nenhuma' : 'sim', $semTarifa ? 'alerta' : 'ok', $semTarifa ? 'Custo das mensagens fica "não disponível".' : '');
     } else {
         $s['WhatsApp e remarketing'][] = relaud_item('Módulo WhatsApp', 'migrações 008–010 pendentes', 'alerta');
+    }
+
+    // ---------------------------------------------------------------- Histórico estruturado (Etapa 2)
+    $sec = 'Histórico estruturado (Etapa 2)';
+    if ($tem('lead_atribuicoes')) {
+        $vivo = $um('SELECT MIN(atribuido_em) FROM lead_atribuicoes WHERE empresa_id = :e AND reconstruido = 0');
+        $s[$sec][] = relaud_item('Gravação ao vivo desde', $vivo ? date('d/m/Y H:i', strtotime($vivo)) : 'nenhuma atribuição ainda', 'info');
+        $tot = (int) $um('SELECT COUNT(*) FROM lead_atribuicoes WHERE empresa_id = :e');
+        $rec = (int) $um('SELECT COUNT(*) FROM lead_atribuicoes WHERE empresa_id = :e AND reconstruido = 1');
+        $s[$sec][] = relaud_item('Atribuições registradas', $tot, 'info', $rec . ' reconstruída(s) de registros antigos (' . relaud_pct($rec, $tot) . ').');
+        $desc = (int) $um("SELECT COUNT(*) FROM lead_atribuicoes WHERE empresa_id = :e AND forma = 'desconhecida'");
+        $s[$sec][] = relaud_item('Atribuições sem forma identificada', $desc, $desc ? 'alerta' : 'ok', 'Dono atual sem registro de como recebeu (roleta/transferência/cadastro).');
+        $semEst = (int) $um('SELECT COUNT(*) FROM lead_atribuicoes WHERE empresa_id = :e AND equipe_id IS NULL');
+        $s[$sec][] = relaud_item('Atribuições sem equipe na data', $semEst, $semEst ? 'alerta' : 'ok', 'Não entram nos filtros por equipe/gerente/superintendência.');
+        $semAtr = (int) $um('SELECT COUNT(*) FROM leads l WHERE l.empresa_id = :e AND l.excluido_em IS NULL AND l.responsavel_id IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM lead_atribuicoes a WHERE a.lead_id = l.id AND a.encerrada_em IS NULL)');
+        $s[$sec][] = relaud_item('Leads com dono e sem atribuição aberta', $semAtr, $semAtr ? 'critico' : 'ok', $semAtr ? 'Rode php -q ferramentas/retroalimentar_historico.php' : '');
+        $s[$sec][] = relaud_item('Mudanças de etapa registradas', (int) $um('SELECT COUNT(*) FROM lead_etapa_historico WHERE empresa_id = :e'), 'info',
+            (int) $um("SELECT COUNT(*) FROM lead_etapa_historico WHERE empresa_id = :e AND origem = 'jornada'") . ' feitas por jornadas.');
+        $s[$sec][] = relaud_item('Contratos registrados', (int) $um('SELECT COUNT(*) FROM lead_contratos WHERE empresa_id = :e'), 'info',
+            (int) $um("SELECT COUNT(*) FROM lead_contratos WHERE empresa_id = :e AND status = 'registrado'") . ' aguardando validação.');
+        $sinal = (int) $um("SELECT COUNT(*) FROM leads l WHERE l.empresa_id = :e AND l.excluido_em IS NULL AND l.etapa = 'contrato_assinado'
+            AND NOT EXISTS (SELECT 1 FROM lead_contratos c WHERE c.lead_id = l.id AND c.status <> 'distratado')");
+        $s[$sec][] = relaud_item('Leads em "Contrato assinado" sem contrato registrado', $sinal, $sinal ? 'alerta' : 'ok', 'Não contam como venda validada.');
+    } else {
+        $s[$sec][] = relaud_item('Histórico estruturado', 'migração 013 pendente', 'alerta', 'Relatórios por corretor usariam a carteira atual.');
     }
     return $s;
 }
