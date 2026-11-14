@@ -30,6 +30,8 @@ function auditoria_rotulo_acao(string $acao): string
         'lead.arquivo_enviado' => 'Arquivo anexado ao lead', 'lead.arquivo_excluido' => 'Arquivo do lead excluído',
         'lead.anonimizado' => 'Lead anonimizado (LGPD)', 'lead.dados_titular_exportados' => 'Dados do titular exportados (LGPD)',
         'relatorio.exportado' => 'Relatório exportado',
+        'relatorio.exportacao_solicitada' => 'Exportação grande solicitada',
+        'relatorio.exportacao_baixada' => 'Exportação baixada',
         'roleta.lead_distribuido' => 'Lead entregue pela roleta', 'roleta.lead_em_fila' => 'Lead na fila da roleta',
         'roleta.entrou' => 'Entrou na roleta', 'roleta.saiu' => 'Saiu da roleta', 'roleta.fila_processada' => 'Fila da roleta processada',
         'meta.lead_recebido' => 'Lead recebido do Meta Ads', 'oferta.lista_importada' => 'Planilha de oferta ativa importada',

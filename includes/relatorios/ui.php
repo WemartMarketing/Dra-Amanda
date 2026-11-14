@@ -430,6 +430,51 @@ function relui_somar(array $linhas, array $chaves): array
     return $t;
 }
 
+/**
+ * Botão + diálogo "Exportar" de um relatório (Excel, CSV ou PDF; resumido,
+ * completo ou dados). Leva os mesmos filtros da tela. Só para quem tem
+ * exportar_relatorios.
+ */
+function relui_exportar(string $rel, array $usuario, array $pub): void
+{
+    if (!usuario_tem_permissao($usuario, 'exportar_relatorios')) {
+        return;
+    }
+    require_once __DIR__ . '/exportar.php';
+    $id = 'modal-exportar-rel';
+    ?>
+    <button type="button" class="btn btn-outline" data-open-modal="<?= $id ?>"><?= icon('download') ?>Exportar</button>
+    <div class="modal-overlay" id="<?= $id ?>" hidden>
+        <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="<?= $id ?>-titulo">
+            <button type="button" class="overlay-close" data-close-modal="<?= $id ?>" aria-label="Fechar">&times;</button>
+            <h2 id="<?= $id ?>-titulo">Exportar relatório</h2>
+            <form action="/api/relatorio_exportar.php" method="post" data-exportar-form data-rel-exportar>
+                <?= csrf_field() ?>
+                <input type="hidden" name="r" value="<?= e($rel) ?>">
+                <?php foreach ($pub as $k => $v): foreach ((array) $v as $vv): ?><input type="hidden" name="<?= e($k) . (is_array($v) ? '[]' : '') ?>" value="<?= e((string) $vv) ?>"><?php endforeach; endforeach; ?>
+                <fieldset class="rel-exp-opcoes"><legend>Formato</legend>
+                    <?php foreach (relexp_formatos() as $k => $r): ?>
+                        <label class="radio-row"><input type="radio" name="formato" value="<?= $k ?>" <?= $k === 'xlsx' ? 'checked' : '' ?>> <?= e($r) ?></label>
+                    <?php endforeach; ?>
+                </fieldset>
+                <fieldset class="rel-exp-opcoes"><legend>Conteúdo</legend>
+                    <?php foreach (relexp_niveis() as $k => $r): ?>
+                        <label class="radio-row"><input type="radio" name="nivel" value="<?= $k ?>" <?= $k === 'completo' ? 'checked' : '' ?>> <?= e($r) ?></label>
+                    <?php endforeach; ?>
+                </fieldset>
+                <p class="muted">Leva os mesmos filtros e o mesmo período da tela, com cabeçalho (empresa, filtros, data/hora e fuso). O Excel tem as abas Resumo, Detalhamento e Notas; o CSV leva só a tabela principal; o PDF é o relatório executivo.</p>
+                <div class="lgpd-aviso" role="note" data-lgpd-dados hidden><?= icon('shield') ?><div>
+                    <b>A exportação de dados tem nome de clientes.</b> Telefone e e-mail não saem. Use só para a gestão comercial, não compartilhe fora da empresa e apague o arquivo quando não precisar mais. Fica registrada na auditoria. Arquivos grandes são preparados em segundo plano.
+                    <label class="check-line"><input type="checkbox" name="ciente_lgpd" value="1"> Entendi e vou usar os dados só para a gestão comercial</label>
+                </div></div>
+                <div class="form-alert" data-form-alerta hidden></div>
+                <button type="submit" class="btn btn-primary"><?= icon('download') ?>Gerar arquivo</button>
+            </form>
+        </div>
+    </div>
+    <?php
+}
+
 /** "1 lead", "2 leads". */
 function relui_qtd(int $n, string $um, string $varios): string
 {

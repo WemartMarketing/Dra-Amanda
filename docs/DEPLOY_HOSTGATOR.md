@@ -97,6 +97,7 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 18 | `sql/migration_012_plantoes_navegacao.sql` | Plantões de vendas: CEP, foto, horário, corretores autorizados, rotas (ver `docs/PLANTOES.md`) |
 | 19 | `sql/migration_013_relatorios_historico.sql` | Central de Relatórios — histórico estruturado, contratos, origens/UTM. **Depois dela:** `php -q ferramentas/retroalimentar_historico.php` (ver `docs/RELATORIOS_ETAPA2.md`) |
 | 20 | `sql/migration_014_relatorios_favoritos.sql` | Central de Relatórios — filtros favoritos por usuário (ver `docs/RELATORIOS_ETAPA3.md`) |
+| 21 | `sql/migration_015_relatorios_exportacoes.sql` | Central de Relatórios — exportações grandes em segundo plano (cron) com link temporário (ver `docs/RELATORIOS_ETAPA5.md`) |
 
 - Atualizando um servidor que já funciona: rode, na ordem, só os arquivos
   que ainda não rodou. Ex.: quem já rodou até o 17 roda apenas o **18**.

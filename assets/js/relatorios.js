@@ -50,3 +50,25 @@
         });
     });
 })();
+
+/* Exportar: o aviso da LGPD aparece (e é obrigatório) só na exportação de dados; PDF não serve para dados. */
+(function () {
+    'use strict';
+    document.querySelectorAll('form[data-rel-exportar]').forEach(function (form) {
+        var aviso = form.querySelector('[data-lgpd-dados]');
+        var ciente = form.querySelector('input[name="ciente_lgpd"]');
+        var pdf = form.querySelector('input[name="formato"][value="pdf"]');
+        function atualizar() {
+            var nivel = (form.querySelector('input[name="nivel"]:checked') || {}).value;
+            var dados = nivel === 'dados';
+            aviso.hidden = !dados;
+            ciente.required = dados;
+            if (pdf) {
+                pdf.disabled = dados;
+                if (dados && pdf.checked) form.querySelector('input[name="formato"][value="xlsx"]').checked = true;
+            }
+        }
+        form.addEventListener('change', atualizar);
+        atualizar();
+    });
+})();

@@ -49,9 +49,10 @@ require __DIR__ . '/../includes/layout_start.php';
         <h1><?= e($titulo) ?></h1>
         <p><?= e($descricao) ?></p>
     </div>
-    <?php if (!$ehCorretor): ?>
-        <div class="actions"><a class="btn btn-outline" href="/pages/relatorios_central.php"><?= icon('list') ?>Todos os relatórios</a></div>
-    <?php endif; ?>
+    <div class="actions">
+        <?php relui_exportar($rel, $usuario, $pub); ?>
+        <?php if (!$ehCorretor): ?><a class="btn btn-outline" href="/pages/relatorios_central.php"><?= icon('list') ?>Todos os relatórios</a><?php endif; ?>
+    </div>
 </div>
 
 <?php

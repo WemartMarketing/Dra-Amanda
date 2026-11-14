@@ -76,6 +76,10 @@ try {
         $r = automacao_executar(200);
         return $r['executadas'] . ' tarefa(s), ' . $r['ok'] . ' ok, ' . $r['reagendadas'] . ' reagendada(s), ' . $r['falhas'] . ' falha(s), ' . $r['travadas_retomadas'] . ' retomada(s)';
     });
+    $etapa('exportações', function () {
+        require_once __DIR__ . '/../includes/relatorios/fila_exportacao.php';
+        return relexp_processar_fila(3);
+    });
     fwrite(STDOUT, '[' . date('Y-m-d H:i:s') . '] ' . implode(' · ', $log) . "\n");
 } finally {
     $pdo->query("SELECT RELEASE_LOCK('wemart_fila')");

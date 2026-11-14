@@ -9,6 +9,7 @@ require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/relatorios/ui.php';
 require_once __DIR__ . '/../includes/relatorios/indicadores.php';
+require_once __DIR__ . '/../includes/relatorios/fila_exportacao.php';
 
 $usuario = auth_require();
 if (!empty($usuario['eh_superadmin'])) {
@@ -87,4 +88,28 @@ require __DIR__ . '/../includes/layout_start.php';
         </section>
     <?php endforeach; ?>
 </div>
+
+<?php $minhas = usuario_tem_permissao($usuario, 'exportar_relatorios') ? relexp_minhas($usuario) : []; if ($minhas): ?>
+<section class="card rel-exportacoes" id="minhas-exportacoes" aria-labelledby="minhas-exp-titulo">
+    <div class="card-head"><div><h2 id="minhas-exp-titulo">Minhas exportações</h2><p>Arquivos grandes preparados em segundo plano. Cada link vale 24 h e só funciona para você.</p></div>
+        <a class="btn btn-outline btn-sm" href="?#minhas-exportacoes">Atualizar</a></div>
+    <div class="table-wrap"><table class="report-table">
+        <thead><tr><th scope="col">Pedido em</th><th scope="col">Relatório</th><th scope="col">Formato</th><th scope="col">Situação</th><th scope="col" class="num">Linhas</th><th scope="col"></th></tr></thead>
+        <tbody>
+        <?php foreach ($minhas as $x):
+            $sit = ['pendente' => ['Na fila', 'pill-muted'], 'gerando' => ['Gerando…', 'pill-blue'], 'pronto' => ['Pronto', 'pill-green'], 'erro' => ['Erro', 'pill-red'], 'expirado' => ['Expirado', 'pill-muted']][$x['status']]; ?>
+            <tr>
+                <td data-rotulo="Pedido em"><?= date('d/m/Y H:i', strtotime($x['criado_em'])) ?></td>
+                <td data-rotulo="Relatório"><?= e(relui_relatorios()[$x['relatorio']][0] ?? $x['relatorio']) ?><?= $x['nivel'] === 'dados' ? ' (dados)' : '' ?></td>
+                <td data-rotulo="Formato"><?= e(strtoupper($x['formato'])) ?></td>
+                <td data-rotulo="Situação"><span class="pill <?= $sit[1] ?>"><?= e($sit[0]) ?></span><?php if ($x['status'] === 'erro' && $x['erro']): ?> <small class="muted"><?= e($x['erro']) ?></small><?php endif; ?>
+                    <?php if ($x['status'] === 'pronto'): ?> <small class="muted">até <?= date('d/m H:i', strtotime($x['expira_em'])) ?></small><?php endif; ?></td>
+                <td class="num" data-rotulo="Linhas"><?= $x['linhas'] !== null ? dash_num($x['linhas']) : '—' ?></td>
+                <td><?php if ($x['status'] === 'pronto' && strtotime($x['expira_em']) > time()): ?><a class="btn btn-primary btn-sm" href="<?= e(relexp_link($x)) ?>"><?= icon('download') ?>Baixar</a><?php endif; ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table></div>
+</section>
+<?php endif; ?>
 <?php require __DIR__ . '/../includes/layout_end.php'; ?>

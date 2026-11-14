@@ -111,7 +111,7 @@ movimentação, coortes, tempo por etapa, avanços/retrocessos), Visitas e Venda
 WhatsApp e Remarketing (mensagens × pessoas, respostas, depois da campanha),
 Perdas e Redistribuições (por motivo, estrutura anterior, destino, tempo).
 
-### Etapa 5 — Exportações
+### Etapa 5 — Exportações ✅ concluída (ver `docs/RELATORIOS_ETAPA5.md`)
 - **Excel (.xlsx real)**: o gerador nativo do sistema (ZipArchive, já usado)
   ampliado para várias abas (Resumo, Detalhamento, Notas), cabeçalho com
   empresa, período, filtros, data/hora e fuso; datas e números tipados;

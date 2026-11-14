@@ -873,6 +873,8 @@ function wmToast(msg, persistir) {
                 var tipo = r.headers.get('Content-Type') || '';
                 if (!r.ok || tipo.indexOf('application/json') === 0) {
                     var j = await r.json().catch(function () { return {}; });
+                    // Arquivo grande: preparado em segundo plano (Central de Relatórios).
+                    if (r.ok && j.ok && j.fila) { wmToast(j.mensagem || 'Arquivo em preparo.'); fecharModal(form); return; }
                     throw new Error(j.erro || 'Não foi possível gerar o arquivo (' + r.status + ').');
                 }
                 var nome = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);

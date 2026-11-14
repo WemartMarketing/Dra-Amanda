@@ -24,3 +24,5 @@
 # Backups do banco (cron/backup.php) e temporários de importação: só no servidor
 /storage/backups/
 /storage/importacoes/
+/storage/exportacoes/*
+!/storage/exportacoes/.gitkeep
