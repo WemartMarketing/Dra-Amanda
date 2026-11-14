@@ -1802,3 +1802,80 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 @media (max-width: 640px) {
     .contrato-card .card-head > .btn, #origens .card-head > .btn { width: 100%; justify-content: center; }
 }
+
+/* ===================== Central de Relatórios (Etapa 3) ===================== */
+.rel-filtros { background: var(--surface, #fff); border-radius: var(--radius, 16px); box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 12px; }
+.rel-filtros-linha { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; }
+.rel-campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #4b5570; min-width: 0; }
+.rel-campo .select-filter { min-width: 150px; max-width: 230px; }
+.rel-datas { display: flex; gap: 10px; }
+.rel-filtros-acoes { display: flex; gap: 8px; margin-left: auto; }
+.rel-aplicados { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 18px; font-size: 13px; }
+.rel-aplicados-rot { font-weight: 700; color: #4b5570; }
+.rel-aplicados .pill svg { width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; }
+.rel-chip { text-decoration: none; }
+.rel-chip:hover { background: #e3e6f0; }
+.rel-favoritos { margin-left: auto; display: inline-flex; gap: 8px; align-items: center; position: relative; }
+.rel-fav-menu summary { list-style: none; cursor: pointer; }
+.rel-fav-menu summary::-webkit-details-marker { display: none; }
+.rel-fav-menu ul { position: absolute; right: 0; top: 42px; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); list-style: none; margin: 0; padding: 6px; min-width: 240px; }
+.rel-fav-menu li { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; }
+.rel-fav-menu li:hover { background: #f5f6fb; }
+.rel-fav-menu li a { font-weight: 700; color: var(--ink); }
+.rel-comparacao { margin: -6px 0 14px; color: #6b758b; font-size: 13px; }
+.rel-nota { display: flex; gap: 10px; align-items: flex-start; background: #eef3ff; color: #2f4a8a; border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+.rel-nota svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.rel-seg { margin-bottom: 12px; flex-wrap: wrap; }
+.rel-linha { position: relative; margin: 6px 0 0; }
+.rel-linha svg { width: 100%; height: 240px; display: block; overflow: visible; }
+.rel-grade { stroke: #eef0f6; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.rel-base { stroke: #c9cfdc; }
+.rel-eixo { font-size: 11px; fill: #8893a4; }
+.rel-area { fill: var(--accent, #635bfa); opacity: .10; }
+.rel-traco { fill: none; stroke: var(--accent, #635bfa); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.rel-mira { stroke: #8893a4; stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.rel-ponto { fill: var(--accent, #635bfa); stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.rel-alvo { fill: transparent; cursor: crosshair; outline: none; }
+.rel-alvo:focus-visible { stroke: var(--accent, #635bfa); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.rel-dica { position: absolute; top: 4px; pointer-events: none; background: #151a2d; color: #fff; border-radius: 10px; padding: 7px 11px; font-size: 12.5px; white-space: nowrap; transform: translateX(-50%); box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.rel-dica b { font-size: 15px; display: block; }
+.rel-lista { margin: 0; display: grid; gap: 2px; }
+.rel-lista > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rel-lista dt { color: #4b5570; }
+.rel-lista dd { margin: 0; font-weight: 800; }
+.rel-lista-sinal dt, .rel-lista-sinal dd { color: #8893a4; font-weight: 600; }
+.rel-subtitulo { display: flex; align-items: center; gap: 8px; font-size: 20px; margin: 4px 0 14px; }
+.rel-subtitulo svg { width: 20px; height: 20px; color: var(--accent); }
+.kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.rel-criterio { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 14px; font-size: 13px; }
+.rel-criterio label { font-weight: 700; color: #4b5570; }
+.rel-destaque { background: #f5f4ff; }
+.rel-melhor { background: #e5f7ed; color: #146c47; font-weight: 800; }
+.rel-rodape { font-size: 12.5px; margin-top: 10px; }
+.rel-emp-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 16px; margin-bottom: 12px; }
+.rel-central { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+.rel-cat { margin: 0; }
+.rel-cat-topo { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rel-cat-topo h2 { margin: 0; font-size: 16.5px; }
+.rel-cat-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rel-cat-lista a, .rel-cat-breve { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.rel-cat-lista a:hover { border-color: var(--accent); background: #f8f7ff; }
+.rel-cat-lista span { font-size: 12.5px; color: #8893a4; font-weight: 400; }
+.rel-cat-breve { background: #fafbfd; color: #8893a4; }
+.rel-cat-breve b .pill { margin-left: 6px; }
+@media (max-width: 1100px) { .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+    .rel-filtros-linha { flex-direction: column; align-items: stretch; }
+    .rel-campo .select-filter { max-width: none; width: 100%; }
+    .rel-datas { flex-direction: column; }
+    .rel-filtros-acoes { margin-left: 0; }
+    .rel-filtros-acoes .btn { flex: 1; justify-content: center; }
+    .rel-favoritos { margin-left: 0; }
+    .rel-linha svg { height: 200px; }
+    .kpi-grid-4 { grid-template-columns: 1fr 1fr; }
+    .rel-central { grid-template-columns: 1fr; }
+}
+.rel-datas[hidden], .rel-mira[hidden], .rel-ponto[hidden] { display: none; }
+.rel-comparar tbody th.nome { text-align: left; font-weight: 700; }
+.rel-marca { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--accent, #635bfa); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--accent, #635bfa); pointer-events: none; }
+.rel-marca[hidden] { display: none; }

@@ -95,7 +95,7 @@ Migração 013 (não destrutiva):
   indicador implementado conforme o dicionário, com testes por consulta
   independente.
 
-### Etapa 3 — Central de Relatórios (dashboards)
+### Etapa 3 — Central de Relatórios (dashboards) ✅ concluída (ver `docs/RELATORIOS_ETAPA3.md`)
 Menu **Relatórios** com as 10 categorias; fluxo *escolher relatório → filtros
 → resultado → exportar*; Visão Executiva (com comparação de períodos só com
 base válida), Corretor (individual com evolução diária/semanal/mensal),

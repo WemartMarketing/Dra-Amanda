@@ -429,19 +429,36 @@ function relatorio_leads_por_origem(array $usuario, array $f): array
 
 // ===================================================================== Corretores (atribuições)
 
-/**
- * Uma linha por corretor com o que ele RECEBEU no período (pela data da
- * atribuição, com a estrutura daquela data) e o que fez nessas atribuições.
- * Mudança de equipe não conta como recebimento.
- */
-function relatorio_corretores(array $usuario, array $f): array
+/** Agrupamentos de atribuições: chave => [coluna em lead_atribuicoes/lead_contratos, rótulo, tabela do nome]. */
+function relatorio_agrupamentos(): array
 {
-    if ($f['vazio'] || !empty($f['erro']) || !historico_instalado()) {
+    return [
+        'corretor' => ['usuario_id', 'Corretor', 'usuarios'],
+        'equipe' => ['equipe_id', 'Equipe', 'equipes'],
+        'gerente' => ['gerente_id', 'Gerente', 'usuarios'],
+        'superintendencia' => ['superintendencia_id', 'Superintendência', 'superintendencias'],
+        'empreendimento' => ['empreendimento_id', 'Empreendimento', 'empreendimentos'],
+    ];
+}
+
+/**
+ * Uma linha por grupo (corretor, equipe, gerente, superintendência ou
+ * empreendimento) com o que foi RECEBIDO no período — pela data da
+ * atribuição e pela estrutura daquela data — e o que foi feito nessas
+ * atribuições, mais os contratos validados do grupo (data da assinatura).
+ * Mudança de equipe não conta como recebimento. Grupo vazio (ex.: sem equipe
+ * registrada) vira uma linha "Sem ... registrado(a)" com id null.
+ */
+function relatorio_agrupado(array $usuario, array $f, string $dim): array
+{
+    $ag = relatorio_agrupamentos()[$dim] ?? null;
+    if (!$ag || $f['vazio'] || !empty($f['erro']) || !historico_instalado()) {
         return [];
     }
+    [$col, $rotulo, $tabela] = $ag;
     [$w, $p] = motor_where_atribuicoes($usuario, $f);
     $p += ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim'], 'ini2' => $f['periodo']['ini'], 'fim2' => $f['periodo']['fim']];
-    $stmt = db()->prepare("SELECT a.usuario_id, u.nome,
+    $stmt = db()->prepare("SELECT a.{$col} AS id, n.nome,
             COUNT(*) AS recebimentos,
             COUNT(DISTINCT a.lead_id) AS leads_recebidos,
             SUM(a.forma = 'roleta') AS pela_roleta,
@@ -451,30 +468,247 @@ function relatorio_corretores(array $usuario, array $f): array
             COUNT(DISTINCT CASE WHEN a.primeiro_contato_efetivo_em IS NOT NULL THEN a.lead_id END) AS contato_efetivo,
             COALESCE(SUM(a.motivo_encerramento <=> 'inatividade' AND COALESCE(a.encerrada_em BETWEEN :ini2 AND :fim2, 0)), 0) AS perdidos_inatividade,
             SUM(a.reconstruido) AS reconstruidas
-        FROM lead_atribuicoes a JOIN leads l ON l.id = a.lead_id JOIN usuarios u ON u.id = a.usuario_id
+        FROM lead_atribuicoes a JOIN leads l ON l.id = a.lead_id LEFT JOIN {$tabela} n ON n.id = a.{$col}
         WHERE {$w} AND a.forma <> 'mudanca_equipe' AND a.atribuido_em BETWEEN :ini AND :fim
-        GROUP BY a.usuario_id, u.nome ORDER BY leads_recebidos DESC, u.nome");
+        GROUP BY a.{$col}, n.nome ORDER BY leads_recebidos DESC, n.nome");
     $stmt->execute($p);
     $linhas = [];
     foreach ($stmt->fetchAll() as $r) {
         $r = array_map(fn ($v) => is_numeric($v) ? (int) $v : $v, $r);
+        $r['id'] = $r['id'] === null ? null : (int) $r['id'];
+        $r['nome'] = $r['nome'] ?? ('Sem ' . mb_strtolower($rotulo) . ' registrado(a)');
         $r['taxa_atendimento'] = motor_taxa($r['atendidos'], $r['leads_recebidos']);
         $r['taxa_contato_efetivo'] = motor_taxa($r['contato_efetivo'], $r['leads_recebidos']);
-        $linhas[] = $r;
+        $linhas[(string) $r['id']] = $r;
     }
-    // Tempo até o 1º atendimento por corretor (mediana, minutos).
-    $stmt = db()->prepare("SELECT a.usuario_id, TIMESTAMPDIFF(MINUTE, a.atribuido_em, a.primeiro_atendimento_em) AS m
+    // Tempo até o 1º atendimento (mediana, minutos) por grupo.
+    $stmt = db()->prepare("SELECT a.{$col} AS id, TIMESTAMPDIFF(MINUTE, a.atribuido_em, a.primeiro_atendimento_em) AS m
         FROM lead_atribuicoes a JOIN leads l ON l.id = a.lead_id
         WHERE {$w} AND a.forma <> 'mudanca_equipe' AND a.atribuido_em BETWEEN :ini AND :fim AND a.primeiro_atendimento_em IS NOT NULL");
     $stmt->execute(array_diff_key($p, ['ini2' => 1, 'fim2' => 1]));
-    $porU = [];
+    $tempos = [];
     foreach ($stmt->fetchAll() as $t) {
-        $porU[(int) $t['usuario_id']][] = (int) $t['m'];
+        $tempos[(string) $t['id']][] = (int) $t['m'];
     }
-    foreach ($linhas as &$l) {
-        $l['tempo_primeiro_atendimento_min'] = motor_mediana($porU[$l['usuario_id']] ?? []);
+    // Contratos validados do grupo (estrutura gravada no contrato).
+    $contratos = [];
+    if (modulo_tabela_existe('lead_contratos')) {
+        [$wc, $pc] = motor_where_contratos($usuario, $f);
+        $stmt = db()->prepare("SELECT c.{$col} AS id, n.nome, COUNT(*) AS contratos, SUM(c.valor_vgv) AS vgv, SUM(c.valor_vgv IS NOT NULL) AS com_valor
+            FROM lead_contratos c JOIN leads l ON l.id = c.lead_id LEFT JOIN {$tabela} n ON n.id = c.{$col}
+            WHERE {$wc} AND c.status = 'validado' AND c.assinado_em BETWEEN :ci AND :cf GROUP BY c.{$col}, n.nome");
+        $stmt->execute($pc + ['ci' => substr($f['periodo']['ini'], 0, 10), 'cf' => substr($f['periodo']['fim'], 0, 10)]);
+        foreach ($stmt->fetchAll() as $c) {
+            $contratos[(string) $c['id']] = $c;
+        }
     }
-    return $linhas;
+    $vazia = ['recebimentos' => 0, 'leads_recebidos' => 0, 'pela_roleta' => 0, 'por_redistribuicao' => 0, 'outras_formas' => 0, 'atendidos' => 0,
+              'contato_efetivo' => 0, 'perdidos_inatividade' => 0, 'reconstruidas' => 0, 'taxa_atendimento' => null, 'taxa_contato_efetivo' => null];
+    foreach ($contratos as $k => $c) {
+        if (!isset($linhas[$k])) { // vendeu no período sem ter recebido lead no período
+            $linhas[$k] = ['id' => $c['id'] === null ? null : (int) $c['id'], 'nome' => $c['nome'] ?? ('Sem ' . mb_strtolower($rotulo) . ' registrado(a)')] + $vazia;
+        }
+    }
+    foreach ($linhas as $k => &$l) {
+        $l['tempo_primeiro_atendimento_min'] = motor_mediana($tempos[$k] ?? []);
+        $l['contratos_validados'] = (int) ($contratos[$k]['contratos'] ?? 0);
+        $l['vgv'] = !empty($contratos[$k]['com_valor']) ? (float) $contratos[$k]['vgv'] : null;
+        $l['vgv_contratos_com_valor'] = (int) ($contratos[$k]['com_valor'] ?? 0);
+        if ($dim === 'corretor') {
+            $l['usuario_id'] = $l['id'];
+        }
+    }
+    unset($l);
+    return array_values($linhas);
+}
+
+/** Compatibilidade: uma linha por corretor (ver relatorio_agrupado). */
+function relatorio_corretores(array $usuario, array $f): array
+{
+    return relatorio_agrupado($usuario, $f, 'corretor');
+}
+
+/** Critérios de ranking: chave => [rótulo, menor_e_melhor, exige_base_minima]. */
+function relatorio_criterios_ranking(): array
+{
+    return [
+        'leads_recebidos' => ['Leads recebidos', false, false],
+        'atendidos' => ['Leads atendidos', false, false],
+        'taxa_atendimento' => ['Taxa de atendimento', false, true],
+        'taxa_contato_efetivo' => ['Taxa de contato efetivo', false, true],
+        'tempo_primeiro_atendimento_min' => ['Tempo até o 1º atendimento (menor é melhor)', true, true],
+        'contratos_validados' => ['Contratos validados', false, false],
+        'vgv' => ['VGV de contratos validados', false, false],
+    ];
+}
+
+/**
+ * Ordena as linhas pelo critério ESCOLHIDO (nunca um "índice" escondido).
+ * Taxas e tempos só entram com pelo menos $baseMinima leads recebidos — com
+ * 1 lead, 100% não é comparável a 40% em 50 leads. Empates dividem a posição.
+ * Retorna ['ranking' => linhas com 'posicao', 'sem_base' => linhas fora do ranking].
+ */
+function relatorio_ranking(array $linhas, string $criterio, int $baseMinima = 5): array
+{
+    $c = relatorio_criterios_ranking()[$criterio] ?? null;
+    if (!$c) {
+        return ['ranking' => [], 'sem_base' => $linhas];
+    }
+    [, $menor, $exigeBase] = $c;
+    $dentro = [];
+    $fora = [];
+    foreach ($linhas as $l) {
+        $v = $l[$criterio] ?? null;
+        if ($v === null || ($exigeBase && ($l['leads_recebidos'] ?? 0) < $baseMinima)) {
+            $fora[] = $l;
+        } else {
+            $dentro[] = $l;
+        }
+    }
+    usort($dentro, fn ($a, $b) => ($menor ? $a[$criterio] <=> $b[$criterio] : $b[$criterio] <=> $a[$criterio]) ?: strcmp((string) $a['nome'], (string) $b['nome']));
+    $pos = 0;
+    $ant = null;
+    foreach ($dentro as $i => &$l) {
+        if ($ant === null || $l[$criterio] != $ant) {
+            $pos = $i + 1;
+            $ant = $l[$criterio];
+        }
+        $l['posicao'] = $pos;
+    }
+    unset($l);
+    return ['ranking' => $dentro, 'sem_base' => $fora];
+}
+
+// ===================================================================== Séries no tempo
+
+function relatorio_granularidades(): array
+{
+    return ['dia' => 'Por dia', 'semana' => 'Por semana', 'mes' => 'Por mês'];
+}
+
+/** Granularidade padrão pelo tamanho do período. */
+function relatorio_granularidade_padrao(array $periodo): string
+{
+    $dias = $periodo['dias'] ?? 30;
+    return $dias <= 45 ? 'dia' : ($dias <= 200 ? 'semana' : 'mes');
+}
+
+/** Métricas de evolução: chave => rótulo. Cada uma pela data do PRÓPRIO evento. */
+function relatorio_metricas_serie(): array
+{
+    return [
+        'leads_recebidos' => 'Leads recebidos (data de entrada)',
+        'recebimentos' => 'Leads entregues a corretores (data da atribuição)',
+        'contatos_efetivos' => 'Contatos efetivos (data do contato)',
+        'visitas_realizadas' => 'Visitas realizadas (data da visita)',
+        'contratos_validados' => 'Contratos validados (data da assinatura)',
+    ];
+}
+
+/**
+ * Série no tempo de uma métrica, com todos os intervalos do período (zeros
+ * explícitos). Retorna [['chave','rotulo','ini','total'], ...].
+ */
+function relatorio_serie(array $usuario, array $f, string $metrica, ?string $gran = null): array
+{
+    $gran = isset(relatorio_granularidades()[$gran ?? '']) ? $gran : relatorio_granularidade_padrao($f['periodo']);
+    $baldes = relatorio_baldes($f['periodo'], $gran);
+    if ($f['vazio'] || !empty($f['erro']) || !isset(relatorio_metricas_serie()[$metrica])) {
+        return array_values($baldes);
+    }
+    $per = ['ini' => $f['periodo']['ini'], 'fim' => $f['periodo']['fim']];
+    $h = historico_instalado();
+    switch ($metrica) {
+        case 'leads_recebidos':
+            [$w, $p] = motor_where_leads($usuario, $f);
+            $sql = "SELECT DATE(leads.criado_em) AS d, COUNT(*) AS n FROM leads WHERE {$w} AND leads.criado_em BETWEEN :ini AND :fim GROUP BY d";
+            break;
+        case 'recebimentos':
+            if (!$h) {
+                return array_values($baldes);
+            }
+            [$w, $p] = motor_where_atribuicoes($usuario, $f);
+            $sql = "SELECT DATE(a.atribuido_em) AS d, COUNT(*) AS n FROM lead_atribuicoes a JOIN leads l ON l.id = a.lead_id
+                    WHERE {$w} AND a.forma <> 'mudanca_equipe' AND a.atribuido_em BETWEEN :ini AND :fim GROUP BY d";
+            break;
+        case 'contatos_efetivos':
+            if (!$h) {
+                return array_values($baldes);
+            }
+            [$w, $p] = motor_where_atribuicoes($usuario, $f);
+            $sql = "SELECT DATE(a.primeiro_contato_efetivo_em) AS d, COUNT(DISTINCT a.lead_id) AS n FROM lead_atribuicoes a JOIN leads l ON l.id = a.lead_id
+                    WHERE {$w} AND a.primeiro_contato_efetivo_em BETWEEN :ini AND :fim GROUP BY d";
+            break;
+        case 'visitas_realizadas':
+            [$w, $p] = motor_where_leads($usuario, $f);
+            $sql = "SELECT DATE(ag.concluido_em) AS d, COUNT(*) AS n FROM agenda_compromissos ag JOIN leads ON leads.id = ag.lead_id
+                    WHERE ag.tipo = 'visita' AND ag.status = 'realizado' AND {$w} AND ag.concluido_em BETWEEN :ini AND :fim GROUP BY d";
+            break;
+        default: // contratos_validados
+            if (!modulo_tabela_existe('lead_contratos')) {
+                return array_values($baldes);
+            }
+            [$w, $p] = motor_where_contratos($usuario, $f);
+            $sql = "SELECT c.assinado_em AS d, COUNT(*) AS n FROM lead_contratos c JOIN leads l ON l.id = c.lead_id
+                    WHERE {$w} AND c.status = 'validado' AND c.assinado_em BETWEEN :ini AND :fim GROUP BY d";
+            $per = ['ini' => substr($per['ini'], 0, 10), 'fim' => substr($per['fim'], 0, 10)];
+    }
+    $stmt = db()->prepare($sql);
+    $stmt->execute($p + $per);
+    foreach ($stmt->fetchAll() as $r) {
+        $k = relatorio_balde_chave((string) $r['d'], $gran);
+        if (isset($baldes[$k])) {
+            $baldes[$k]['total'] += (int) $r['n'];
+        }
+    }
+    return array_values($baldes);
+}
+
+function relatorio_balde_chave(string $data, string $gran): string
+{
+    $d = new DateTimeImmutable(substr($data, 0, 10));
+    if ($gran === 'semana') {
+        return $d->modify('monday this week')->format('Y-m-d');
+    }
+    return $gran === 'mes' ? $d->format('Y-m') : $d->format('Y-m-d');
+}
+
+/** Intervalos vazios do período (semana começa na segunda; o 1º e o último podem ser parciais). */
+function relatorio_baldes(array $periodo, string $gran): array
+{
+    $ini = new DateTimeImmutable(substr($periodo['ini'] ?? date('Y-m-d'), 0, 10));
+    $fim = new DateTimeImmutable(substr($periodo['fim'] ?? date('Y-m-d'), 0, 10));
+    $meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    $b = [];
+    for ($d = $ini; $d <= $fim; $d = $d->modify('+1 day')) {
+        $k = relatorio_balde_chave($d->format('Y-m-d'), $gran);
+        if (isset($b[$k])) {
+            continue;
+        }
+        $rot = $gran === 'mes' ? $meses[(int) $d->format('n') - 1] . '/' . $d->format('y') : ($gran === 'semana' ? 'sem. ' . (new DateTimeImmutable($k))->format('d/m') : $d->format('d/m'));
+        $b[$k] = ['chave' => $k, 'rotulo' => $rot, 'ini' => $gran === 'semana' ? max($k, $ini->format('Y-m-d')) : $d->format('Y-m-d'), 'total' => 0];
+        if (count($b) > 400) {
+            break;
+        }
+    }
+    return $b;
+}
+
+/** Visitas de UM corretor (quem conduziu a visita), no escopo de agenda de quem vê. */
+function relatorio_visitas_do_corretor(array $usuario, array $f, int $corretorId): array
+{
+    if ($f['vazio'] || !empty($f['erro'])) {
+        return ['realizadas' => 0, 'ausentes' => 0, 'agendadas' => 0];
+    }
+    $s = rbac_agenda_scope($usuario);
+    $stmt = db()->prepare("SELECT
+            COALESCE(SUM(ag.status = 'realizado' AND COALESCE(ag.concluido_em BETWEEN :i1 AND :f1, 0)), 0) AS realizadas,
+            COALESCE(SUM(ag.status = 'cliente_ausente' AND COALESCE(ag.concluido_em BETWEEN :i2 AND :f2, 0)), 0) AS ausentes,
+            COALESCE(SUM(ag.criado_em BETWEEN :i3 AND :f3 AND ag.reagendado_de IS NULL), 0) AS agendadas
+        FROM agenda_compromissos ag WHERE ag.tipo = 'visita' AND ag.usuario_id = :vc AND {$s['sql']}");
+    $per = $f['periodo'];
+    $stmt->execute($s['params'] + ['vc' => $corretorId, 'i1' => $per['ini'], 'f1' => $per['fim'], 'i2' => $per['ini'], 'f2' => $per['fim'], 'i3' => $per['ini'], 'f3' => $per['fim']]);
+    return array_map('intval', $stmt->fetch());
 }
 
 /** Perdas por inatividade no período, pela estrutura de QUEM perdeu (encerramento da atribuição). */
