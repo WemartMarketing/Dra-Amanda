@@ -1,94 +1,39 @@
 <?php
 /**
- * POST /api/plantao_salvar.php
- *   { id?, nome, endereco, bairro, cidade, estado, latitude, longitude,
- *     raio_metros, ativo?, empreendimentos[] }
- * Permissão: gerenciar_plantoes. Sem exclusão física (roletas apontam
- * para o plantão); desativar com "ativo".
+ * POST /api/plantao_salvar.php (multipart)
+ *   { id?, nome, endereco, cep, complemento, bairro, cidade, estado, latitude, longitude,
+ *     raio_metros, horario_descricao, observacoes, ativo?, empreendimentos[], roletas[],
+ *     usuarios[], foto (arquivo opcional), remover_foto? }
+ * Permissão: gerenciar_plantoes. Sem exclusão física (roletas e histórico
+ * apontam para o plantão); desativar com "ativo". Regras em includes/plantoes.php.
  */
 require_once __DIR__ . '/../includes/api.php';
-require_once __DIR__ . '/../includes/estrutura.php';
+require_once __DIR__ . '/../includes/plantoes.php';
 
 $usuario = api_iniciar('gerenciar_plantoes');
-$empresaId = (int) $usuario['empresa_ativa_id'];
-$id = (int) ($_POST['id'] ?? 0);
-
-if ($id && !api_registro_da_empresa('plantoes', $id, $empresaId)) {
-    api_erro('Plantão não encontrado.', 404);
+if (!plantao_modulo_ok()) {
+    api_erro('Atualização do banco pendente: rode a migração 012 (plantões).', 409);
 }
+$id = (int) ($_POST['id'] ?? 0) ?: null;
 
-$nome = api_texto($_POST['nome'] ?? null);
-if ($nome === null) {
-    api_erro('Informe o nome do plantão.', 422);
+$foto = null;   // null = manter
+$upload = empreendimento_salvar_imagem('foto', PLANTAO_FOTO_DIR);
+if (!$upload['ok']) {
+    api_erro($upload['erro'], 422);
 }
-$estado = strtoupper(trim((string) ($_POST['estado'] ?? '')));
-if ($estado !== '' && !in_array($estado, estados_brasil(), true)) {
-    api_erro('Estado inválido.', 422);
+if ($upload['arquivo']) {
+    $foto = $upload['arquivo'];
+} elseif (!empty($_POST['remover_foto'])) {
+    $foto = '';
 }
-
-/** Aceita vírgula decimal (padrão brasileiro) e valida a faixa. */
-function coordenada(?string $valor, float $limite): ?float
-{
-    $valor = str_replace(',', '.', trim((string) $valor));
-    if ($valor === '') {
-        return null;
+$r = plantao_salvar($usuario, $id, $_POST, $foto);
+if (!$r['ok']) {
+    if ($upload['arquivo']) {
+        @unlink(PLANTAO_FOTO_DIR . '/' . $upload['arquivo']);
     }
-    if (!is_numeric($valor) || abs((float) $valor) > $limite) {
-        return NAN;
-    }
-    return round((float) $valor, 7);
+    api_erro($r['erro'], $r['erro'] === 'Plantão não encontrado.' ? 404 : 422);
 }
-$latitude = coordenada($_POST['latitude'] ?? null, 90);
-$longitude = coordenada($_POST['longitude'] ?? null, 180);
-if (is_float($latitude) && is_nan($latitude) || is_float($longitude) && is_nan($longitude)) {
-    api_erro('Coordenadas inválidas. Use o formato -23.5505 / -46.6333.', 422);
+if ($foto !== null && $r['foto_anterior'] && $r['foto_anterior'] !== $foto && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp)$/', $r['foto_anterior'])) {
+    @unlink(PLANTAO_FOTO_DIR . '/' . $r['foto_anterior']);
 }
-if (($latitude === null) !== ($longitude === null)) {
-    api_erro('Informe latitude e longitude juntas (ou deixe as duas vazias).', 422);
-}
-
-$raio = (int) ($_POST['raio_metros'] ?? 300);
-if ($raio < 50 || $raio > 5000) {
-    api_erro('O raio deve ficar entre 50 e 5.000 metros.', 422);
-}
-
-$empreendimentos = api_ids_da_empresa('empreendimentos', $_POST['empreendimentos'] ?? [], $empresaId);
-
-$dados = [
-    'nome'        => $nome,
-    'endereco'    => api_texto($_POST['endereco'] ?? null, 255),
-    'bairro'      => api_texto($_POST['bairro'] ?? null, 120),
-    'cidade'      => api_texto($_POST['cidade'] ?? null, 120),
-    'estado'      => $estado !== '' ? $estado : null,
-    'latitude'    => $latitude,
-    'longitude'   => $longitude,
-    'raio_metros' => $raio,
-    'ativo'       => $id ? (!empty($_POST['ativo']) ? 1 : 0) : 1,
-];
-
-db()->beginTransaction();
-if ($id) {
-    $sets = implode(', ', array_map(fn ($c) => "{$c} = :{$c}", array_keys($dados)));
-    db()->prepare("UPDATE plantoes SET {$sets} WHERE id = :id AND empresa_id = :empresa_id")
-        ->execute($dados + ['id' => $id, 'empresa_id' => $empresaId]);
-    $evento = 'plantao.editado';
-} else {
-    $colunas = implode(', ', array_keys($dados));
-    $valores = implode(', ', array_map(fn ($c) => ":{$c}", array_keys($dados)));
-    db()->prepare("INSERT INTO plantoes (empresa_id, {$colunas}) VALUES (:empresa_id, {$valores})")
-        ->execute($dados + ['empresa_id' => $empresaId]);
-    $id = (int) db()->lastInsertId();
-    $evento = 'plantao.criado';
-}
-db()->prepare('DELETE FROM plantao_empreendimentos WHERE plantao_id = :id')->execute(['id' => $id]);
-$ins = db()->prepare('INSERT INTO plantao_empreendimentos (plantao_id, empreendimento_id) VALUES (:pid, :eid)');
-foreach ($empreendimentos as $empId) {
-    $ins->execute(['pid' => $id, 'eid' => $empId]);
-}
-db()->commit();
-
-auditoria_registrar($empresaId, (int) $usuario['id'], $evento, 'plantao', $id, [
-    'nome' => $nome, 'raio_metros' => $raio, 'latitude' => $latitude, 'longitude' => $longitude,
-    'ativo' => $dados['ativo'], 'empreendimentos' => $empreendimentos,
-]);
-api_responder(['ok' => true, 'id' => $id]);
+api_responder(['ok' => true, 'id' => $r['id'], 'mensagem' => 'Plantão salvo.']);

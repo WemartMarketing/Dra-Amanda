@@ -94,9 +94,10 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 15 | `sql/migration_009_whatsapp_fase2.sql` | WhatsApp — Fase 2 (integração com a Cloud API) |
 | 16 | `sql/migration_010_jornada_boas_vindas.sql` | Jornadas — Fase 4 (autorização de WhatsApp pelo formulário do Meta) |
 | 17 | `sql/migration_011_meta_criativos.sql` | Origem do lead: campanha, anúncio e criativo do Meta Ads (ver `docs/META_CRIATIVOS.md`) |
+| 18 | `sql/migration_012_plantoes_navegacao.sql` | Plantões de vendas: CEP, foto, horário, corretores autorizados, rotas (ver `docs/PLANTOES.md`) |
 
 - Atualizando um servidor que já funciona: rode, na ordem, só os arquivos
-  que ainda não rodou. Ex.: quem já rodou até o 16 roda apenas o **17**.
+  que ainda não rodou. Ex.: quem já rodou até o 17 roda apenas o **18**.
   Os seeds (2, 6, 8, 10, 12) são só para demonstração; não há seed da
   Etapa 6 em diante. Na dúvida, repita a migração: todas podem rodar mais
   de uma vez sem estragar nada.

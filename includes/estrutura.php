@@ -64,7 +64,7 @@ function upload_limite_bytes(): int
  * conteúdo extra embutido no arquivo. Nome final aleatório, extensão
  * definida pelo tipo real.
  */
-function empreendimento_salvar_imagem(string $campo): array
+function empreendimento_salvar_imagem(string $campo, string $dir = EMPREENDIMENTO_IMAGEM_DIR): array
 {
     if (empty($_FILES[$campo]) || $_FILES[$campo]['error'] === UPLOAD_ERR_NO_FILE) {
         return ['ok' => true, 'arquivo' => null];
@@ -92,13 +92,13 @@ function empreendimento_salvar_imagem(string $campo): array
         return ['ok' => false, 'erro' => 'Imagem com resolução grande demais. Use até 40 megapixels.'];
     }
 
-    if (!is_dir(EMPREENDIMENTO_IMAGEM_DIR) && !mkdir(EMPREENDIMENTO_IMAGEM_DIR, 0755, true)) {
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
         return ['ok' => false, 'erro' => 'Pasta de imagens indisponível no servidor.'];
     }
 
     $extensao = $tiposPermitidos[$mime];
     $nome = bin2hex(random_bytes(16)) . '.' . $extensao;
-    $destino = EMPREENDIMENTO_IMAGEM_DIR . '/' . $nome;
+    $destino = $dir . '/' . $nome;
 
     $gravou = false;
     if (function_exists('imagecreatefromstring')) {

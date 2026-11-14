@@ -904,3 +904,49 @@ document.querySelectorAll('[data-pend-abrir]').forEach(function (b) {
         if (!alvo.hidden) { var campo = alvo.querySelector('textarea'); if (campo) campo.focus(); }
     });
 });
+
+// ------------------------------------------------ Plantões: rotas, copiar endereço, CEP
+(function () {
+    // Rota: no computador abre em nova aba; no celular abre na mesma (o sistema
+    // entrega o link ao app do Google Maps/Waze quando ele está instalado).
+    var desktop = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+    document.querySelectorAll('a[data-rota]').forEach(function (a) { if (desktop) a.target = '_blank'; });
+
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-copiar]');
+        if (!b) return;
+        var texto = b.dataset.copiar;
+        var ok = function () { wmToast('Endereço copiado.'); };
+        var falha = function () {
+            var t = document.createElement('textarea');
+            t.value = texto; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+            document.body.appendChild(t); t.select();
+            try { document.execCommand('copy'); ok(); } catch (err) { wmToast('Não foi possível copiar. Endereço: ' + texto); }
+            document.body.removeChild(t);
+        };
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(texto).then(ok, falha); else falha();
+    });
+
+    var botaoCep = document.querySelector('[data-buscar-cep]');
+    if (botaoCep) {
+        botaoCep.addEventListener('click', async function () {
+            var form = botaoCep.closest('form');
+            var st = form.querySelector('[data-cep-status]');
+            var cep = (form.elements.cep.value || '').replace(/\D/g, '');
+            if (cep.length !== 8) { st.textContent = 'Digite os 8 números do CEP.'; return; }
+            st.textContent = 'Buscando…';
+            try {
+                var r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
+                var j = await r.json();
+                if (j.erro) { st.textContent = 'CEP não encontrado. Preencha o endereço à mão.'; return; }
+                if (j.logradouro && !form.elements.endereco.value) form.elements.endereco.value = j.logradouro + ', ';
+                if (j.bairro) form.elements.bairro.value = j.bairro;
+                if (j.localidade) form.elements.cidade.value = j.localidade;
+                if (j.uf) form.elements.estado.value = j.uf;
+                form.elements.cep.value = cep.slice(0, 5) + '-' + cep.slice(5);
+                st.textContent = 'Endereço preenchido. Complete o número e confira.';
+                form.elements.endereco.focus();
+            } catch (err) { st.textContent = 'Não foi possível consultar o CEP agora. Preencha à mão.'; }
+        });
+    }
+})();

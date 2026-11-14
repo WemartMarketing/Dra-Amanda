@@ -61,7 +61,7 @@ $navItems = [
     ['key' => 'relatorios', 'href' => '/pages/relatorios.php', 'label' => 'Perdas e transferências',                    'icon' => 'alert',    'mostrar' => usuario_tem_permissao($usuario, 'visualizar_indicadores')],
     ['key' => 'equipes',    'href' => '/pages/equipes.php',    'label' => 'Equipes',                                    'icon' => 'users',    'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_equipes')],
     ['key' => 'empreendimentos', 'href' => '/pages/empreendimentos.php', 'label' => 'Empreendimentos',                  'icon' => 'building', 'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_empreendimentos') || (!$ehCorretor && usuario_tem_permissao($usuario, 'visualizar_leads'))],
-    ['key' => 'plantoes',   'href' => '/pages/plantoes.php',   'label' => 'Plantões',                                   'icon' => 'map',      'mostrar' => usuario_tem_permissao($usuario, 'gerenciar_plantoes')],
+    ['key' => 'plantoes',   'href' => '/pages/plantoes.php',   'label' => 'Plantões',                                   'icon' => 'map',      'mostrar' => empty($usuario['eh_superadmin'])],
     ['key' => 'usuarios',   'href' => '/pages/usuarios.php',   'label' => 'Usuários e acessos',                         'icon' => 'shield',   'mostrar' => usuario_tem_permissao($usuario, 'administrar_usuarios')],
     ['key' => 'funil',      'href' => '/pages/funil.php',      'label' => 'Etapas do funil',                            'icon' => 'settings', 'mostrar' => usuario_tem_permissao($usuario, 'configurar_funil')],
     ['key' => 'recuperacao', 'href' => '/pages/recuperacao.php', 'label' => 'Recuperação de leads',                     'icon' => 'clock',    'mostrar' => usuario_tem_permissao($usuario, 'configurar_recuperacao')],
