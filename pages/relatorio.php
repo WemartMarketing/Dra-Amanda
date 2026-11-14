@@ -11,6 +11,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/relatorios/ui.php';
+require_once __DIR__ . '/../includes/relatorios/telas_especializadas.php';
 
 $usuario = auth_require();
 if (!empty($usuario['eh_superadmin'])) {
@@ -309,7 +310,7 @@ elseif ($rel === 'gestao'):
     </div>
 <?php
 // ============================================================================ EMPREENDIMENTOS
-else:
+elseif ($rel === 'empreendimentos'):
     $todos = $op['empreendimentos'];
     $nomes = array_column($todos, 'nome', 'id');
     $sel = array_values(array_unique(array_filter(array_map('intval', (array) ($pub['emp'] ?? [])), fn ($id) => isset($nomes[$id]))));
@@ -385,6 +386,9 @@ else:
             <?php dash_barras_horizontais(array_map(fn ($id) => ['rotulo' => $nomes[$id], 'total' => (int) $res[$id]['leads_recebidos']['valor']], $sel), 'Leads recebidos por empreendimento', 6); ?>
         </div>
     <?php endif;
+// ============================================================================ ESPECIALIZADOS (Etapa 4)
+else:
+    relui_tela_especializada(['rel' => $rel, 'usuario' => $usuario, 'f' => $f, 'pub' => $pub, 'op' => $op, 'cob' => $cob, 'url' => $url]);
 endif;
 ?>
 <script src="/assets/js/relatorios.js" defer></script>

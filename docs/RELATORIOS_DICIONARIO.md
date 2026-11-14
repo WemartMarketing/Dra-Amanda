@@ -263,21 +263,21 @@ Percentual dos leads distribuídos em que o cliente foi efetivamente alcançado.
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com histórico confiável |
 
-### 🟡 Funil — posição atual (`funil_posicao`)
+### 🟢 Funil — posição atual (`funil_posicao`)
 
 Quantos leads estão em cada etapa AGORA (ou numa data de corte).
 
 | Campo | Definição |
 |---|---|
 | Fórmula | COUNT(leads) por etapa atual. Data de corte: reconstruída pelas transições registradas. |
-| Fonte | leads.etapa_id; data de corte: lead_etapa_historico (Etapa 2). |
+| Fonte | leads.etapa_id (onde estão hoje) + lead_etapa_historico (até onde chegaram). Motor: relatorio_funil_detalhe(). |
 | Data usada | Agora / data de corte. |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Lead em uma etapa só. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
-| Dados ausentes / limitações | Data de corte no passado só a partir do histórico estruturado (antes dele: "não reconstruível"). |
+| Dados ausentes / limitações | O "até onde chegaram" usa a etapa atual e as passagens registradas; antes da migração 013 só as mudanças auditadas. |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟢 Funil — movimentações no período (`funil_movimentacao`)
 
@@ -484,12 +484,12 @@ Quanto tempo o lead esperou um corretor disponível.
 | Campo | Definição |
 |---|---|
 | Fórmula | Mediana de (resolvido_em − entrou_em) da fila; leads entregues direto contam 0. |
-| Fonte | roleta_fila_historico (cada passagem: entrou_em → saiu_em, resultado). |
+| Fonte | roleta_fila_historico (cada passagem: entrou_em → saiu_em, resultado). Motor: relatorio_plantoes(). |
 | Data usada | entrou_em. |
 | Filtros | Empresa, período, roleta, empreendimento. |
 | Deduplicação | Uma espera por passagem pela fila. |
 | Permissão | Escopos acima de corretor. |
-| Dados ausentes / limitações | A fila guarda a ÚLTIMA passagem do lead (o registro é reaproveitado): passagens anteriores do mesmo lead não ficam. Etapa 2: histórico da fila. |
+| Dados ausentes / limitações | Antes da migração 013 só existe a última passagem de cada lead pela fila (marcada como reconstruída). |
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
@@ -500,7 +500,7 @@ Quanto tempo cada corretor ficou disponível na roleta (presença real), diferen
 | Campo | Definição |
 |---|---|
 | Fórmula | SUM(saiu_em − entrou_em) das sessões; sessão aberta usa a última verificação. |
-| Fonte | roleta_sessoes, roleta_presencas |
+| Fonte | roleta_sessoes, recortadas ao período (sessão aberta usa a última verificação). Motor: relatorio_plantoes(). |
 | Data usada | entrou_em (dividida por dia). |
 | Filtros | Empresa, período, roleta, corretor. |
 | Deduplicação | Sessões sobrepostas do mesmo corretor não existem (chave única). |
@@ -516,7 +516,7 @@ Se o lead chegou com a roleta aberta ou fechada.
 | Campo | Definição |
 |---|---|
 | Fórmula | COUNT(leads com chegada_roleta_aberta = 0) — gravado na PRIMEIRA chegada do lead à roleta. |
-| Fonte | leads.chegada_roleta_aberta / chegada_roleta_id. Motor: relatorio_leads(). |
+| Fonte | leads.chegada_roleta_aberta / chegada_roleta_id. Motor: relatorio_leads(). Por roleta: relatorio_plantoes(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, roleta, empreendimento. |
 | Deduplicação | Lead conta uma vez. |
@@ -534,7 +534,7 @@ De onde veio o cliente (origem ORIGINAL). Canal de atendimento (ex.: WhatsApp de
 | Campo | Definição |
 |---|---|
 | Fórmula | COUNT(leads) por origem detalhada (configurável por empresa) e por grupo. |
-| Fonte | leads.origem_detalhe_id → lead_origens (Meta Ads, Google Ads, WhatsApp, Telefone, Site...) + UTMs (utm_source/medium/campaign/content/term). Motor: relatorio_leads_por_origem(). |
+| Fonte | leads.origem_detalhe_id → lead_origens (Meta Ads, Google Ads, WhatsApp, Telefone, Site...) + UTMs (utm_source/medium/campaign/content/term). Motor: relatorio_leads_por_origem(). Com o que já aconteceu com a coorte (contato, visita, contrato): relatorio_origens(). |
 | Data usada | Data de entrada do lead (leads.criado_em). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Lead conta uma vez. |
@@ -550,7 +550,7 @@ Leads, contato, visitas e contratos por campanha/conjunto/anúncio/criativo do M
 | Campo | Definição |
 |---|---|
 | Fórmula | Indicadores de leads/visitas/contratos agrupados pelos ids de origem gravados no lead. |
-| Fonte | leads.meta_* + meta_anuncios (migração 011); leads.campanha (texto) para outros casos. |
+| Fonte | leads.meta_* + meta_anuncios (pages/relatorio_anuncios.php, com prévia do criativo) e leads.utm_* (relatorio_origens()). |
 | Data usada | Data de entrada do lead (leads.criado_em). (coorte). |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. Campanha, conjunto, anúncio. |
 | Deduplicação | Lead conta uma vez, no anúncio do formulário que enviou. |
@@ -835,21 +835,21 @@ Duas leituras, sempre identificadas: (1) COORTE — dos leads recebidos no perí
 | Atualização | Tempo real (consulta direta ao banco). |
 | Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
 
-### 🟡 Conversão de visita em contrato (`taxa_visita_contrato`)
+### 🟢 Conversão de visita em contrato (`taxa_visita_contrato`)
 
 Dos leads com visita realizada, quantos assinaram contrato.
 
 | Campo | Definição |
 |---|---|
-| Fórmula | leads com visita realizada e contrato ÷ leads com visita realizada × 100 (coorte pela data da visita). |
-| Fonte | agenda_compromissos, contratos |
+| Fórmula | Leads com visita realizada no período que têm contrato VALIDADO ÷ leads com visita realizada no período × 100. |
+| Fonte | agenda_compromissos + lead_contratos (status validado). Motor: relatorio_visitas_por(). |
 | Data usada | concluido_em da visita. |
 | Filtros | Empresa, período, empreendimento, superintendência, gerente, equipe, corretor, origem, campanha/anúncio, etapa. |
 | Deduplicação | Leads únicos. |
 | Permissão | Sempre dentro do recorte de leads do usuário (rbac_leads_scope): empresa ativa; GP de Produto só os empreendimentos vinculados; superintendente a sua superintendência; gerente a sua equipe; corretor a própria carteira. Superadmin não vê dados de leads. Filtros só restringem, nunca ampliam. |
 | Dados ausentes / limitações | Sem base → "—". |
 | Atualização | Tempo real (consulta direta ao banco). |
-| Disponibilidade | Disponível com limitação (ver tratamento de ausentes) |
+| Disponibilidade | Disponível com histórico confiável |
 
 ### 🟡 VGV dos contratos (`vgv`)
 
@@ -908,7 +908,7 @@ Quanto tempo o lead perdido esperou até ter novo corretor.
 | Campo | Definição |
 |---|---|
 | Fórmula | Mediana de (próxima atribuição − data da perda). |
-| Fonte | lead_atribuicoes: encerrada_em (inatividade) → atribuido_em da próxima atribuição. Motor: relatorio_perdas(). |
+| Fonte | lead_atribuicoes: encerrada_em (inatividade) → atribuido_em da próxima atribuição. Motor: relatorio_perdas(). Por estrutura: relatorio_perdas_por(). |
 | Data usada | Data da perda. |
 | Filtros | Como "Perdidos por inatividade". |
 | Deduplicação | Uma medida por perda. |
@@ -940,7 +940,7 @@ Para qual estrutura foram os leads perdidos, e o que aconteceu com eles depois.
 | Campo | Definição |
 |---|---|
 | Fórmula | Agrupamento por para_* das perdas + etapa atual agregada. |
-| Fonte | lead_transferencias, leads |
+| Fonte | lead_atribuicoes: próxima atribuição depois da perda, com a estrutura de quem recebeu. Motor: relatorio_perdas_destino(). |
 | Data usada | Data da perda. |
 | Filtros | Como "Perdidos por inatividade". |
 | Deduplicação | Cada perda conta. |

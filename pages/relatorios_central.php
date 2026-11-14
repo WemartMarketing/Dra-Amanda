@@ -31,22 +31,25 @@ $cat = [
     'executiva' => [[relui_relatorios()['executiva'][0], relui_relatorios()['executiva'][1], $r('executiva'), true]],
     'leads' => [
         ['Dashboard de leads e funil', 'Entrada, distribuição, atendimento e funil do período.', '/pages/dashboard.php', true],
-        ['Funil em detalhe (coortes, tempo por etapa)', 'Posição × movimentação, avanços e retrocessos por etapa.', null, true],
+        [relui_relatorios()['funil'][0], relui_relatorios()['funil'][1], $r('funil'), true],
     ],
     'corretores' => [
         [relui_relatorios()['corretor'][0], relui_relatorios()['corretor'][1], $r('corretor'), true],
         [relui_relatorios()['gestao'][0], relui_relatorios()['gestao'][1], $r('gestao'), true],
     ],
     'empreendimentos' => [[relui_relatorios()['empreendimentos'][0], relui_relatorios()['empreendimentos'][1], $r('empreendimentos'), true]],
-    'plantoes' => [['Plantões e roletas', 'Presença real × horário do plantão, espera na fila, leads fora do horário.', null, true]],
+    'plantoes' => [[relui_relatorios()['plantoes'][0], relui_relatorios()['plantoes'][1], $r('plantoes'), true]],
     'marketing' => [
         ['Leads por anúncio', 'Campanha, conjunto e anúncio do Meta Ads, com a prévia do criativo.', '/pages/relatorio_anuncios.php', true],
-        ['Origens e UTMs', 'Leads, atendimento e vendas por origem detalhada e UTM.', null, true],
+        [relui_relatorios()['origens'][0], relui_relatorios()['origens'][1], $r('origens'), true],
     ],
     'whatsapp' => [['Automação e remarketing', 'Mensagens, respostas e resultados das jornadas e campanhas.', '/pages/relatorio_automacao.php',
         $tem('whatsapp_configurar') || $tem('gerenciar_campanhas_wa')]],
-    'visitas' => [['Visitas e vendas', 'Agendadas, confirmadas, realizadas, comparecimento e contratos.', null, true]],
-    'perdas' => [['Perdas e transferências', 'Leads perdidos por inatividade e transferências, pela estrutura que perdeu.', '/pages/relatorios.php', true]],
+    'visitas' => [[relui_relatorios()['visitas'][0], relui_relatorios()['visitas'][1], $r('visitas'), true]],
+    'perdas' => [
+        [relui_relatorios()['perdas'][0], relui_relatorios()['perdas'][1], $r('perdas'), true],
+        ['Transferências (detalhe)', 'Transferências por motivo e pela estrutura anterior, com a série no tempo.', '/pages/relatorios.php', true],
+    ],
     'auditoria' => [
         ['Auditoria', 'Quem fez o quê, inclusive exportações.', '/pages/auditoria.php', $tem('visualizar_auditoria')],
         ['Qualidade dos dados', 'Origem não detalhada, atribuições sem estrutura, contratos sem registro…', null, $tem('visualizar_auditoria')],

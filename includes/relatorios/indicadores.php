@@ -464,6 +464,19 @@ function relatorio_indicadores_etapa2(array $i): array
         'leads_origem' => ['formula' => 'COUNT(leads) por origem detalhada (configurável por empresa) e por grupo.', 'fonte' => 'leads.origem_detalhe_id → lead_origens (Meta Ads, Google Ads, WhatsApp, Telefone, Site...) + UTMs (utm_source/medium/campaign/content/term). Motor: relatorio_leads_por_origem().',
             'ausentes' => 'Leads antigos de "Manual"/"Outro" ficam como "Cadastro manual (não detalhado)" / "Outros" — não dá para saber se vieram do Google, do site ou do telefone.', 'disponibilidade' => 'parcial'],
     ];
+    // Etapa 4: relatórios especializados (includes/relatorios/especializados.php).
+    $aj['funil_posicao'] = ['fonte' => 'leads.etapa_id (onde estão hoje) + lead_etapa_historico (até onde chegaram). Motor: relatorio_funil_detalhe().',
+        'ausentes' => 'O "até onde chegaram" usa a etapa atual e as passagens registradas; antes da migração 013 só as mudanças auditadas.', 'disponibilidade' => 'disponivel'];
+    $aj['espera_distribuicao'] += ['disponibilidade' => 'parcial', 'ausentes' => 'Antes da migração 013 só existe a última passagem de cada lead pela fila (marcada como reconstruída).'];
+    $aj['espera_distribuicao']['fonte'] .= ' Motor: relatorio_plantoes().';
+    $aj['presenca_corretor'] = ['fonte' => 'roleta_sessoes, recortadas ao período (sessão aberta usa a última verificação). Motor: relatorio_plantoes().'];
+    $aj['leads_fora_horario']['fonte'] .= ' Por roleta: relatorio_plantoes().';
+    $aj['leads_origem']['fonte'] .= ' Com o que já aconteceu com a coorte (contato, visita, contrato): relatorio_origens().';
+    $aj['leads_campanha_anuncio'] = ['fonte' => 'leads.meta_* + meta_anuncios (pages/relatorio_anuncios.php, com prévia do criativo) e leads.utm_* (relatorio_origens()).'];
+    $aj['taxa_visita_contrato'] = ['formula' => 'Leads com visita realizada no período que têm contrato VALIDADO ÷ leads com visita realizada no período × 100.',
+        'fonte' => 'agenda_compromissos + lead_contratos (status validado). Motor: relatorio_visitas_por().', 'disponibilidade' => 'disponivel'];
+    $aj['destino_redistribuidos'] = ['fonte' => 'lead_atribuicoes: próxima atribuição depois da perda, com a estrutura de quem recebeu. Motor: relatorio_perdas_destino().'];
+    $aj['tempo_redistribuicao']['fonte'] .= ' Por estrutura: relatorio_perdas_por().';
     foreach ($aj as $k => $campos) {
         if (isset($i[$k])) {
             $i[$k] = array_merge($i[$k], $campos);

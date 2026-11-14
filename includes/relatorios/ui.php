@@ -236,6 +236,11 @@ function relui_relatorios(): array
         'corretor' => ['Desempenho do corretor', 'Leads recebidos, atendimento, contato efetivo, visitas e contratos de um corretor, com a evolução.', 'user'],
         'gestao' => ['Equipes, gerentes e superintendências', 'Comparativo por estrutura (na data de cada entrega), com ranking por um critério escolhido.', 'users'],
         'empreendimentos' => ['Comparar empreendimentos', 'Os mesmos indicadores lado a lado para 2 a 6 empreendimentos.', 'building'],
+        'funil' => ['Funil em detalhe', 'Onde estão os leads do período, até onde chegaram, transições entre etapas e tempo em cada etapa.', 'filter'],
+        'plantoes' => ['Plantões e roletas', 'Entregas por roleta, chegadas fora do horário, espera na fila e presença dos corretores.', 'map'],
+        'origens' => ['Origens e UTMs', 'Leads por origem de aquisição e UTM, e o que já aconteceu com eles (contato, visita, contrato).', 'anuncio'],
+        'visitas' => ['Visitas e vendas', 'Visitas agendadas, confirmadas, realizadas e o que virou contrato, por corretor ou empreendimento.', 'calendar'],
+        'perdas' => ['Perdas e redistribuições', 'Leads perdidos por inatividade ou transferidos, pela estrutura que perdeu, e o que aconteceu depois.', 'alert'],
     ];
 }
 
@@ -264,9 +269,9 @@ function relui_valor($v, string $unidade = ''): string
         case '%':
             return number_format((float) $v, 1, ',', '.') . '%';
         case 'min':
-            return dash_duracao((float) $v * 60);
+            return (float) $v == 0.0 ? '0' : dash_duracao((float) $v * 60);
         case 'h':
-            return dash_duracao((float) $v * 3600);
+            return (float) $v == 0.0 ? '0' : dash_duracao((float) $v * 3600);
         case 'R$':
             return 'R$ ' . number_format((float) $v, 2, ',', '.');
         default:
@@ -370,6 +375,59 @@ function relui_grafico_linha(array $serie, string $titulo, string $unidade = 'le
         </tbody></table></div>
     </details>
     <?php
+}
+
+/**
+ * Tabela ordenável genérica. $cols: [chave => [rótulo, unidade]] — unidade
+ * 'texto' para a coluna de nome. $link: fn(linha) => url|null para a 1ª coluna.
+ */
+function relui_tabela(string $id, array $cols, array $linhas, ?array $totais = null, ?callable $link = null, string $vazio = 'Nada no período para esta seleção.'): void
+{
+    if (!$linhas) {
+        echo '<p class="empty-note">' . e($vazio) . '</p>';
+        return;
+    }
+    echo '<div class="table-wrap dash-table-wrap"><table class="report-table dash-table" id="' . e($id) . '" data-ordenavel><thead><tr>';
+    $i = 0;
+    foreach ($cols as [$rot, $u]) {
+        echo '<th scope="col" class="' . ($u === 'texto' ? '' : 'num') . '" aria-sort="none"><button type="button" data-ordenar="' . $i++ . '" data-tipo="' . ($u === 'texto' ? 'texto' : 'num') . '">' . e($rot) . '</button></th>';
+    }
+    echo '</tr></thead><tbody>';
+    foreach ($linhas as $l) {
+        echo '<tr>';
+        $primeira = true;
+        foreach ($cols as $k => [$rot, $u]) {
+            $v = $l[$k] ?? null;
+            if ($u === 'texto') {
+                $url = $primeira && $link ? $link($l) : null;
+                echo '<td class="nome" data-sort="' . e((string) $v) . '" data-rotulo="' . e($rot) . '">' . ($url ? '<a href="' . e($url) . '">' . e((string) $v) . '</a>' : e((string) $v)) . '</td>';
+            } else {
+                echo '<td class="num" data-sort="' . ($v === null ? -1 : e((string) $v)) . '" data-rotulo="' . e($rot) . '">' . e(relui_valor($v, $u)) . '</td>';
+            }
+            $primeira = false;
+        }
+        echo '</tr>';
+    }
+    echo '</tbody>';
+    if ($totais) {
+        echo '<tfoot><tr>';
+        foreach ($cols as $k => [$rot, $u]) {
+            echo '<td class="' . ($u === 'texto' ? 'nome' : 'num') . '" data-rotulo="' . e($rot) . '">' . e($u === 'texto' ? ($totais[$k] ?? '') : (array_key_exists($k, $totais) ? relui_valor($totais[$k], $u) : '')) . '</td>';
+        }
+        echo '</tr></tfoot>';
+    }
+    echo '</table></div>';
+}
+
+/** Soma colunas numéricas (para a linha de total). */
+function relui_somar(array $linhas, array $chaves): array
+{
+    $t = [];
+    foreach ($chaves as $k) {
+        $vals = array_filter(array_column($linhas, $k), fn ($v) => $v !== null);
+        $t[$k] = $vals ? array_sum($vals) : null;
+    }
+    return $t;
 }
 
 /** "1 lead", "2 leads". */

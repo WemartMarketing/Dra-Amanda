@@ -1879,3 +1879,10 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .rel-comparar tbody th.nome { text-align: left; font-weight: 700; }
 .rel-marca { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--accent, #635bfa); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--accent, #635bfa); pointer-events: none; }
 .rel-marca[hidden] { display: none; }
+.rel-alcance .funnel-row { grid-template-columns: 150px minmax(80px, 1fr) 330px; }
+.rel-alcance .rel-alcance-valor { width: auto; min-width: 250px; white-space: nowrap; text-align: left; }
+@media (max-width: 640px) {
+    .rel-alcance .funnel-row { grid-template-columns: 1fr; gap: 4px; }
+    .rel-alcance .rel-alcance-valor { min-width: 0; white-space: normal; }
+}
+.rel-nota a { color: inherit; text-decoration: underline; font-weight: 700; }

@@ -104,7 +104,7 @@ Empreendimentos (comparação de 2+). Filtros aplicados sempre visíveis, botão
 limpar, filtros favoritos. Gráficos em SVG (sem bibliotecas externas), clique
 para detalhar quando autorizado.
 
-### Etapa 4 — Relatórios especializados
+### Etapa 4 — Relatórios especializados ✅ concluída (ver `docs/RELATORIOS_ETAPA4.md`)
 Marketing (campanha/anúncio com prévia do criativo), Plantões e Roletas
 (presença real × horário do plantão, espera, fora do horário), Funil (posição ×
 movimentação, coortes, tempo por etapa, avanços/retrocessos), Visitas e Vendas,
