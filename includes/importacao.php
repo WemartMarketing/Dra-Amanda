@@ -162,7 +162,7 @@ function importacao_xml_reader(string $xml): XMLReader
     return $r;
 }
 
-function importacao_ler_xlsx(string $caminho): array
+function importacao_ler_xlsx(string $caminho, int $maxColunas = 50): array
 {
     if (!class_exists('ZipArchive') || !class_exists('XMLReader')) {
         return ['ok' => false, 'erro' => 'O servidor não tem as extensões zip/xmlreader. Envie em CSV.'];
@@ -243,7 +243,7 @@ function importacao_ler_xlsx(string $caminho): array
                 $ref = (string) $r->getAttribute('r');
                 $col = $ref !== '' ? importacao_coluna_indice($ref) : count($linha);
                 $tipo = (string) $r->getAttribute('t');
-                if ($col > 49) {
+                if ($col >= $maxColunas) {
                     $col = -1;
                 }
                 if ($r->isEmptyElement) {
