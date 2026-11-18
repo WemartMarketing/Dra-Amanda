@@ -2034,3 +2034,24 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .jv-etapas ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .jv-etapas li { display: inline-flex; gap: 6px; align-items: baseline; padding: 4px 10px; border-radius: 99px; background: #f3f4f8; font-size: 13px; }
 .jv-resultado .pill { white-space: normal; text-align: left; line-height: 1.35; }
+
+/* ---------- Inteligência de Vendas (painel) ---------- */
+.vp-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; }
+.vp-filtros .field { margin: 0; }
+.vp-filtros-acoes { display: flex; gap: 12px; align-items: center; }
+.vp-abas { display: flex; flex-wrap: wrap; }
+.vp-lista { list-style: none; margin: 0; padding: 0; }
+.vp-lista li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.vp-lista li:last-child { border-bottom: 0; }
+.vp-barras li { grid-template-columns: minmax(120px, 42%) 1fr auto; }
+.vp-resultados td, .vp-resultados th { white-space: nowrap; }
+.vp-resultados td[data-rotulo="Cliente"], .vp-resultados td[data-rotulo="Comprado"] { white-space: normal; min-width: 140px; }
+.vendas-filtros a.is-ativo { font-weight: 700; color: var(--ink); }
+@media (max-width: 640px) {
+    .vp-abas { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+    .vp-abas .seg-link { white-space: nowrap; }
+    .vp-resultados td, .vp-resultados th { white-space: normal; }
+}
+.vp-filtros-box > summary { list-style: none; margin-bottom: 12px; display: inline-flex; }
+.vp-filtros-box > summary::-webkit-details-marker { display: none; }
+@media (min-width: 641px) { .vp-filtros-box > summary { display: none; } }

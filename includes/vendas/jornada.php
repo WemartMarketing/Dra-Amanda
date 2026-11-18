@@ -399,42 +399,58 @@ function vendas_jornada(array $usuario, int $vendaId): ?array
 }
 
 /**
- * Classificação comercial da venda (análise gerencial; não atribui crédito,
- * comissão nem culpa). Usa a equivalência CONFIRMADA do corretor da planilha
- * e os responsáveis do CRM na data da venda.
+ * Classificação comercial PURA (mesma regra na Jornada e no Painel).
+ * $equiv: linha de vendas_equivalencias do vendedor (ou null);
+ * $resp: responsáveis do CRM na data da venda [[usuario_id, equipe_id], ...];
+ * $equipeVendedor: equipe atual do usuário do CRM que é o vendedor (se houver).
  */
+function vendas_classificar_comercial(string $situacao, bool $vinculada, ?string $cronologia, ?array $equiv, array $resp, ?int $equipeVendedor): string
+{
+    if ($situacao === 'ambigua') {
+        return 'pendente_revisao';
+    }
+    if (!$vinculada || $cronologia === 'posterior') {
+        return 'nao_aplicavel';
+    }
+    if (!$equiv || $equiv['classificacao'] === 'nao_identificado' || $equiv['classificacao'] === 'nao_existe') {
+        return 'nao_identificado';
+    }
+    if ($equiv['classificacao'] === 'externo') {
+        return 'canal_externo';
+    }
+    if (!$resp) {
+        return 'sem_historico';
+    }
+    $u = (int) $equiv['usuario_id'];
+    if (in_array($u, array_map('intval', array_column($resp, 'usuario_id')), true)) {
+        return 'responsavel_crm';
+    }
+    return $equipeVendedor && in_array($equipeVendedor, array_map('intval', array_column($resp, 'equipe_id')), true) ? 'outro_corretor_mesma_estrutura' : 'outra_equipe';
+}
+
+/** Chave da equivalência de corretor de uma venda (id do sistema externo; sem id, o nome comparável). */
+function vendas_chave_corretor(array $venda): string
+{
+    $id = $venda['corretor_id_origem'] ?? null;
+    return $id !== null && $id !== '' ? (string) $id : 'nome:' . vendas_nome_comparavel((string) ($venda['corretor_texto'] ?? ''));
+}
+
+/** Classificação comercial de uma jornada (análise gerencial; não atribui crédito, comissão nem culpa). */
 function vendas_classificacao_comercial(array $J): string
 {
     $corr = $J['corr'];
     $venda = $J['venda'];
-    $sit = vendas_situacao_efetiva($corr);
-    if ($sit === 'ambigua') {
-        return 'pendente_revisao';
+    $equiv = null;
+    $equipeVendedor = null;
+    if ($corr && (int) $corr['vinculada']) {
+        $st = db()->prepare("SELECT * FROM vendas_equivalencias WHERE empresa_id = :e AND sistema_origem = :s AND tipo = 'corretor' AND valor_origem = :v");
+        $st->execute(['e' => $venda['empresa_id'], 's' => $venda['sistema_origem'], 'v' => vendas_chave_corretor($venda)]);
+        $equiv = $st->fetch() ?: null;
+        if ($equiv && $equiv['usuario_id']) {
+            $st = db()->prepare('SELECT equipe_id FROM usuarios WHERE id = :u');
+            $st->execute(['u' => $equiv['usuario_id']]);
+            $equipeVendedor = (int) $st->fetchColumn() ?: null;
+        }
     }
-    if (!$corr || !(int) $corr['vinculada'] || $corr['cronologia'] === 'posterior') {
-        return 'nao_aplicavel';
-    }
-    $chave = $venda['corretor_id_origem'] ?? null;
-    $chave = $chave !== null && $chave !== '' ? (string) $chave : 'nome:' . vendas_nome_comparavel((string) $venda['corretor_texto']);
-    $st = db()->prepare("SELECT * FROM vendas_equivalencias WHERE empresa_id = :e AND sistema_origem = :s AND tipo = 'corretor' AND valor_origem = :v");
-    $st->execute(['e' => $venda['empresa_id'], 's' => $venda['sistema_origem'], 'v' => $chave]);
-    $eq = $st->fetch();
-    if (!$eq || $eq['classificacao'] === 'nao_identificado') {
-        return 'nao_identificado';
-    }
-    if ($eq['classificacao'] === 'externo') {
-        return 'canal_externo';
-    }
-    $resp = $J['responsaveis_na_venda'];
-    if (!$resp) {
-        return 'sem_historico';
-    }
-    $u = (int) $eq['usuario_id'];
-    if (in_array($u, array_column($resp, 'usuario_id'), true)) {
-        return 'responsavel_crm';
-    }
-    $st = db()->prepare('SELECT equipe_id FROM usuarios WHERE id = :u');
-    $st->execute(['u' => $u]);
-    $equipeVendedor = (int) $st->fetchColumn();
-    return $equipeVendedor && in_array($equipeVendedor, array_map('intval', array_column($resp, 'equipe_id')), true) ? 'outro_corretor_mesma_estrutura' : 'outra_equipe';
+    return vendas_classificar_comercial(vendas_situacao_efetiva($corr), (bool) ($corr['vinculada'] ?? false), $corr['cronologia'] ?? null, $equiv, $J['responsaveis_na_venda'], $equipeVendedor);
 }

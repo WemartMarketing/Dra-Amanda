@@ -9,7 +9,7 @@ com os leads, atendimentos, corretores, campanhas e históricos do WeMart Sales.
 | 2 | Importação: upload, mapeamento, validação, prévia, lotes, duplicidade, histórico de alterações | **concluída** |
 | 3 | Cruzamento persistido: índice de contatos, candidatos, revisão humana, auditoria, reprocessamento | **concluída** |
 | 4 | Jornada do Cliente: linha do tempo e tempos (jornada, responsabilidade, interação) | **concluída** |
-| 5 | Painel de conciliação, resultados detalhados e relatórios especializados | — |
+| 5 | Painel de conciliação, resultados detalhados e relatórios especializados | **concluída** |
 | 6 | Exportações (Excel, CSV, PDF), testes de integridade e segurança | — |
 
 ---
@@ -353,3 +353,68 @@ A tela avisa quando:
   - histórico incompleto.
 - **Mutações:** 15 de 15 detectadas.
 - **Fluxo completo no navegador:** computador e celular, a 390px sem rolagem lateral. Um gerente sem permissão é bloqueado.
+
+---
+
+## 12. Fase 5 — Painel e relatórios (concluída)
+
+**Tela:** `/pages/vendas_painel.php` (Relatórios → Inteligência de Vendas → Painel de vendas × CRM). Exige a permissão `ver_inteligencia_vendas`.
+
+### Uma fonte só
+`vendas_fatos()` (`includes/vendas/painel.php`) monta um fato por venda em cerca de 8 consultas em lote, sem consultas por venda. Os dados vêm de:
+- vendas e correspondências;
+- leads vinculados, atribuições e transferências;
+- campanhas de WhatsApp e anúncios;
+- equivalências de corretores.
+
+Todos os indicadores e relatórios saem desses fatos. A classificação comercial é a mesma função pura usada na Jornada (`vendas_classificar_comercial`), e o teste confere venda a venda que **painel = jornada**.
+
+**Regras:**
+- Entram só as vendas cuja situação foi marcada como venda (`eh_venda`). Distratos ficam fora.
+- **Encontrada no CRM** = ligada sem conflito (ou confirmada na revisão) **e** com entrada no CRM até o dia da venda.
+- Transferências, oferta ativa, remarketing, responsáveis e interesses contam **só até a data da venda**.
+- Atribuições encerradas antes da venda e as que começaram depois não fazem de ninguém o "responsável na data".
+- Ambíguas não emprestam os leads candidatos.
+
+### Filtros
+| Filtro | O que filtra |
+|---|---|
+| Período | Data da venda (mesmos períodos da Central) |
+| Empreendimento | Empreendimento comprado (pela equivalência) |
+| Equipe e corretor | Responsável no CRM **na data da venda** |
+| Origem | Origem no CRM do 1º cadastro |
+| Situação | Situação da conciliação |
+
+Filtros inválidos são ignorados. No celular, os filtros ficam recolhidos num botão, com o número de filtros ativos.
+
+### Abas
+| Aba | Conteúdo |
+|---|---|
+| Visão geral | Indicadores do §14: importadas, encontradas (e %), por telefone, e-mail ou ambos, confirmadas na revisão, ambíguas, posteriores, sem correspondência; múltiplas oportunidades, empreendimento diferente, oferta ativa, remarketing, redistribuição, outro canal; VGV total e das encontradas; jornada média e mediana |
+| Encontradas na base | Por empreendimento comprado (vendas, encontradas, %, VGV) e por mídia declarada na venda |
+| Jornada até a compra | Média, mediana, faixas (até 30, 31–90, 91–180, 181–365 dias, mais de 1 ano) e tempo por origem |
+| Entre empreendimentos | 1º interesse → comprado, quantas tiveram interesses intermediários e VGV. Avisa quantas ficaram de fora por falta de equivalência |
+| Anúncios | Campanhas e anúncios do 1º cadastro dos clientes que compraram |
+| Após remarketing | Clientes com campanha antes da compra e o tempo entre a última campanha e a venda |
+| Após redistribuição | Transferência, redistribuição ou oferta ativa antes da compra, com 1º corretor, responsável na venda e classificação |
+| Outros canais | Classificação comercial e a lista "vendas realizadas por outro canal com histórico anterior no CRM" (outro corretor da equipe, outra equipe ou canal externo) |
+| Produtividade | Por corretor: recebidos, atendidos, visitas, transferidos (CRM, no período) ao lado das vendas em que era o responsável na data e das em que foi o 1º corretor. Populações diferentes, **sem taxa** entre elas |
+| Resultados | Tabela do §15: cliente, comprado, data, valor, cruzamento, origem, empreendimento e corretor iniciais, corretor da venda, transferências, oferta, remarketing, jornada e "Ver jornada" ou "Revisar correspondência". Tem busca, ordenação e paginação |
+
+Cada aba termina com **fonte, período, data de geração e nota metodológica**: associação no tempo não é causa, VGV não é receita, e ninguém recebe crédito nem culpa.
+
+### Acesso
+- Os indicadores são agregados e não mostram a linha do tempo de ninguém.
+- "Ver jornada" leva à Jornada, que aplica a carteira atual do usuário.
+- Um gerente sem a permissão é bloqueado.
+- Exportação (Excel, CSV, PDF): Fase 6.
+
+### Testes
+- **Fase 5:** `tests/vendas_fase5_test.php`, com 47 verificações. Cobre:
+  - a classificação pura, todos os indicadores, cada filtro e os relatórios especializados;
+  - coerência com a Jornada;
+  - eventos depois da venda e atribuições encerradas;
+  - confirmada na revisão com entrada posterior;
+  - isolamento entre empresas.
+- **Mutações:** 16 de 16 detectadas.
+- **Navegador:** as 10 abas sem erro; no celular, todas cabem em 390px; gerente bloqueado.
