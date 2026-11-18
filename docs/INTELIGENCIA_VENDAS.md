@@ -6,7 +6,7 @@ com os leads, atendimentos, corretores, campanhas e históricos do WeMart Sales.
 | Fase | Conteúdo | Situação |
 |---|---|---|
 | 1 | Análise da planilha, do banco e da arquitetura; leitor e normalizador; regras de correspondência v1; diagnóstico só-leitura | **concluída** |
-| 2 | Importação: upload, mapeamento, validação, prévia, lotes, duplicidade, histórico de alterações | aguardando aprovação |
+| 2 | Importação: upload, mapeamento, validação, prévia, lotes, duplicidade, histórico de alterações | **concluída** |
 | 3 | Cruzamento persistido: índice de contatos, candidatos, revisão humana, auditoria, reprocessamento | — |
 | 4 | Jornada do Cliente: linha do tempo e tempos (jornada, responsabilidade, interação) | — |
 | 5 | Painel de conciliação, resultados detalhados e relatórios especializados | — |
@@ -141,3 +141,72 @@ A saída tem só contagens e nomes de empreendimentos e mídias. Ela responde, c
 - `includes/importacao.php`: leitor XLSX com limite de colunas configurável (padrão 50, como antes).
 - `ferramentas/analisar_vendas.php`: diagnóstico e prévia, sem gravar nada.
 - `tests/vendas_fase1_test.php`: 81 verificações com dados fictícios; 10 de 10 mutações detectadas.
+
+---
+
+## 9. Fase 2 — Importação (concluída)
+
+**Onde:** Relatórios → Inteligência de Vendas → **Importar vendas** (`/pages/vendas_importar.php`). Só quem tem a permissão `importar_vendas` (Master, por padrão).
+
+### Fluxo
+1. **Enviar:** a empresa é sempre a empresa ativa da sessão (campo só leitura); escolhe-se o sistema de origem (HM) e o arquivo (XLSX ou CSV, até 5 MB e 5.000 linhas, 65+ colunas).
+2. **Conferir:**
+   - **Colunas:** as da HM são reconhecidas sozinhas. "Ajustar" permite trocar qualquer coluna e recalcula a prévia.
+   - **Campos obrigatórios:** data da venda, empreendimento e `id` ou `Venda RM`.
+   - **Colunas não usadas:** as pessoais aparecem como "não importadas (LGPD)"; as demais, como "informação extra". Nenhuma some em silêncio.
+3. **Prévia (nada gravado):**
+   - **Contagens:** novas, alteradas na origem, já importadas, repetidas no arquivo, inconsistentes (entram com alerta) e recusadas, com os motivos.
+   - **Tabela das linhas:** sem nome, telefone, e-mail nem CPF. Mostra só se o contato serve para o cruzamento.
+   - **Arquivo repetido:** se for o mesmo arquivo de um lote anterior (SHA-256), um aviso diz isso.
+4. **Confirmar:**
+   - **Situações:** a pessoa marca quais situações contam como venda (padrão: "Vendido"). As outras ficam gravadas, mas não contam.
+   - **Vendas alteradas:** ela também decide se atualiza as vendas que mudaram na origem.
+5. **Lote:**
+   - **Página do lote** (`/pages/vendas_lote.php`): contagens, resultado de cada linha (número da linha, id de origem, motivo, alertas) e campos alterados.
+   - **Reprocessar:** lê de novo o original guardado, com o mesmo mapeamento.
+   - **Histórico:** fica na página de importação.
+
+A prévia e a gravação usam a **mesma** análise (`vendas_analisar()`): o lote sempre bate com a prévia.
+
+### Regras de duplicidade e atualização
+- **Chave:** empresa + sistema de origem + `id`. Sem `id`, a venda é encontrada pela `Venda RM`.
+- **Mesmo `id` repetido no arquivo:** só a primeira linha vale; as outras ficam "ignoradas".
+- **`Venda RM` já usada por outra venda,** no arquivo ou no banco: a linha é **recusada** (conflito). Nunca cria duplicata.
+- **Venda já importada e igual:** "sem alteração". Reenviar o arquivo não duplica nada.
+- **Venda já importada e diferente:**
+  - É atualizada só com autorização na confirmação.
+  - O histórico (`vendas_externas_versoes`) guarda antes e depois dos campos comerciais.
+  - Para dados pessoais, o histórico registra só "alterado".
+- **Linhas recusadas:** sem identificador, data da venda vazia, inválida ou no futuro, ou empreendimento vazio.
+- **Linhas que entram com alerta:**
+  - `datacadastro` inválida (31/12/1969), no futuro ou depois da venda. Ela nunca substitui a entrada no CRM.
+  - Telefone fora do padrão.
+  - Valor zero.
+- **Gravação:** em transação. Uma falha no meio não deixa vendas parciais, e o lote fica "falhou" com o motivo.
+- **Nada é alterado em leads, Kanban, responsáveis, eventos ou automações** (verificado nos testes).
+
+### Decisões adotadas (configuráveis; respondem às perguntas da Fase 1)
+
+| Pergunta | Adotado |
+|---|---|
+| CPF | Só HMAC-SHA256 com chave do servidor **por empresa**, mais os 2 últimos dígitos. O número em claro nunca é gravado. Serve para confirmar identidade no futuro, sem permitir cruzar clientes do SaaS. |
+| Quem importa | Permissão `importar_vendas`, dada ao Master. Pode ser concedida a outras funções em Usuários e acessos. |
+| Arquivo original | Guardado em `storage/vendas/` (bloqueado ao navegador e fora do git) por **30 dias**, para reprocessar. Depois, o cron (`cron/rotinas.php`, etapa "vendas: arquivos") apaga o arquivo; os dados tratados ficam. |
+| Valor | Coluna `valor` = valor de venda da unidade (VGV), **não** receita. `tabela` e `desconto` ficam guardados à parte. |
+| Prefixos do corretor (CIA_, CORRETOR_…) | Guardados como texto, sem interpretação. A classificação interno/externo virá do cadastro de equivalências (Fase 3), com revisão humana. |
+
+### Tabelas (migração 017)
+`vendas_lotes`, `vendas_lote_linhas`, `vendas_externas`, `vendas_externas_versoes`; permissões `importar_vendas` e `ver_inteligencia_vendas`.
+
+### Testes
+- **Fase 2:** `tests/vendas_fase2_test.php`, com 62 verificações de dados fictícios. Cobre:
+  - repetição do arquivo, atualização controlada e histórico;
+  - conflito de `Venda RM` e busca pela `Venda RM` quando falta o `id`;
+  - mesmo cliente com duas unidades;
+  - isolamento entre empresas e permissões;
+  - CPF e colunas não gravadas, e auditoria sem dados pessoais;
+  - reprocessamento e descarte do original;
+  - falha no meio sem gravação parcial;
+  - leads intocados.
+- **Mutações:** 12 de 12 detectadas.
+- **Fluxo completo no navegador:** testado com planilha fictícia no formato da HM (65 colunas), no computador e no celular.

@@ -1931,3 +1931,20 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .rel-mod-vazio div { flex: 1; display: flex; flex-direction: column; }
 .rel-mod-vazio b { color: var(--ink); }
 @media (max-width: 640px) { .rel-mod-grade { grid-template-columns: 1fr; } .rel-mod-vazio { flex-wrap: wrap; } }
+
+/* ---------- Inteligência de Vendas (importação) ---------- */
+.txt-warn { color: var(--amber); }
+.txt-bad { color: var(--red); }
+.regra-lista li.is-warn svg { color: var(--amber); }
+.vendas-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.vendas-motivos { margin-top: 18px; gap: 18px; }
+.vendas-colunas > summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.vendas-colunas > summary::-webkit-details-marker { display: none; }
+.vendas-colunas[open] > summary { margin-bottom: 8px; }
+.vendas-colunas form .muted { margin: 10px 0; }
+.vendas-contato { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #f1f2f6; color: #8a91a6; text-decoration: line-through; }
+.vendas-contato.is-ok { background: #e7f6f0; color: var(--green); text-decoration: none; }
+.vendas-previa td small { color: #5b6378; }
+.vendas-arquivo-nota { display: flex; align-items: center; gap: 6px; margin: 4px 0 16px; }
+.vendas-arquivo-nota svg { width: 16px; height: 16px; flex: none; }
+.header .actions form { display: inline-flex; flex-direction: column; }

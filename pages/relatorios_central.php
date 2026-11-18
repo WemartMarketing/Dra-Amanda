@@ -52,13 +52,16 @@ $cat = [
         [relui_relatorios()['perdas'][0], relui_relatorios()['perdas'][1], $r('perdas'), true],
         ['Transferências (detalhe)', 'Transferências por motivo e pela estrutura anterior, com a série no tempo.', '/pages/relatorios.php', true],
     ],
+    'vendas' => [
+        ['Importar vendas', 'Planilha de vendas do sistema comercial (HM): mapeamento, validação, prévia e histórico de lotes.', '/pages/vendas_importar.php', $tem('importar_vendas')],
+    ],
     'auditoria' => [
         ['Auditoria', 'Quem fez o quê, inclusive exportações.', '/pages/auditoria.php', $tem('visualizar_auditoria')],
         ['Qualidade dos dados', 'Origem não detalhada, atribuições sem estrutura, contratos sem registro…', '/pages/qualidade_dados.php', $tem('visualizar_auditoria') || $tem('administrar_usuarios')],
     ],
 ];
 $icones = ['executiva' => 'chart', 'leads' => 'list', 'corretores' => 'users', 'empreendimentos' => 'building', 'plantoes' => 'map',
-           'marketing' => 'anuncio', 'whatsapp' => 'whatsapp', 'visitas' => 'calendar', 'perdas' => 'alert', 'auditoria' => 'shield'];
+           'marketing' => 'anuncio', 'whatsapp' => 'whatsapp', 'visitas' => 'calendar', 'perdas' => 'alert', 'vendas' => 'target', 'auditoria' => 'shield'];
 
 $pageTitle = 'Relatórios — ' . APP_NAME;
 require __DIR__ . '/../includes/layout_start.php';
@@ -76,7 +79,7 @@ require __DIR__ . '/../includes/layout_start.php';
 </div>
 
 <div class="rel-central">
-    <?php foreach (relatorio_categorias() as $k => $cRot): $itens = array_filter($cat[$k] ?? [], fn ($i) => $i[3]); if (!$itens) continue; ?>
+    <?php foreach (array_merge(relatorio_categorias(), ['vendas' => 'Inteligência de Vendas']) as $k => $cRot): $itens = array_filter($cat[$k] ?? [], fn ($i) => $i[3]); if (!$itens) continue; ?>
         <section class="card rel-cat" aria-labelledby="cat-<?= e($k) ?>">
             <div class="rel-cat-topo"><span class="kpi-icon"><?= icon($icones[$k] ?? 'chart') ?></span><h2 id="cat-<?= e($k) ?>"><?= e(is_array($cRot) ? $cRot['nome'] ?? $k : $cRot) ?></h2></div>
             <ul class="rel-cat-lista">

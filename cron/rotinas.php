@@ -64,6 +64,10 @@ try {
         return $r['perdidos'] . ' recuperado(s), ' . $r['redistribuidos'] . ' redistribuído(s), ' . $r['em_fila'] . ' na fila';
     });
     $etapa('temporários', fn () => importacao_limpar_temporarios(3600) . ' apagado(s)');
+    $etapa('vendas: arquivos', function () {
+        require_once __DIR__ . '/../includes/vendas/importacao.php';
+        return vendas_descartar_arquivos() . ' original(is) descartado(s)';
+    });
     $etapa('whatsapp', function () {
         $r = wa_processar_pendentes(300);
         return $r['tentados'] . ' aviso(s), ' . $r['processados'] . ' ok, ' . $r['erros'] . ' erro(s)';
