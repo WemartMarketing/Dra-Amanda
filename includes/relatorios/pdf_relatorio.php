@@ -137,8 +137,17 @@ function relpdf_documento(array $secoes, string $tituloDoc, string $destino): in
                     $pdf->texto($x + 10, $ly, $l, RELPDF_CINZA);
                     $ly += 9;
                 }
-                $pdf->fonte(true, 15);
-                $pdf->texto($x + 10, $y + 44, $pdf->caber(relui_valor($ind['valor'], $ind['unidade']), $cw - 18));
+                if ($ind['valor'] !== null && !is_numeric($ind['valor'])) {
+                    // Valor de texto (nome, data, classificação): fonte menor, até 2 linhas.
+                    $pdf->fonte(true, 10);
+                    $tl = array_slice($pdf->quebrar((string) $ind['valor'], $cw - 18), 0, 2);
+                    foreach ($tl as $k => $l) {
+                        $pdf->texto($x + 10, $y + (count($tl) > 1 ? 38 : 44) + $k * 12, $k === 1 ? $pdf->caber($l, $cw - 18) : $l);
+                    }
+                } else {
+                    $pdf->fonte(true, 15);
+                    $pdf->texto($x + 10, $y + 44, $pdf->caber(relui_valor($ind['valor'], $ind['unidade']), $cw - 18));
+                }
                 [$vt, $vc] = $ind['anterior'] !== null || $ind['variacao'] !== null ? relui_variacao($ind) : ['', ''];
                 if ($vt !== '') {
                     $pdf->fonte(false, 7);

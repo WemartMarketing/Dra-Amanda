@@ -10,7 +10,7 @@ com os leads, atendimentos, corretores, campanhas e históricos do WeMart Sales.
 | 3 | Cruzamento persistido: índice de contatos, candidatos, revisão humana, auditoria, reprocessamento | **concluída** |
 | 4 | Jornada do Cliente: linha do tempo e tempos (jornada, responsabilidade, interação) | **concluída** |
 | 5 | Painel de conciliação, resultados detalhados e relatórios especializados | **concluída** |
-| 6 | Exportações (Excel, CSV, PDF), testes de integridade e segurança | — |
+| 6 | Exportações (Excel, CSV, PDF), testes de integridade e segurança | **concluída** |
 
 ---
 
@@ -418,3 +418,90 @@ Cada aba termina com **fonte, período, data de geração e nota metodológica**
   - isolamento entre empresas.
 - **Mutações:** 16 de 16 detectadas.
 - **Navegador:** as 10 abas sem erro; no celular, todas cabem em 390px; gerente bloqueado.
+
+---
+
+## 13. Fase 6 — Exportações, integridade e segurança (concluída)
+
+### Exportações
+O botão **Exportar** fica no Painel, na Conciliação e na Jornada. O arquivo leva os mesmos filtros da tela e usa o **mesmo gerador da Central de Relatórios**:
+- **Excel** real, com as abas Resumo, Detalhamento e Notas;
+- **CSV** com fórmulas neutralizadas (só a tabela mais detalhada);
+- **PDF** próprio.
+
+Todo arquivo tem cabeçalho (empresa, período, filtros, data e hora, fuso e quem gerou) e as notas de método.
+
+| Exportação | Resumido | Completo |
+|---|---|---|
+| Painel | Indicadores e tabelas agregadas (empreendimento, mídia, faixas de jornada, movimentos entre empreendimentos, classificação comercial, produtividade) | + resultados por venda, com o nome do cliente |
+| Conciliação | Vendas por situação do cruzamento | + lista de vendas, com o nome do cliente |
+| Jornada | — | Sempre completo: indicadores, quem atendeu e linha do tempo |
+
+**Regras:**
+- **Telefone, e-mail e CPF nunca saem**, nem no completo. Os testes procuram esses dados em todos os arquivos gerados.
+- **Permissões:** `exportar_relatorios` + `ver_inteligencia_vendas`.
+- **Ciência LGPD:** obrigatória para tudo que traz nome de cliente (completo e jornada).
+- **Jornada:** só sai quando o cliente está na carteira atual de quem exporta. As oportunidades de outras carteiras ficam fora, com aviso.
+- **Auditoria:** toda exportação fica registrada (tipo, formato, nível, linhas, filtros), sem dados pessoais.
+- **Isolamento:** outra empresa não exporta nem vê nada da sua.
+
+### LGPD: apagar os dados pessoais de uma venda (migração 019)
+- **Onde:** na tela de correspondência da venda. Exige a permissão `importar_vendas` (Master) e um motivo, por exemplo o protocolo do pedido do titular.
+- **O que apaga:** nome, telefones, e-mail e CPF codificado. Ficam data, empreendimento e valor, sem identificar a pessoa.
+- **Vínculo com o CRM:** dependia dos contatos, então é desfeito. Os leads do CRM não mudam; para eles existe a anonimização na ficha do lead.
+- **Reimportação:** a venda fica marcada. Reenviar a planilha (mesmo com valores alterados) atualiza os dados comerciais, mas **não devolve** os dados pessoais.
+- **Auditoria:** registra o motivo, sem o nome.
+
+### Integridade (só leitura)
+Fica no painel **Qualidade dos dados**, na seção "Inteligência de Vendas", e no terminal:
+```bash
+php -q ferramentas/verificar_vendas.php [--empresa=ID]   # sai com código 2 se houver item crítico
+```
+
+| Nível | Verifica |
+|---|---|
+| Crítico | Vínculo com lead de **outra empresa**; venda "vinculada" sem lead; leads vinculados em venda não vinculada; decisão humana sem justificativa; lote com linhas faltando no registro; índice com lead excluído ou de outra empresa; venda anonimizada que ainda tem dado pessoal |
+| Atenção | Vendas não cruzadas; vínculo com lead excluído; ambíguas aguardando revisão; cruzamento com regras antigas; originais vencidos ainda guardados (cron parado?); empreendimentos e corretores sem equivalência |
+| Informativo | Lotes que falharam |
+
+Em quase todos os casos, "Recalcular cruzamento" corrige; isso é testado com inconsistências injetadas.
+
+### Segurança verificada nos testes
+- **Endpoints:** toda API do módulo passa por `api_iniciar` (sessão, CSRF, permissão) e não concatena entrada do usuário em SQL.
+- **Telas:** toda página do módulo verifica a permissão e mantém o superadmin fora dos dados da empresa. Os valores impressos passam por `e()` ou por conversão numérica.
+- **Comunicação:** o módulo **nunca** grava em WhatsApp, campanhas, automações nem jornadas automáticas.
+- **Logs:** os logs de erro não levam nome, telefone, e-mail nem CPF.
+
+### Os 20 cenários obrigatórios
+
+| # | Cenário | Onde é testado |
+|---|---|---|
+| 1 | Telefone e e-mail coincidindo | `vendas_fase1` (regras), `vendas_fase3` (motor) |
+| 2 | Apenas telefone coincidindo | `vendas_fase1`, `vendas_fase3` |
+| 3 | Apenas e-mail coincidindo | `vendas_fase1`, `vendas_fase3` |
+| 4 | Telefone de um cliente e e-mail de outro | `vendas_fase1`, `vendas_fase3` (ambígua + revisão) |
+| 5 | Vários leads do mesmo cliente | `vendas_fase1`, `vendas_fase3`, `vendas_fase4` |
+| 6 | Dois empreendimentos de interesse | `vendas_fase3`, `vendas_fase4` (interesses e intermediário) |
+| 7 | Comprou empreendimento diferente | `vendas_fase4`, `vendas_fase5` (movimentos) |
+| 8 | Histórico de transferência | `vendas_fase4`, `vendas_fase5` (transferência depois da venda não conta) |
+| 9 | Passou pela oferta ativa | `vendas_fase4`, `vendas_fase5` |
+| 10 | Recebeu remarketing | `vendas_fase4`, `vendas_fase5` (campanha depois da venda não conta) |
+| 11 | Venda por outro corretor | `vendas_fase4`, `vendas_fase5` (classificação comercial) |
+| 12 | Vendedor externo não identificado | `vendas_fase4`, `vendas_fase5` (prefixo não classifica) |
+| 13 | Sem correspondência no CRM | `vendas_fase1`, `vendas_fase3`, `vendas_fase4` |
+| 14 | Lead cadastrado depois da venda | `vendas_fase1`, `vendas_fase3`, `vendas_fase5` (confirmada mas posterior) |
+| 15 | Datas inconsistentes | `vendas_fase1` (sentinela, futura, depois da venda), `vendas_fase2` |
+| 16 | Importação repetida do mesmo arquivo | `vendas_fase2`, `vendas_fase6` (com venda anonimizada) |
+| 17 | Mesmo cliente com mais de uma unidade | `vendas_fase1`, `vendas_fase2`, `vendas_fase3` |
+| 18 | Restrições por gerente e superintendência | `vendas_fase3` (revisão), `vendas_fase4` (jornada), `vendas_fase6` (exportação) |
+| 19 | Isolamento entre empresas | Todas as fases |
+| 20 | Exportações e proteção de dados | `vendas_fase6` |
+
+**Totais do módulo:** 371 verificações automatizadas, só com dados fictícios. Em cada fase, os testes de mutação confirmaram que os testes detectam erros nas regras importantes.
+
+### Implantação (resumo)
+1. `git pull` no servidor.
+2. Migrações **017, 018 e 019** (`docs/DEPLOY_HOSTGATOR.md`, itens 23 a 25).
+3. Conferir se o cron `cron/rotinas.php` está ativo (descarte dos originais após 30 dias).
+4. Importar a planilha pela tela, cadastrar as **equivalências** de empreendimentos e corretores e revisar as ambíguas.
+5. Rodar `php -q ferramentas/verificar_vendas.php` para conferir a integridade.

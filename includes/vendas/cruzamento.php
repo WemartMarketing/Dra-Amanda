@@ -449,6 +449,57 @@ function vendas_revisar(array $usuario, int $vendaId, string $decisao, array $le
     return $novaDecisao;
 }
 
+// ------------------------------------------------------------------ LGPD
+
+/**
+ * Apaga os dados pessoais de uma venda importada (pedido do titular):
+ * nome, telefones, e-mail e CPF codificado. Os dados comerciais ficam (valor,
+ * empreendimento, data), sem identificar a pessoa. O vínculo com o CRM, que
+ * dependia desses contatos, é desfeito; reimportações não devolvem os dados.
+ */
+function vendas_anonimizar(array $usuario, int $vendaId, string $justificativa): void
+{
+    $empresaId = (int) $usuario['empresa_ativa_id'];
+    if (!modulo_tabela_existe('vendas_externas') || !vendas_coluna_anonimizada()) {
+        throw new RuntimeException('Rode a migração 019.');
+    }
+    if (mb_strlen(trim($justificativa)) < 5) {
+        throw new InvalidArgumentException('Informe o motivo (ex.: pedido do titular, protocolo nº ...).');
+    }
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id FROM vendas_externas WHERE id = :id AND empresa_id = :e');
+    $st->execute(['id' => $vendaId, 'e' => $empresaId]);
+    if (!$st->fetchColumn()) {
+        throw new InvalidArgumentException('Venda não encontrada.');
+    }
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('UPDATE vendas_externas SET cliente_nome = NULL, telefone1 = NULL, telefone2 = NULL, email = NULL, cpf_hash = NULL, cpf_final = NULL,
+                       anonimizada_em = NOW(), anonimizada_por = :u, hash_conteudo = \'\' WHERE id = :id AND empresa_id = :e')->execute(['u' => (int) $usuario['id'], 'id' => $vendaId, 'e' => $empresaId]);
+        // Histórico de versões pode guardar só "alterado" para dados pessoais: nada a apagar ali.
+        $pdo->prepare("UPDATE vendas_correspondencias SET decisao = 'automatica' WHERE venda_id = :v")->execute(['v' => $vendaId]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+    auditoria_registrar($empresaId, (int) $usuario['id'], 'vendas_anonimizar', 'venda_externa', $vendaId, ['motivo' => mb_substr(trim($justificativa), 0, 200)]);
+    if (vendas_cruzamento_instalado()) {
+        $st = $pdo->prepare('SELECT * FROM vendas_externas WHERE id = :id');
+        $st->execute(['id' => $vendaId]);
+        vendas_cruzar_venda($empresaId, $st->fetch());
+    }
+}
+
+function vendas_coluna_anonimizada(): bool
+{
+    static $tem = null;
+    if ($tem === null) {
+        $tem = (bool) db()->query("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'vendas_externas' AND column_name = 'anonimizada_em'")->fetchColumn();
+    }
+    return $tem;
+}
+
 // ------------------------------------------------------------------ máscaras (telas)
 
 /** (11) 9••••-4321 — só o suficiente para comparar. */

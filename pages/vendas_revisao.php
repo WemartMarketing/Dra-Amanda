@@ -162,6 +162,21 @@ require __DIR__ . '/../includes/layout_start.php';
         <?php endif; ?>
     </form>
 
+    <?php if (!empty($venda['anonimizada_em'])): ?>
+        <div class="rel-nota" role="note"><?= icon('shield') ?><span>Dados pessoais desta venda apagados em <?= date('d/m/Y H:i', strtotime($venda['anonimizada_em'])) ?> (LGPD). Novas importações não os devolvem.</span></div>
+    <?php elseif (usuario_tem_permissao($usuario, 'importar_vendas') && vendas_coluna_anonimizada()): ?>
+        <details class="card vendas-lgpd">
+            <summary><?= icon('shield') ?><b>LGPD:</b> apagar os dados pessoais desta venda</summary>
+            <form data-api-form action="/api/vendas_conciliacao.php">
+                <input type="hidden" name="acao" value="anonimizar"><input type="hidden" name="venda_id" value="<?= (int) $venda['id'] ?>">
+                <p class="muted">Para pedidos do titular. Apaga nome, telefones, e-mail e CPF codificado desta venda; ficam só os dados comerciais (data, empreendimento, valor), sem identificar a pessoa. O vínculo com o CRM é desfeito e nova importação do mesmo arquivo não devolve os dados. Não altera os leads do CRM (para eles, use a anonimização na ficha do lead).</p>
+                <div class="field"><label for="v-anon">Motivo</label><input type="text" id="v-anon" name="justificativa" required minlength="5" maxlength="200" placeholder="Ex.: pedido do titular, protocolo nº ..."></div>
+                <div class="form-alert" data-form-alerta hidden></div>
+                <button type="submit" class="btn btn-outline danger-outline"><?= icon('trash') ?>Apagar dados pessoais</button>
+            </form>
+        </details>
+    <?php endif; ?>
+
     <?php if ($revisoes || $historico): ?>
         <div class="card">
             <div class="card-head"><div><h2>Histórico</h2><p>Decisões humanas e mudanças do cruzamento automático.</p></div></div>

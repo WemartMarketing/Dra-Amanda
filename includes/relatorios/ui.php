@@ -265,6 +265,9 @@ function relui_valor($v, string $unidade = ''): string
     if ($v === null) {
         return '—';
     }
+    if (!is_numeric($v)) {
+        return (string) $v;   // indicador de texto (ex.: nome, data, "Sim"): nunca vira 0
+    }
     switch ($unidade) {
         case '%':
             return number_format((float) $v, 1, ',', '.') . '%';

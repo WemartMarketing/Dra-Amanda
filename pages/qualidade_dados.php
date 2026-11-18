@@ -18,6 +18,12 @@ if (!empty($usuario['eh_superadmin']) || !(usuario_tem_permissao($usuario, 'visu
     pagina_acesso_restrito($crumb, $activeNav, 'Ver auditoria');
 }
 $secoes = relatorio_auditoria_dados((int) $usuario['empresa_ativa_id']);
+if (is_file(__DIR__ . '/../includes/vendas/integridade.php')) {
+    require_once __DIR__ . '/../includes/vendas/integridade.php';
+    if (vendas_instalado()) {
+        $secoes['Inteligência de Vendas'] = vendas_integridade((int) $usuario['empresa_ativa_id']);
+    }
+}
 $cont = ['critico' => 0, 'alerta' => 0, 'ok' => 0];
 foreach ($secoes as $itens) {
     foreach ($itens as $it) {
@@ -37,6 +43,11 @@ $corrigir = [
     'Leads em "Contrato assinado" sem contrato registrado' => ['/pages/kanban.php', 'Registrar os contratos na ficha'],
     'Tarifas de mensagem' => ['/pages/whatsapp.php', 'Cadastrar tarifas'],
     'Equipes sem superintendência' => ['/pages/equipes.php', 'Ajustar equipes'],
+    'Vendas ainda não cruzadas' => ['/pages/vendas_conciliacao.php', 'Abrir a conciliação'],
+    'Ambíguas aguardando revisão' => ['/pages/vendas_conciliacao.php?s=ambigua', 'Revisar'],
+    'Cruzamentos com regras antigas' => ['/pages/vendas_conciliacao.php', 'Recalcular o cruzamento'],
+    'Vendas com empreendimento sem equivalência' => ['/pages/vendas_equivalencias.php', 'Cadastrar equivalências'],
+    'Vendas com corretor sem equivalência' => ['/pages/vendas_equivalencias.php?aba=corretores', 'Cadastrar equivalências'],
 ];
 $onde = function (string $rotulo) use ($corrigir) {
     foreach ($corrigir as $prefixo => $x) {

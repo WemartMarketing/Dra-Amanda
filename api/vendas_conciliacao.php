@@ -40,6 +40,13 @@ try {
             vendas_equivalencia_salvar($usuario, $tipoEq, (string) ($_POST['valor_texto'] ?? ''), $dados);
             api_responder(['ok' => true, 'mensagem' => 'Equivalência salva.']);
 
+        case 'anonimizar':
+            if (!usuario_tem_permissao($usuario, 'importar_vendas')) {
+                api_erro('Só quem importa vendas pode anonimizar.', 403);
+            }
+            vendas_anonimizar($usuario, (int) ($_POST['venda_id'] ?? 0), (string) ($_POST['justificativa'] ?? ''));
+            api_responder(['ok' => true, 'mensagem' => 'Dados pessoais da venda apagados.']);
+
         case 'imobiliaria':
             $nome = api_texto($_POST['nome'] ?? null);
             if (!$nome) {

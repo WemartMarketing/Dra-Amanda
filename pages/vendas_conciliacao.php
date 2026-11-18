@@ -9,6 +9,7 @@ require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/lead_componentes.php';
 require_once __DIR__ . '/../includes/vendas/cruzamento.php';
+require_once __DIR__ . '/../includes/vendas/exportar_ui.php';
 
 $usuario = auth_require();
 $crumb = 'Conciliação de vendas';
@@ -80,6 +81,7 @@ require __DIR__ . '/../includes/layout_start.php';
         <p>Cada venda importada do sistema comercial e o que o cruzamento encontrou no CRM, por telefone e e-mail. Ambíguas só viram vínculo depois de revisadas por uma pessoa. Nome nunca é usado como prova.</p>
     </div>
     <div class="actions">
+        <?php if ($instalado) { vendas_exportar_botao($usuario, 'conciliacao', ['lote' => $loteF ?: null]); } ?>
         <?php if ($podeRevisar && $instalado): ?>
             <button type="button" class="btn btn-outline" data-api-acao="/api/vendas_conciliacao.php" data-acao="recalcular" data-confirmar="Refazer o cruzamento de todas as vendas com os dados atuais do CRM? Decisões humanas são mantidas."><?= icon('refresh') ?>Recalcular cruzamento</button>
             <a class="btn btn-outline" href="/pages/vendas_equivalencias.php"><?= icon('building') ?>Equivalências</a>

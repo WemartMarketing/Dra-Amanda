@@ -276,6 +276,14 @@ function vendas_analisar(int $empresaId, string $sistema, array $leitura, array 
             $reg['eh_venda'] = in_array($sit, $situacoesVenda, true) ? 1 : 0;
             $r['registro'] = $reg;
             $existente = $existPorChave[$chave] ?? $existenteRm;
+            if ($existente && !empty($existente['anonimizada_em'])) {
+                // Anonimizada a pedido do titular: a reimportação NUNCA devolve os dados pessoais.
+                foreach (VENDAS_CAMPOS_PESSOAIS as $cp) {
+                    $reg[$cp] = null;
+                }
+                $r['registro'] = $reg;
+                $r['alertas'][] = 'Venda anonimizada (LGPD): dados pessoais da planilha ignorados.';
+            }
             if (!$existente) {
                 $r['resultado'] = 'incluida';
             } else {

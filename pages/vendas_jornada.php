@@ -10,6 +10,7 @@ require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/lead_componentes.php';
 require_once __DIR__ . '/../includes/criativo_ui.php';
 require_once __DIR__ . '/../includes/vendas/jornada.php';
+require_once __DIR__ . '/../includes/vendas/exportar_ui.php';
 
 $usuario = auth_require();
 $crumb = 'Jornada do Cliente';
@@ -43,7 +44,7 @@ require __DIR__ . '/../includes/layout_start.php';
             <p>Comprou <b><?= e($J['movimento']['comprado_nome'] ?? $v['empreendimento_texto'] ?? '—') ?></b><?= $v['unidade'] ? ' (unidade ' . e($v['unidade']) . ')' : '' ?> em <b><?= $data($v['data_venda']) ?></b> por <?= e($brl($v['valor'])) ?> · venda <?= e($v['chave_origem']) ?> no sistema comercial</p>
         <?php else: ?><h1>Venda não encontrada</h1><?php endif; ?>
     </div>
-    <?php if ($J): ?><div class="actions"><a class="btn btn-outline" href="/pages/vendas_revisao.php?id=<?= (int) $J['venda']['id'] ?>"><?= icon('search') ?>Ver correspondência</a></div><?php endif; ?>
+    <?php if ($J): ?><div class="actions"><?php if ($J['acesso'] === 'ok') { vendas_exportar_botao($usuario, 'jornada', ['venda' => (int) $J['venda']['id']]); } ?><a class="btn btn-outline" href="/pages/vendas_revisao.php?id=<?= (int) $J['venda']['id'] ?>"><?= icon('search') ?>Ver correspondência</a></div><?php endif; ?>
 </div>
 
 <?php if (!$J): ?>

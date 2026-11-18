@@ -2055,3 +2055,8 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .vp-filtros-box > summary { list-style: none; margin-bottom: 12px; display: inline-flex; }
 .vp-filtros-box > summary::-webkit-details-marker { display: none; }
 @media (min-width: 641px) { .vp-filtros-box > summary { display: none; } }
+.vendas-lgpd > summary { cursor: pointer; display: flex; gap: 8px; align-items: center; list-style: none; }
+.vendas-lgpd > summary::-webkit-details-marker { display: none; }
+.vendas-lgpd > summary svg { width: 16px; height: 16px; color: var(--muted); }
+.vendas-lgpd[open] > summary { margin-bottom: 10px; }
+.danger-outline { color: var(--red); border-color: #f1c7cd; }

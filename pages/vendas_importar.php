@@ -126,12 +126,12 @@ require __DIR__ . '/../includes/layout_start.php';
         </div>
         <?php if ($an): $c = $an['contagens']; ?>
             <div class="kpi-grid vendas-kpis">
-                <div class="kpi"><div class="kpi-top"><span class="label">Novas</span><div class="kpi-icon"><?= icon('plus') ?></div></div><div class="kpi-value txt-ok"><?= $c['incluida'] ?></div><div class="kpi-sub">serão incluídas</div></div>
-                <div class="kpi"><div class="kpi-top"><span class="label">Alteradas na origem</span><div class="kpi-icon"><?= icon('edit') ?></div></div><div class="kpi-value"><?= $c['atualizada'] ?></div><div class="kpi-sub">já importadas, com mudanças</div></div>
-                <div class="kpi"><div class="kpi-top"><span class="label">Já importadas</span><div class="kpi-icon"><?= icon('check') ?></div></div><div class="kpi-value"><?= $c['sem_alteracao'] ?></div><div class="kpi-sub">iguais: nada muda</div></div>
-                <div class="kpi"><div class="kpi-top"><span class="label">Repetidas no arquivo</span><div class="kpi-icon"><?= icon('users') ?></div></div><div class="kpi-value"><?= $c['repetidas_no_arquivo'] ?></div><div class="kpi-sub">mesmo id; só a 1ª vale</div></div>
-                <div class="kpi"><div class="kpi-top"><span class="label">Inconsistentes</span><div class="kpi-icon"><?= icon('info') ?></div></div><div class="kpi-value txt-warn"><?= $c['com_alerta'] ?></div><div class="kpi-sub">importadas com alerta</div></div>
-                <div class="kpi"><div class="kpi-top"><span class="label">Recusadas</span><div class="kpi-icon"><?= icon('alert') ?></div></div><div class="kpi-value<?= $c['erro'] ? ' txt-bad' : '' ?>"><?= $c['erro'] ?></div><div class="kpi-sub">não serão gravadas</div></div>
+                <div class="kpi"><div class="kpi-top"><span class="label">Novas</span><div class="kpi-icon"><?= icon('plus') ?></div></div><div class="kpi-value txt-ok"><?= (int) $c['incluida'] ?></div><div class="kpi-sub">serão incluídas</div></div>
+                <div class="kpi"><div class="kpi-top"><span class="label">Alteradas na origem</span><div class="kpi-icon"><?= icon('edit') ?></div></div><div class="kpi-value"><?= (int) $c['atualizada'] ?></div><div class="kpi-sub">já importadas, com mudanças</div></div>
+                <div class="kpi"><div class="kpi-top"><span class="label">Já importadas</span><div class="kpi-icon"><?= icon('check') ?></div></div><div class="kpi-value"><?= (int) $c['sem_alteracao'] ?></div><div class="kpi-sub">iguais: nada muda</div></div>
+                <div class="kpi"><div class="kpi-top"><span class="label">Repetidas no arquivo</span><div class="kpi-icon"><?= icon('users') ?></div></div><div class="kpi-value"><?= (int) $c['repetidas_no_arquivo'] ?></div><div class="kpi-sub">mesmo id; só a 1ª vale</div></div>
+                <div class="kpi"><div class="kpi-top"><span class="label">Inconsistentes</span><div class="kpi-icon"><?= icon('info') ?></div></div><div class="kpi-value txt-warn"><?= (int) $c['com_alerta'] ?></div><div class="kpi-sub">importadas com alerta</div></div>
+                <div class="kpi"><div class="kpi-top"><span class="label">Recusadas</span><div class="kpi-icon"><?= icon('alert') ?></div></div><div class="kpi-value<?= $c['erro'] ? ' txt-bad' : '' ?>"><?= (int) $c['erro'] ?></div><div class="kpi-sub">não serão gravadas</div></div>
             </div>
             <?php if ($an['motivos_erro'] || $an['motivos_alerta']): ?>
                 <div class="grid-2 vendas-motivos">
