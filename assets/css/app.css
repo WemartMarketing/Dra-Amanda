@@ -1948,3 +1948,41 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 .vendas-arquivo-nota { display: flex; align-items: center; gap: 6px; margin: 4px 0 16px; }
 .vendas-arquivo-nota svg { width: 16px; height: 16px; flex: none; }
 .header .actions form { display: inline-flex; flex-direction: column; }
+
+/* ---------- Inteligência de Vendas (conciliação) ---------- */
+.chips-filtro { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips-filtro .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13px; text-decoration: none; }
+.chips-filtro a.chip:hover { border-color: var(--accent); }
+.chips-filtro .chip.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chips-filtro .chip b { font-weight: 700; }
+.vendas-filtros { flex-wrap: wrap; gap: 12px; align-items: center; }
+.vendas-busca { display: flex; gap: 8px; align-items: center; }
+.vendas-busca input[type=search] { min-width: 220px; }
+.vendas-alerta { color: var(--amber); vertical-align: middle; cursor: help; }
+.vendas-alerta svg { width: 16px; height: 16px; }
+.paginacao { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 16px; }
+.vendas-metodo { margin-top: 14px; font-size: 13px; }
+.vendas-dl { display: grid; grid-template-columns: minmax(140px, auto) 1fr; gap: 8px 16px; margin: 0; }
+.vendas-dl dt { color: #6b7389; font-size: 13px; }
+.vendas-dl dd { margin: 0; font-weight: 500; }
+.vendas-contato.is-mostra { text-decoration: none; }
+.vendas-decisao { margin: 8px 0 14px; }
+.vendas-historico { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.vendas-historico li { padding: 8px 0; border-bottom: 1px solid #eef0f5; }
+.vendas-abas { margin-bottom: 16px; }
+.vendas-equiv-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vendas-equiv-form select { min-width: 220px; max-width: 100%; }
+.vendas-equiv-form .form-alert { flex-basis: 100%; }
+.vendas-imobs { list-style: none; margin: 0; padding: 0; }
+.vendas-imobs li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eef0f5; }
+.vendas-imobs li.is-inativa span { opacity: .6; }
+.vendas-cruz-lote .chips-filtro .chip { background: #fafbfd; }
+@media (max-width: 640px) {
+    .vendas-dl { grid-template-columns: 1fr; gap: 2px; }
+    .vendas-dl dd { margin-bottom: 8px; }
+    .vendas-busca { width: 100%; }
+    .vendas-busca input[type=search] { min-width: 0; flex: 1; }
+    .vendas-equiv-form select { min-width: 0; width: 100%; }
+}
+.vendas-contato.is-variante { background: #fdf3e1; color: #a26a0b; text-decoration: none; }
+.vendas-equiv-form select, .vendas-busca input[type=search] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 14px; background: #fff; color: var(--ink); font-family: inherit; }

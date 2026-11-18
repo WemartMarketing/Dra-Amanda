@@ -7,7 +7,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/estrutura.php';
 require_once __DIR__ . '/../includes/lead_componentes.php';
-require_once __DIR__ . '/../includes/vendas/importacao.php';
+require_once __DIR__ . '/../includes/vendas/cruzamento.php';
 
 $usuario = auth_require();
 $crumb = 'Lote de vendas';
@@ -41,6 +41,13 @@ if ($lote) {
     $st->execute(['l' => $lote['id']]);
     foreach ($st->fetchAll() as $v) {
         $alteracoes[(int) $v['venda_id']] = array_keys(json_decode($v['alteracoes'], true) ?: []);
+    }
+    $cruz = [];
+    if (vendas_cruzamento_instalado()) {
+        $st = db()->prepare("SELECT CASE WHEN c.id IS NULL THEN 'pendente' WHEN c.decisao = 'automatica' THEN c.status ELSE c.decisao END s, COUNT(*) q
+                             FROM vendas_externas v LEFT JOIN vendas_correspondencias c ON c.venda_id = v.id WHERE v.empresa_id = :e AND v.ultimo_lote_id = :l GROUP BY s");
+        $st->execute(['e' => $empresaId, 'l' => $lote['id']]);
+        $cruz = array_column($st->fetchAll(), 'q', 's');
     }
     $arquivoDisponivel = false;
     $orig = $lote['reprocessa_lote_id'] ? vendas_lote_carregar($empresaId, (int) $lote['reprocessa_lote_id']) : $lote;
@@ -101,6 +108,14 @@ require __DIR__ . '/../includes/layout_start.php';
         <?php elseif ($arquivoDisponivel): ?>Usa o arquivo original do lote #<?= (int) $lote['reprocessa_lote_id'] ?>.
         <?php else: ?>Arquivo original já descartado; os dados tratados continuam disponíveis.<?php endif; ?>
     </p>
+
+    <?php if ($cruz): $sitV = vendas_situacoes() + ['pendente' => ['Não cruzada', 'pill-muted']]; ?>
+        <div class="card vendas-cruz-lote">
+            <div class="card-head"><div><h2>Cruzamento com o CRM</h2><p>Vendas deste lote, por resultado.</p></div>
+                <?php if (usuario_tem_permissao($usuario, 'ver_inteligencia_vendas')): ?><a class="btn btn-primary btn-sm" href="/pages/vendas_conciliacao.php?lote=<?= (int) $lote['id'] ?>"><?= icon('arrow-r') ?>Abrir na conciliação</a><?php endif; ?></div>
+            <div class="chips-filtro"><?php foreach ($cruz as $k => $n): ?><span class="chip"><span class="pill <?= $sitV[$k][1] ?? 'pill-muted' ?>"><?= e($sitV[$k][0] ?? $k) ?></span> <b><?= (int) $n ?></b></span><?php endforeach; ?></div>
+        </div>
+    <?php endif; ?>
 
     <div class="card">
         <div class="card-head">

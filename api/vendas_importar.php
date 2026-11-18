@@ -9,7 +9,7 @@
  * Nada aqui altera leads, Kanban ou automações.
  */
 require_once __DIR__ . '/../includes/api.php';
-require_once __DIR__ . '/../includes/vendas/importacao.php';
+require_once __DIR__ . '/../includes/vendas/cruzamento.php';
 
 $usuario = api_iniciar('importar_vendas');
 $empresaId = (int) $usuario['empresa_ativa_id'];
@@ -30,6 +30,20 @@ $sessaoDoToken = function () use ($usuario, $empresaId): array {
         api_erro('O arquivo temporário expirou (1 hora). Envie a planilha de novo.', 410);
     }
     return [$token, $s, $caminho];
+};
+
+// Passo 8 do fluxo: cruza as vendas do lote com o CRM logo após importar. Se falhar, a importação continua válida.
+$cruzarLote = function (int $loteId) use ($empresaId): string {
+    if (!vendas_cruzamento_instalado()) {
+        return 'Cruzamento: rode a migração 018.';
+    }
+    try {
+        $r = vendas_cruzar($empresaId, $loteId);
+        return 'Cruzamento feito em ' . $r['vendas'] . ' venda(s).';
+    } catch (Throwable $e) {
+        error_log('[vendas_cruzar] ' . $e->getMessage());
+        return 'O cruzamento não rodou agora; use "Recalcular cruzamento" na Conciliação.';
+    }
 };
 
 switch ($acao) {
@@ -112,7 +126,7 @@ switch ($acao) {
         }
         @unlink($caminho);
         unset($_SESSION['vendas_importacoes'][$token]);
-        api_responder(['ok' => true, 'id' => $loteId, 'mensagem' => 'Importação concluída.']);
+        api_responder(['ok' => true, 'id' => $loteId, 'mensagem' => 'Importação concluída. ' . $cruzarLote($loteId)]);
 
     case 'reprocessar':
         $loteId = (int) ($_POST['lote_id'] ?? 0);
@@ -124,7 +138,7 @@ switch ($acao) {
         } catch (Throwable $e) {
             api_erro(mb_substr($e->getMessage(), 0, 250), 422);
         }
-        api_responder(['ok' => true, 'id' => $novo, 'mensagem' => 'Lote reprocessado.']);
+        api_responder(['ok' => true, 'id' => $novo, 'mensagem' => 'Lote reprocessado. ' . $cruzarLote($novo)]);
 
     default:
         api_erro('Ação inválida.', 422);

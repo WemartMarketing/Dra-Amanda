@@ -7,7 +7,7 @@ com os leads, atendimentos, corretores, campanhas e históricos do WeMart Sales.
 |---|---|---|
 | 1 | Análise da planilha, do banco e da arquitetura; leitor e normalizador; regras de correspondência v1; diagnóstico só-leitura | **concluída** |
 | 2 | Importação: upload, mapeamento, validação, prévia, lotes, duplicidade, histórico de alterações | **concluída** |
-| 3 | Cruzamento persistido: índice de contatos, candidatos, revisão humana, auditoria, reprocessamento | — |
+| 3 | Cruzamento persistido: índice de contatos, candidatos, revisão humana, auditoria, reprocessamento | **concluída** |
 | 4 | Jornada do Cliente: linha do tempo e tempos (jornada, responsabilidade, interação) | — |
 | 5 | Painel de conciliação, resultados detalhados e relatórios especializados | — |
 | 6 | Exportações (Excel, CSV, PDF), testes de integridade e segurança | — |
@@ -210,3 +210,61 @@ A prévia e a gravação usam a **mesma** análise (`vendas_analisar()`): o lote
   - leads intocados.
 - **Mutações:** 12 de 12 detectadas.
 - **Fluxo completo no navegador:** testado com planilha fictícia no formato da HM (65 colunas), no computador e no celular.
+
+---
+
+## 10. Fase 3 — Cruzamento (concluída)
+
+**Telas:**
+- **Conciliação** (`/pages/vendas_conciliacao.php`, permissão `ver_inteligencia_vendas`): todas as vendas, com o resultado do cruzamento. Tem filtro por situação, busca por id, Venda RM ou cliente, filtro por lote e "Dias até a compra".
+- **Revisão** (`/pages/vendas_revisao.php`): a venda, os leads candidatos com a evidência de cada um e a decisão humana.
+- **Equivalências** (`/pages/vendas_equivalencias.php`, permissão `revisar_correspondencias`): empreendimentos, corretores e imobiliárias parceiras.
+
+O cruzamento roda **sozinho depois de cada importação** (passo 8 do fluxo) e no reprocessamento. Também pode ser refeito em "Recalcular cruzamento" quando entram dados novos no CRM.
+
+### Como funciona (`includes/vendas/cruzamento.php`)
+1. **Índice de contatos** (`contato_identificadores`): reconstruído a cada cruzamento a partir dos leads ativos da empresa e do telefone do contato de WhatsApp ligado ao lead.
+   - Leads excluídos (LGPD) ficam de fora.
+   - O índice é só um atalho; a fonte continua sendo `leads`.
+2. **Candidatos:** telefone e e-mail **exatos**, depois de padronizados. A variante do 9º dígito só aponta candidato.
+3. **Regras v1** (seção 4) e cronologia contra a 1ª entrada comprovada no CRM: a menor data entre o cadastro e o formulário do anúncio.
+4. **Persistência idempotente:**
+   - `vendas_correspondencias` guarda uma linha por venda, com status, motivo, cronologia, alertas e versão das regras.
+   - `vendas_correspondencia_leads` guarda os leads ligados, cada um com evidência e papel (vinculado, candidato ou descartado).
+   - Rodar de novo não duplica nada. O histórico (`vendas_conciliacao_log`) só ganha linha quando o status ou os leads mudam.
+5. **A decisão humana prevalece:**
+   - Confirmar, marcar "sem vínculo" ou reabrir exige justificativa. Tudo fica em `vendas_revisoes`, no histórico e na auditoria, sem dados pessoais.
+   - Um novo cruzamento **não** sobrescreve uma decisão humana. Se o automático passar a discordar, aparece um alerta para revisar.
+6. **Escopo na revisão:** só dá para confirmar leads que o revisor pode ver hoje (`rbac_leads_scope`). Lead fora da carteira aparece sem dados.
+7. **Contatos mascarados nas telas:** (11) 9••••-4321 e f•••@dominio. O suficiente para comparar.
+8. **Nada muda no CRM:** confirmar um vínculo não altera o lead, o responsável, a etapa nem as automações.
+
+### Situações na conciliação
+
+| Situação | Conta como "encontrada no CRM"? |
+|---|---|
+| Forte, por telefone, por e-mail | Sim (automática, sem conflito) |
+| Confirmada na revisão | Sim |
+| Ambígua | Não, até alguém revisar |
+| Posterior à venda | Não como conversão: a pessoa só entrou no CRM depois de comprar |
+| Sem correspondência / Sem vínculo (revisão) | Não |
+
+### Equivalências
+- **Empreendimento da planilha → empreendimento do CRM, ou "não existe no CRM":**
+  - Há sugestão só quando o nome é idêntico (sem acento e caixa) e único no CRM.
+  - A sugestão nunca é aplicada sozinha.
+  - Depois de confirmada, `vendas_externas.empreendimento_id` é preenchido.
+- **Corretor da planilha (`id_corretor`):** pode ser classificado como usuário do CRM, externo (com ou sem imobiliária parceira) ou não identificado. O prefixo do nome (CIA_, CORRETOR_…) não classifica ninguém. Essa classificação alimenta a análise de "venda por outro canal" (Fase 5).
+- **Imobiliárias parceiras:** cadastro simples, que pode ser ativado e desativado.
+
+### Testes
+- **Fase 3:** `tests/vendas_fase3_test.php`, com 61 verificações de dados fictícios. Cobre:
+  - cenários 1 a 5, 13, 14, 17 e 19 da especificação;
+  - variante do 9º dígito, lead excluído e contato secundário de WhatsApp;
+  - idempotência e histórico, e recruzamento com lead novo;
+  - permissões e escopo do revisor;
+  - confirmar, rejeitar e reabrir, com a decisão preservada no recruzamento;
+  - equivalências e isolamento entre empresas;
+  - leads intocados.
+- **Mutações:** 14 de 14 detectadas.
+- **Fluxo completo no navegador:** importação, cruzamento automático, conciliação, revisão e equivalências. Um gerente sem permissão é bloqueado nas telas, e a API responde 403.

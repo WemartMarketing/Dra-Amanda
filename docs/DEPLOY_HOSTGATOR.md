@@ -100,6 +100,7 @@ Importe pelo **phpMyAdmin** (aba *Importar*) ou pelo terminal com
 | 21 | `sql/migration_015_relatorios_exportacoes.sql` | Central de Relatórios — exportações grandes em segundo plano (cron) com link temporário (ver `docs/RELATORIOS_ETAPA5.md`) |
 | 22 | `sql/migration_016_relatorios_investimentos_modelos.sql` | Central de Relatórios — investimento em anúncios, modelos personalizados, permissão e índices de desempenho (ver `docs/RELATORIOS_ETAPA6.md`) |
 | 23 | `sql/migration_017_vendas_importacao.sql` | Inteligência de Vendas — lotes de importação, vendas externas, histórico de alterações e permissões `importar_vendas` / `ver_inteligencia_vendas` (ver `docs/INTELIGENCIA_VENDAS.md`) |
+| 24 | `sql/migration_018_vendas_cruzamento.sql` | Inteligência de Vendas — índice de contatos, cruzamento venda × CRM, revisão humana, histórico, equivalências, imobiliárias parceiras e permissão `revisar_correspondencias` (ver `docs/INTELIGENCIA_VENDAS.md`) |
 
 - Atualizando um servidor que já funciona: rode, na ordem, só os arquivos
   que ainda não rodou. Ex.: quem já rodou até o 17 roda apenas o **18**.

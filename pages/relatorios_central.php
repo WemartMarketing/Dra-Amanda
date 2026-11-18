@@ -53,7 +53,9 @@ $cat = [
         ['Transferências (detalhe)', 'Transferências por motivo e pela estrutura anterior, com a série no tempo.', '/pages/relatorios.php', true],
     ],
     'vendas' => [
+        ['Conciliação de vendas', 'Vendas importadas × leads do CRM: encontradas, ambíguas para revisar, sem correspondência e posteriores à venda.', '/pages/vendas_conciliacao.php', $tem('ver_inteligencia_vendas')],
         ['Importar vendas', 'Planilha de vendas do sistema comercial (HM): mapeamento, validação, prévia e histórico de lotes.', '/pages/vendas_importar.php', $tem('importar_vendas')],
+        ['Equivalências', 'Empreendimentos e corretores do sistema comercial × cadastros do CRM; imobiliárias parceiras.', '/pages/vendas_equivalencias.php', $tem('revisar_correspondencias')],
     ],
     'auditoria' => [
         ['Auditoria', 'Quem fez o quê, inclusive exportações.', '/pages/auditoria.php', $tem('visualizar_auditoria')],
