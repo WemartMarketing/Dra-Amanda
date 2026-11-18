@@ -132,7 +132,8 @@ require __DIR__ . '/../includes/layout_start.php';
                         <td class="num" data-rotulo="Leads"><?= (int) $v['n_leads'] ?: '—' ?></td>
                         <td data-rotulo="Entrada no CRM"><?= $v['primeira_entrada_em'] ? date('d/m/Y', strtotime($v['primeira_entrada_em'])) : '—' ?></td>
                         <td class="num" data-rotulo="Dias até a compra"><?= $dias !== null ? $dias : '—' ?></td>
-                        <td><a class="btn <?= $v['sit'] === 'ambigua' && $podeRevisar ? 'btn-primary' : 'btn-outline' ?> btn-sm" href="/pages/vendas_revisao.php?id=<?= (int) $v['id'] ?>"><?= $v['sit'] === 'ambigua' && $podeRevisar ? 'Revisar' : 'Ver' ?></a></td>
+                        <td class="vendas-acoes-linha"><?php if (in_array($v['sit'], ['forte', 'telefone', 'email', 'confirmada', 'posterior'], true)): ?><a class="btn btn-primary btn-sm" href="/pages/vendas_jornada.php?id=<?= (int) $v['id'] ?>">Ver jornada</a><?php endif; ?>
+                            <a class="btn <?= $v['sit'] === 'ambigua' && $podeRevisar ? 'btn-primary' : 'btn-outline' ?> btn-sm" href="/pages/vendas_revisao.php?id=<?= (int) $v['id'] ?>"><?= $v['sit'] === 'ambigua' && $podeRevisar ? 'Revisar' : 'Correspondência' ?></a></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

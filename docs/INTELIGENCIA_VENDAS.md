@@ -8,7 +8,7 @@ com os leads, atendimentos, corretores, campanhas e históricos do WeMart Sales.
 | 1 | Análise da planilha, do banco e da arquitetura; leitor e normalizador; regras de correspondência v1; diagnóstico só-leitura | **concluída** |
 | 2 | Importação: upload, mapeamento, validação, prévia, lotes, duplicidade, histórico de alterações | **concluída** |
 | 3 | Cruzamento persistido: índice de contatos, candidatos, revisão humana, auditoria, reprocessamento | **concluída** |
-| 4 | Jornada do Cliente: linha do tempo e tempos (jornada, responsabilidade, interação) | — |
+| 4 | Jornada do Cliente: linha do tempo e tempos (jornada, responsabilidade, interação) | **concluída** |
 | 5 | Painel de conciliação, resultados detalhados e relatórios especializados | — |
 | 6 | Exportações (Excel, CSV, PDF), testes de integridade e segurança | — |
 
@@ -268,3 +268,88 @@ O cruzamento roda **sozinho depois de cada importação** (passo 8 do fluxo) e n
   - leads intocados.
 - **Mutações:** 14 de 14 detectadas.
 - **Fluxo completo no navegador:** importação, cruzamento automático, conciliação, revisão e equivalências. Um gerente sem permissão é bloqueado nas telas, e a API responde 403.
+
+---
+
+## 11. Fase 4 — Jornada do Cliente (concluída)
+
+**Tela:** `/pages/vendas_jornada.php?id=<venda>`, aberta pelo botão "Ver jornada" na Conciliação e na Revisão. Exige a permissão `ver_inteligencia_vendas`.
+
+### De onde vêm os dados
+Não há tabela nova. A Jornada é montada **na leitura** (`includes/vendas/jornada.php`) e não grava nada. Ela junta o que já está no CRM:
+
+| Evento | Fonte |
+|---|---|
+| Cadastro, origem, UTMs, formulário do anúncio | `leads` (+ `lead_origens`, `meta_anuncios`) |
+| Lista de oferta ativa | `leads.oferta_lista_id` → `oferta_listas` |
+| Distribuição, 1º atendimento, 1º contato efetivo, responsáveis | `lead_atribuicoes` |
+| Transferências (com motivo) | `lead_transferencias` |
+| Etapas do Kanban e tempo em cada uma | `lead_etapa_historico` |
+| Ligação, WhatsApp aberto pelo corretor, contato registrado | `lead_eventos` |
+| Visitas agendadas e realizadas | `agenda_compromissos` |
+| Mensagens do cliente e do corretor (agrupadas por dia) | `whatsapp_mensagens` |
+| Campanhas de remarketing recebidas | `whatsapp_campanha_destinatarios` |
+| Jornadas automáticas | `jornada_execucoes` |
+| Contrato registrado no CRM | `lead_contratos` |
+| Venda | `vendas_externas` (marcada como **importada**) |
+
+**Natureza de cada evento:**
+- **Registrado:** gravado pelo CRM na hora.
+- **Importado:** vem do sistema comercial.
+- **Reconstruído:** gerado depois pela retroalimentação, não observado na hora.
+
+Eventos depois da venda ficam num bloco separado e não entram nas métricas.
+
+### Quem vê o quê (regra de acesso após transferência)
+- **Leads da jornada:** só os **vinculados** à venda (automático sem conflito ou confirmado na revisão). Os descartados na revisão nunca aparecem.
+- **Carteira atual:** desses, só entram os que o usuário pode consultar **hoje** (`rbac_leads_scope`). As outras oportunidades ficam ocultas, com um aviso de quantas são.
+- **Sem lead visível:** a jornada individual não aparece. Os números agregados continuam disponíveis nos relatórios.
+
+### Indicadores (separados de propósito)
+- **Tempo decorrido:** dias da 1ª entrada comprovada no CRM até a venda, só quando a pessoa já estava no CRM antes. Também mostra dias até o 1º atendimento humano, do 1º atendimento à venda, da 1ª visita realizada à venda e da última interação à venda.
+- **Tempo de responsabilidade:** dias com cada corretor, cortados na data da venda.
+- **Interação efetiva:** quantidade de **dias** com contato registrado, resposta do cliente ou visita. Não confundir com tempo de jornada.
+- **Contagens:** transferências, redistribuições por inatividade, tentativas de contato, respostas no WhatsApp, visitas, campanhas e jornadas automáticas **antes** da venda.
+- **Oferta ativa:** "Sim" quando há registro. Sem registro, aparece como "sem registro" e não é presumida.
+- **Períodos sem interação:** intervalos de mais de 30 dias sem interação humana. Campanha automática não conta como interação.
+
+### Entrada × compra
+- **O que mostra:** todos os interesses em ordem (1º, intermediários) e o empreendimento comprado, com o resultado "mesmo", "diferente" ou "indisponível".
+- **Quando fica indisponível:** sem equivalência do empreendimento comprado, ou sem interesse registrado no lead.
+- **Nenhum interesse é eleito como responsável pela venda.**
+
+### Origem × mídia da venda
+- **Lado a lado:** a 1ª origem no CRM (e a última antes da compra), as UTMs e o anúncio com a prévia do criativo (o mesmo card da ficha do lead) aparecem ao lado da **mídia declarada na venda**.
+- **Uma não substitui a outra:** a diferença entre as duas não é tratada como erro.
+- **Anúncio ausente:** quando falta, aparece "não disponível".
+
+### Classificação comercial (análise gerencial, sem crédito nem culpa)
+
+| Classificação | Quando |
+|---|---|
+| Venda pelo responsável do CRM | O vendedor (equivalência confirmada) era um dos responsáveis no CRM na data da venda |
+| Venda por outro corretor da mesma equipe | O vendedor é usuário do CRM da mesma equipe de um dos responsáveis na data |
+| Venda por outra equipe | O vendedor é usuário do CRM de outra equipe |
+| Venda por canal externo identificado | A equivalência do vendedor está marcada como "externo" |
+| Responsável pela venda não identificado | Vendedor sem equivalência ou marcado como "não identificado" |
+| Sem histórico do responsável na data da venda | Não há atribuição registrada que cubra a data |
+| Correspondência pendente de revisão | A venda está ambígua |
+| Cliente não estava no CRM antes da venda | Cruzamento "posterior" ou sem vínculo |
+
+O prefixo do nome do corretor nunca decide nada: só vale a equivalência confirmada por uma pessoa.
+
+### Histórico incompleto
+A tela avisa quando:
+- falta histórico de distribuição: o 1º corretor fica "não disponível" e **não** se usa o responsável atual no lugar;
+- falta histórico de etapas;
+- parte do histórico foi reconstruída;
+- o lead veio do Meta Ads sem o anúncio registrado.
+
+### Testes
+- **Fase 4:** `tests/vendas_fase4_test.php`, com 50 verificações. Usa um cliente fictício completo, com dois interesses, transferência por inatividade, oferta ativa, visita, WhatsApp, campanhas antes e depois da venda e jornada automática. Cobre:
+  - cenários 5 a 12, 14, 15 e 18 da especificação;
+  - lead descartado na revisão;
+  - isolamento entre empresas;
+  - histórico incompleto.
+- **Mutações:** 15 de 15 detectadas.
+- **Fluxo completo no navegador:** computador e celular, a 390px sem rolagem lateral. Um gerente sem permissão é bloqueado.

@@ -86,6 +86,7 @@ require __DIR__ . '/../includes/layout_start.php';
     </div>
 </div>
 
+<?php if ($venda && $corr && (int) $corr['vinculada']): ?><div class="actions vendas-jornada-link"><a class="btn btn-primary" href="/pages/vendas_jornada.php?id=<?= (int) $venda['id'] ?>"><?= icon('clock') ?>Ver jornada do cliente</a></div><?php endif; ?>
 <?php if (!$venda): ?>
     <div class="card stub-card"><div class="stub-icon"><?= icon('alert') ?></div><h2>Venda não encontrada</h2><p>Ela não existe ou é de outra empresa.</p></div>
 <?php else: ?>

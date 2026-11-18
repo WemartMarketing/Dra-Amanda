@@ -1986,3 +1986,51 @@ a.kpi:hover { box-shadow: 0 0 0 2px #dcd9ff, var(--shadow); }
 }
 .vendas-contato.is-variante { background: #fdf3e1; color: #a26a0b; text-decoration: none; }
 .vendas-equiv-form select, .vendas-busca input[type=search] { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 14px; background: #fff; color: var(--ink); font-family: inherit; }
+
+/* ---------- Inteligência de Vendas (Jornada do Cliente) ---------- */
+.jv-incompleto { align-items: flex-start; }
+.jv-incompleto ul { margin: 6px 0 0; padding-left: 18px; }
+.jv-kpis .kpi-value { font-size: 30px; }
+.jv-fluxo { list-style: none; margin: 0; padding: 0; position: relative; }
+.jv-fluxo li { position: relative; padding: 0 0 18px 26px; display: flex; flex-direction: column; gap: 2px; }
+.jv-fluxo li::before { content: ''; position: absolute; left: 6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--line); border: 2px solid var(--accent); box-sizing: border-box; }
+.jv-fluxo li:not(:last-child)::after { content: ''; position: absolute; left: 10px; top: 18px; bottom: 2px; width: 2px; background: var(--line); }
+.jv-fluxo li.is-compra::before { background: var(--green); border-color: var(--green); }
+.jv-fluxo li.is-depois { opacity: .55; }
+.jv-fluxo-rot { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.jv-resultado { margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.jv-nota { font-size: 13px; margin-top: 12px; }
+.jv-vendedor { margin-bottom: 14px; }
+.jv-depois td { opacity: .55; }
+.jv-barras { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+.jv-barras li { display: grid; grid-template-columns: minmax(110px, 38%) 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
+.jv-barra { height: 8px; background: #eef0f6; border-radius: 99px; overflow: hidden; }
+.jv-barra i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.jv-tl { list-style: none; margin: 0; padding: 0; position: relative; }
+.jv-tl::before { content: ''; position: absolute; left: 17px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+.jv-ev { position: relative; display: flex; gap: 14px; padding: 8px 0; }
+.jv-ic { position: relative; z-index: 1; flex: none; width: 36px; height: 36px; border-radius: 50%; background: #f1f0ff; color: var(--accent); display: grid; place-items: center; border: 3px solid var(--surface); }
+.jv-ic svg { width: 16px; height: 16px; }
+.jv-venda .jv-ic { background: var(--green); color: #fff; }
+.jv-remarketing .jv-ic, .jv-automacao .jv-ic { background: #fff4e0; color: #b7791f; }
+.jv-transferencia .jv-ic { background: #e9f1ff; color: #3567c9; }
+.jv-whatsapp_cliente .jv-ic { background: #e7f6f0; color: var(--green); }
+.jv-corpo { display: flex; flex-direction: column; gap: 2px; padding-top: 2px; min-width: 0; }
+.jv-topo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.jv-lead { padding: 1px 8px; border-radius: 99px; background: #f3f4f8; color: #4b5570; }
+.jv-det { color: #5b6378; font-size: 13px; overflow-wrap: anywhere; }
+.jv-venda b { color: var(--green); }
+.jv-depois-bloco { margin-top: 10px; }
+.jv-depois-bloco summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.jv-depois-bloco .jv-ev { opacity: .65; }
+@media (max-width: 640px) {
+    .jv-kpis .kpi-value { font-size: 24px; }
+    .jv-barras li { grid-template-columns: 1fr auto; }
+    .jv-barras .jv-barra { grid-column: 1 / -1; order: 3; }
+}
+.vendas-acoes-linha { white-space: nowrap; display: flex; gap: 6px; justify-content: flex-end; }
+.vendas-jornada-link { margin: -6px 0 16px; }
+.jv-etapas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.jv-etapas ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.jv-etapas li { display: inline-flex; gap: 6px; align-items: baseline; padding: 4px 10px; border-radius: 99px; background: #f3f4f8; font-size: 13px; }
+.jv-resultado .pill { white-space: normal; text-align: left; line-height: 1.35; }
